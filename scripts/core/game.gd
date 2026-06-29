@@ -679,6 +679,10 @@ func _assign_ai_tasks():
 		if tasks.is_empty():
 			break
 		
+		# 超重角色不分配采集/制作/建造任务，先让它们去存放
+		if settler.is_overweight():
+			continue
+		
 		var sid = settler.settler_id
 		
 		# 找到该定居者允许做的、距离最近的最高优先级任务

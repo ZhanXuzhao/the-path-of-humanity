@@ -344,7 +344,7 @@ func _tick_harvest():
 	# 采集到背包（优先放入个人背包）
 	inventory.add_item(item_id, amount)
 	
-	# 检查是否超重，超重则去置物架存放
+	# 检查是否超重——超重时去存放，但每次存放更多物品以减少往返次数
 	if is_overweight():
 		complete_task()
 		return
@@ -782,36 +782,14 @@ func _store_excess_to_storage():
 		if bld.inventory == null or bld.inventory.is_full():
 			continue
 		
-		# 把背包物品转移到置物架（只转移超重部分）
-		var to_store = []
-		var weight = get_inventory_weight()
-		var target_weight = carry_capacity * 0.7  # 降到70%负重
-		
+		# 把背包物品转移到置物架（清空背包）
 		for i in range(inventory.items.size() - 1, -1, -1):
-			if weight <= target_weight:
-				break
 			var stack = inventory.items[i]
 			if stack == null:
 				continue
-			var data = stack.get_data()
-			if data == null:
-				continue
-			var stack_weight = data.weight * stack.amount
-			if weight - stack_weight >= target_weight:
-				# 整组转移
-				var remaining = bld.inventory.add_item(stack.item_id, stack.amount)
-				if remaining < stack.amount:
-					inventory.remove_item(stack.item_id, stack.amount - remaining)
-					weight -= stack_weight - remaining * data.weight
-			else:
-				# 转移部分
-				var move_count = floori((weight - target_weight) / data.weight)
-				move_count = max(1, move_count)
-				var remaining = bld.inventory.add_item(stack.item_id, move_count)
-				var actual = move_count - remaining
-				if actual > 0:
-					inventory.remove_item(stack.item_id, actual)
-					weight -= actual * data.weight
+			var remaining = bld.inventory.add_item(stack.item_id, stack.amount)
+			if remaining < stack.amount:
+				inventory.remove_item(stack.item_id, stack.amount - remaining)
 		
 		if not is_overweight():
 			break
@@ -829,34 +807,14 @@ func _store_excess_to_storage_at(bld_pos: Vector2i):
 		_auto_store_overweight()
 		return
 	
-	var target_weight = carry_capacity * 0.7  # 降到70%负重
-	var weight = get_inventory_weight()
-	
+	# 清空背包——把背包中所有物品转移到置物架
 	for i in range(inventory.items.size() - 1, -1, -1):
-		if weight <= target_weight:
-			break
 		var stack = inventory.items[i]
 		if stack == null:
 			continue
-		var data = stack.get_data()
-		if data == null:
-			continue
-		var stack_weight = data.weight * stack.amount
-		if weight - stack_weight >= target_weight:
-			# 整组转移
-			var remaining = bld.inventory.add_item(stack.item_id, stack.amount)
-			if remaining < stack.amount:
-				inventory.remove_item(stack.item_id, stack.amount - remaining)
-				weight -= stack_weight - remaining * data.weight
-		else:
-			# 转移部分
-			var move_count = floori((weight - target_weight) / data.weight)
-			move_count = max(1, move_count)
-			var remaining = bld.inventory.add_item(stack.item_id, move_count)
-			var actual = move_count - remaining
-			if actual > 0:
-				inventory.remove_item(stack.item_id, actual)
-				weight -= actual * data.weight
+		var remaining = bld.inventory.add_item(stack.item_id, stack.amount)
+		if remaining < stack.amount:
+			inventory.remove_item(stack.item_id, stack.amount - remaining)
 
 func _auto_store_overweight():
 	"""超重时自动寻找最近的置物架，创建搬运任务走过去存放"""
