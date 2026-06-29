@@ -84,6 +84,8 @@ func _ready():
 # 定居者信息面板相关变量
 var _tracked_settler = null
 var _need_bars: Dictionary = {}  # need_id -> ProgressBar
+var _inventory_weight_label: Label
+var _inventory_container: VBoxContainer
 
 func _settler_info_connections():
 	var game = get_node("/root/Game")
@@ -98,6 +100,51 @@ func _on_settler_selected(settler):
 	settler_info_panel.visible = true
 	_tracked_settler = settler
 	_build_settler_info_ui(settler)
+
+func _update_inventory_display(settler):
+	"""更新背包显示内容和负重情况"""
+	if not is_instance_valid(settler) or not is_instance_valid(_inventory_weight_label):
+		return
+	
+	var weight = settler.get_inventory_weight()
+	var cap = settler.carry_capacity
+	var pct = minf(weight / max(cap, 1.0), 1.0) * 100.0
+	
+	# 负重显示
+	var weight_color = Color(0.9, 0.9, 0.6)
+	if pct >= 90.0:
+		weight_color = Color(1.0, 0.3, 0.3)
+	elif pct >= 70.0:
+		weight_color = Color(1.0, 0.8, 0.2)
+	_inventory_weight_label.add_theme_color_override("font_color", weight_color)
+	_inventory_weight_label.text = "负重: %.1f/%.1f (%.0f%%)" % [weight, cap, pct]
+	
+	# 物品列表
+	for child in _inventory_container.get_children():
+		child.queue_free()
+	
+	if settler.inventory == null or settler.inventory.is_empty():
+		var empty_label = Label.new()
+		empty_label.text = "  (背包为空)"
+		empty_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+		empty_label.add_theme_constant_override("minimum_font_size", 11)
+		_inventory_container.add_child(empty_label)
+		return
+	
+	for stack in settler.inventory.items:
+		var item_data = ItemDefinitions.get_item(stack.item_id)
+		var name_str = item_data.name if item_data else stack.item_id
+		var hbox = HBoxContainer.new()
+		var icon_label = Label.new()
+		icon_label.text = "•"
+		icon_label.custom_minimum_size = Vector2(16, 0)
+		var name_label = Label.new()
+		name_label.text = "%s × %d" % [name_str, stack.amount]
+		name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+		name_label.add_theme_constant_override("minimum_font_size", 11)
+		hbox.add_child(icon_label)
+		hbox.add_child(name_label)
+		_inventory_container.add_child(hbox)
 
 func _on_settler_deselected():
 	"""取消选中时隐藏信息面板"""
@@ -176,7 +223,7 @@ func _build_settler_info_ui(settler):
 		return
 	
 	settler_name_label.text = settler.settler_name
-	settler_state_label.text = "状态: " + Settler.get_state_display(settler.state)
+	settler_state_label.text = "状态: " + Settler.get_state_display(settler.state, settler.current_task if settler.current_task else {})
 	settler_hp_label.text = "生命:"
 	settler_hp_bar.max_value = settler.max_hp
 	settler_hp_bar.value = settler.hp
@@ -212,6 +259,20 @@ func _build_settler_info_ui(settler):
 		hbox.add_child(bar)
 		settler_needs_container.add_child(hbox)
 		_need_bars[need_id] = bar
+	
+	# -------- 背包/负重区域 --------
+	var inv_sep = HSeparator.new()
+	settler_needs_container.add_child(inv_sep)
+	
+	_inventory_weight_label = Label.new()
+	_inventory_weight_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.6))
+	_inventory_weight_label.add_theme_constant_override("minimum_font_size", 12)
+	settler_needs_container.add_child(_inventory_weight_label)
+	
+	_inventory_container = VBoxContainer.new()
+	settler_needs_container.add_child(_inventory_container)
+	
+	_update_inventory_display(settler)
 
 func _process(delta):
 	if fps_label:
@@ -220,7 +281,7 @@ func _process(delta):
 	# 选中定居者时实时更新信息面板
 	if settler_info_panel.visible and is_instance_valid(_tracked_settler):
 		var s = _tracked_settler
-		settler_state_label.text = "状态: " + Settler.get_state_display(s.state)
+		settler_state_label.text = "状态: " + Settler.get_state_display(s.state, s.current_task if s.current_task else {})
 		settler_hp_bar.max_value = s.max_hp
 		settler_hp_bar.value = s.hp
 		# 更新需求条数值
@@ -228,6 +289,8 @@ func _process(delta):
 			var bar = _need_bars[need_id]
 			if is_instance_valid(bar):
 				bar.value = s.needs.get(need_id, 0.0)
+		# 更新背包显示
+		_update_inventory_display(s)
 	elif settler_info_panel.visible and not is_instance_valid(_tracked_settler):
 		# 如果选中的定居者已死亡/消失，自动隐藏面板
 		_on_settler_deselected()

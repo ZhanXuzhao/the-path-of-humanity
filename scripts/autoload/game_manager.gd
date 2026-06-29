@@ -68,8 +68,6 @@ func _ready():
 	process_mode = PROCESS_MODE_ALWAYS
 	_load_settings()
 	_setup_autosave()
-	# 窗口关闭时自动保存
-	get_tree().root.close_requested.connect(_on_close_requested)
 
 func _load_settings():
 	"""从 res://resources/game_settings.cfg 加载游戏设置"""
@@ -111,10 +109,6 @@ func _load_settings():
 	settings["combat_priority"] = cfg.get_value("work", "combat_priority", 1)
 	
 	print("游戏设置已加载")
-
-func _on_close_requested():
-	save_game(true)
-	get_tree().quit()
 
 func _setup_autosave():
 	# 每分钟自动存档计时器

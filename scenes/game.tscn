@@ -147,14 +147,14 @@ anchors_preset = 0
 offset_left = 8.0
 offset_top = 400.0
 offset_right = 260.0
-offset_bottom = 664.0
+offset_bottom = 928.0
 theme_override_styles/panel = SubResource(2)
 
 [node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/SettlerInfoPanel"]
 offset_left = 4.0
 offset_top = 4.0
 offset_right = 248.0
-offset_bottom = 260.0
+offset_bottom = 524.0
 
 [node name="VBox" type="VBoxContainer" parent="UI/HUD/SettlerInfoPanel/ScrollContainer"]
 offset_left = 0.0

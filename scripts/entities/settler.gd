@@ -188,16 +188,45 @@ func _draw():
 		# 选择光环
 		draw_arc(Vector2.ZERO, TILE_SIZE * 0.55, 0, TAU, 36, Color(0.3, 0.8, 1.0, 0.9), 2.5)
 
-static func get_state_display(state_val: int) -> String:
+# 根据任务数据获取工作类别显示文字
+static func get_work_type_from_task(current_task: Dictionary) -> String:
+	"""从任务数据中提取工作类别名称"""
+	if current_task.is_empty():
+		return ""
+	var task_type = current_task.get("type", "")
+	match task_type:
+		"HARVEST":
+			var skill = current_task.get("skill", "")
+			match skill:
+				"mining": return "采矿"
+				"woodcutting": return "伐木"
+				_: return "采集"
+		"CONSTRUCT": return "建造"
+		"CRAFT": return "制作"
+		"STORE": return "搬运"
+		"RESEARCH": return "研究"
+		"COMBAT": return "战斗"
+		_: return ""
+
+static func get_state_display(state_val: int, current_task: Dictionary = {}) -> String:
 	"""将状态枚举转换为中文显示文字"""
 	match state_val:
-		SettlerState.IDLE: return "空闲"
-		SettlerState.MOVING: return "移动中"
-		SettlerState.WORKING: return "工作中"
+		SettlerState.IDLE: return "无工作"
+		SettlerState.MOVING:
+			var work_name = get_work_type_from_task(current_task)
+			if work_name != "":
+				return work_name + "中"
+			return "移动中"
+		SettlerState.WORKING:
+			var work_name = get_work_type_from_task(current_task)
+			if work_name != "":
+				return work_name + "中"
+			return "工作中"
 		SettlerState.EATING: return "进食中"
 		SettlerState.SLEEPING: return "睡眠中"
 		SettlerState.FLEEING: return "逃跑中"
 		SettlerState.COMBAT: return "战斗中"
+		_: return "未知"
 		_: return "未知"
 
 # -------- 移动系统 --------
@@ -288,9 +317,10 @@ func _tick_harvest():
 	# 采集到背包（优先放入个人背包）
 	inventory.add_item(item_id, amount)
 	
-	# 检查是否超重，超重则自动存储到附近置物架
+	# 检查是否超重，超重则去置物架存放
 	if is_overweight():
-		_store_excess_to_storage()
+		complete_task()
+		return
 	
 	# 增加经验
 	add_skill_experience(current_task.get("skill", ""), 1.0)
@@ -459,6 +489,73 @@ func _store_excess_to_storage():
 		if not is_overweight():
 			break
 
+func _store_excess_to_storage_at(bld_pos: Vector2i):
+	"""将背包中超重的部分存入指定建筑"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		_dump_inventory_to_global()
+		return
+	
+	var bld = game.building_system.get_building_at(bld_pos)
+	if bld == null or bld.inventory == null:
+		_dump_inventory_to_global()
+		return
+	
+	var target_weight = carry_capacity * 0.7  # 降到70%负重
+	var weight = get_inventory_weight()
+	
+	for i in range(inventory.items.size() - 1, -1, -1):
+		if weight <= target_weight:
+			break
+		var stack = inventory.items[i]
+		if stack == null:
+			continue
+		var data = stack.get_data()
+		if data == null:
+			continue
+		var stack_weight = data.weight * stack.amount
+		if weight - stack_weight >= target_weight:
+			# 整组转移
+			var remaining = bld.inventory.add_item(stack.item_id, stack.amount)
+			if remaining < stack.amount:
+				inventory.remove_item(stack.item_id, stack.amount - remaining)
+				weight -= stack_weight - remaining * data.weight
+		else:
+			# 转移部分
+			var move_count = floori((weight - target_weight) / data.weight)
+			move_count = max(1, move_count)
+			var remaining = bld.inventory.add_item(stack.item_id, move_count)
+			var actual = move_count - remaining
+			if actual > 0:
+				inventory.remove_item(stack.item_id, actual)
+				weight -= actual * data.weight
+
+func _auto_store_overweight():
+	"""超重时自动寻找最近的置物架，创建搬运任务走过去存放"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		_dump_inventory_to_global()
+		return
+	
+	var storage_buildings = _find_nearby_storage()
+	if storage_buildings.is_empty():
+		_dump_inventory_to_global()
+		return
+	
+	# 找最近的置物架
+	var best_bld = storage_buildings[0]
+	var center_pos = _bld_world_center(best_bld)
+	
+	# 创建搬运任务——走到置物架后自动存放超重物品
+	current_task = {
+		"type": "STORE",
+		"target_bld_pos": best_bld.grid_pos,
+		"target_world_pos": center_pos,
+		"skill": "",
+	}
+	target_world_pos = center_pos
+	state = SettlerState.MOVING
+
 func _dump_inventory_to_global():
 	"""背包物品全部上交全局资源（兜底方案）"""
 	var gm = get_node("/root/GameManager")
@@ -522,21 +619,25 @@ func _tick_store():
 	var item_id: String = current_task.get("item_id", "")
 	var amount: int = current_task.get("amount", 0)
 	
-	if item_id == "" or amount <= 0:
-		complete_task()
-		return
-	
-	# 从背包移除物品并存入建筑
 	var bld = game.building_system.get_building_at(target_bld_pos)
 	if bld == null or bld.inventory == null:
 		complete_task()
 		return
 	
-	var removed = inventory.remove_item(item_id, amount)
-	if removed > 0:
-		bld.inventory.add_item(item_id, removed)
-	
-	complete_task()
+	if item_id != "" and amount > 0:
+		# 指定物品——仅搬运指定物品
+		var removed = inventory.remove_item(item_id, amount)
+		if removed > 0:
+			bld.inventory.add_item(item_id, removed)
+		complete_task()
+	else:
+		# 未指定物品——自动存放所有超重部分
+		_store_excess_to_storage_at(target_bld_pos)
+		# 如果还超重，继续搬运
+		if is_overweight():
+			_auto_store_overweight()
+		else:
+			complete_task()
 
 # -------- 睡眠系统 --------
 func try_sleep(bld_pos: Vector2i, world_pos: Vector2):
@@ -846,6 +947,10 @@ func complete_task():
 		task_completed.emit(current_task.get("id", ""))
 	current_task = null
 	state = SettlerState.IDLE
+	
+	# 如果超重，自动寻找置物架去存放物品
+	if is_overweight():
+		_auto_store_overweight()
 
 # -------- 伤害系统 --------
 func take_damage(amount: float):
