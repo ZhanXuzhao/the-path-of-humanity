@@ -255,8 +255,9 @@ func _get_camera_world_rect() -> Rect2:
 	var cam_center = _camera.position
 	
 	# 视口大小（世界坐标）
-	var view_w = view_size.x * zoom.x
-	var view_h = view_size.y * zoom.y
+	# 当 zoom > 1（放大）时看到的世界范围变小，所以用除法
+	var view_w = view_size.x / zoom.x
+	var view_h = view_size.y / zoom.y
 	
 	return Rect2(
 		Vector2(cam_center.x - view_w / 2.0, cam_center.y - view_h / 2.0),
