@@ -1,5 +1,5 @@
 # 库存系统 - Inventory System
-# 管理物品的存储、堆叠、转移
+# 管理物品的存储、转移（按物品种类记录总数，不区分堆叠）
 class_name Inventory
 extends RefCounted
 
@@ -7,42 +7,9 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 
 signal items_changed
 
-var items: Array[ItemStack] = []  # 库存中的物品堆
-var max_slots: int = 30           # 最大格子数
-var capacity: int = 0             # 最大容量 (0=不限)
-
-# 物品堆结构
-class ItemStack:
-	var item_id: String
-	var amount: int
-	
-	func _init(id: String, amt: int = 1):
-		item_id = id
-		amount = amt
-	
-	func get_data():
-		return ItemDefinitions.get_item(item_id)
-	
-	func is_full() -> bool:
-		var data = get_data()
-		if data == null:
-			return true
-		return amount >= data.max_stack
-	
-	func can_add(_amt: int = 1) -> int:
-		var data = get_data()
-		if data == null:
-			return 0
-		return data.max_stack - amount
-	
-	func add(amt: int) -> int:
-		var data = get_data()
-		if data == null:
-			return amt
-		var can_add_amt = data.max_stack - amount
-		var to_add = min(can_add_amt, amt)
-		amount += to_add
-		return amt - to_add  # 返回剩余未添加的数量
+var items: Dictionary = {}  # item_id -> total_amount，每种物品只占一条
+var max_slots: int = 30     # 最大物品种类数
+var capacity: int = 0       # 最大总物品数 (0=不限)
 
 func _init(slots: int = 30, cap: int = 0):
 	max_slots = slots
@@ -58,58 +25,47 @@ func add_item(item_id: String, amount: int = 1) -> int:
 	if item_def == null or item_def.id == "":
 		return amount
 	
-	var remaining = amount
+	# 容量上限检查
+	if capacity > 0:
+		var current_total = get_total_items()
+		var can_add = capacity - current_total
+		if can_add <= 0:
+			return amount
+		amount = mini(amount, can_add)
 	
-	# 先尝试堆叠到现有的同类型物品堆
-	for stack in items:
-		if stack.item_id == item_id and not stack.is_full():
-			remaining = stack.add(remaining)
-			if remaining <= 0:
-				emit_signal("items_changed")
-				return 0
+	# 种类上限检查（仅新增物品种类时）
+	if not items.has(item_id) and items.size() >= max_slots:
+		return amount
 	
-	# 如果还有剩余，创建新堆叠
-	while remaining > 0 and items.size() < max_slots:
-		var new_stack := ItemStack.new(item_id)
-		remaining = new_stack.add(remaining)
-		items.append(new_stack)
-	
+	items[item_id] = items.get(item_id, 0) + amount
 	emit_signal("items_changed")
-	return remaining
+	return 0
 
 func remove_item(item_id: String, amount: int = 1) -> int:
 	"""移除物品，返回实际移除的数量"""
-	var removed = 0
-	for i in range(items.size() - 1, -1, -1):
-		if items[i].item_id == item_id:
-			var stack = items[i]
-			var to_remove = min(stack.amount, amount - removed)
-			stack.amount -= to_remove
-			removed += to_remove
-			if stack.amount <= 0:
-				items.remove_at(i)
-			if removed >= amount:
-				break
+	if not items.has(item_id) or items[item_id] <= 0:
+		return 0
 	
-	if removed > 0:
-		emit_signal("items_changed")
-	return removed
+	var available = items[item_id]
+	var to_remove = mini(available, amount)
+	items[item_id] = available - to_remove
+	if items[item_id] <= 0:
+		items.erase(item_id)
+	
+	emit_signal("items_changed")
+	return to_remove
 
 # -------- 查询 --------
 func has_item(item_id: String, amount: int = 1) -> bool:
-	return get_item_count(item_id) >= amount
+	return items.get(item_id, 0) >= amount
 
 func get_item_count(item_id: String) -> int:
-	var total = 0
-	for stack in items:
-		if stack.item_id == item_id:
-			total += stack.amount
-	return total
+	return items.get(item_id, 0)
 
 func get_total_items() -> int:
 	var total = 0
-	for stack in items:
-		total += stack.amount
+	for amt in items.values():
+		total += amt
 	return total
 
 func is_empty() -> bool:
@@ -126,22 +82,27 @@ func clear():
 
 # -------- 序列化 --------
 func to_dict() -> Dictionary:
-	var data = {
+	return {
 		"max_slots": max_slots,
 		"capacity": capacity,
-		"items": []
+		"items": items.duplicate(),
 	}
-	for stack in items:
-		data.items.append({
-			"id": stack.item_id,
-			"amount": stack.amount
-		})
-	return data
 
 func from_dict(data: Dictionary):
 	max_slots = data.get("max_slots", 30)
 	capacity = data.get("capacity", 0)
 	items.clear()
-	for item_data in data.get("items", []):
-		var stack := ItemStack.new(item_data.id, item_data.amount)
-		items.append(stack)
+	var raw_items = data.get("items", {})
+	if raw_items is Array:
+		# 兼容旧存档：items 为 [{id, amount}, ...] 格式
+		for entry in raw_items:
+			var item_id = entry.get("id", "")
+			var amt = entry.get("amount", 0)
+			if item_id != "" and amt > 0:
+				items[item_id] = items.get(item_id, 0) + amt
+	else:
+		# 新存档：items 为 {item_id: amount, ...} 格式
+		for item_id in raw_items:
+			var amt = raw_items[item_id]
+			if amt > 0:
+				items[item_id] = amt

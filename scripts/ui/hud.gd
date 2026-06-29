@@ -171,15 +171,17 @@ func _update_inventory_display(settler):
 		_inventory_container.add_child(empty_label)
 		return
 	
-	for stack in settler.inventory.items:
-		var item_data = ItemDefinitions.get_item(stack.item_id)
-		var name_str = item_data.name if item_data else stack.item_id
+	# 显示物品种类及总数（ inventories 现已按种类汇总）
+	for item_id in settler.inventory.items:
+		var total = settler.inventory.items[item_id]
+		var item_data = ItemDefinitions.get_item(item_id)
+		var name_str = item_data.name if item_data else item_id
 		var hbox = HBoxContainer.new()
 		var icon_label = Label.new()
 		icon_label.text = "•"
 		icon_label.custom_minimum_size = Vector2(16, 0)
 		var name_label = Label.new()
-		name_label.text = "%s × %d" % [name_str, stack.amount]
+		name_label.text = "%s × %d" % [name_str, total]
 		name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 		name_label.add_theme_constant_override("minimum_font_size", 11)
 		hbox.add_child(icon_label)
@@ -419,15 +421,17 @@ func _update_storage_panel(bld):
 		storage_items_container.add_child(empty_label)
 		return
 	
-	for stack in bld.inventory.items:
-		var item_data = ItemDefinitions.get_item(stack.item_id)
-		var name_str = item_data.name if item_data else stack.item_id
+	# 显示物品种类及总数（ inventories 现已按种类汇总）
+	for item_id in bld.inventory.items:
+		var total = bld.inventory.items[item_id]
+		var item_data = ItemDefinitions.get_item(item_id)
+		var name_str = item_data.name if item_data else item_id
 		var hbox = HBoxContainer.new()
 		var icon_label = Label.new()
 		icon_label.text = "•"
 		icon_label.custom_minimum_size = Vector2(16, 0)
 		var name_label = Label.new()
-		name_label.text = "%s × %d" % [name_str, stack.amount]
+		name_label.text = "%s × %d" % [name_str, total]
 		name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
 		name_label.add_theme_constant_override("minimum_font_size", 12)
 		hbox.add_child(icon_label)

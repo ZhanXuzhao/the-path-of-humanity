@@ -931,10 +931,11 @@ func _tick_craft():
 func get_inventory_weight() -> float:
 	"""计算背包中所有物品的总重量"""
 	var total = 0.0
-	for stack in inventory.items:
-		var data = stack.get_data()
+	for item_id in inventory.items:
+		var amt = inventory.items[item_id]
+		var data = ItemDefinitions.get_item(item_id)
 		if data:
-			total += data.weight * stack.amount
+			total += data.weight * amt
 	return total
 
 func is_overweight() -> bool:
@@ -978,13 +979,13 @@ func _store_excess_to_storage():
 			continue
 		
 		# 把背包物品转移到置物架（清空背包）
-		for i in range(inventory.items.size() - 1, -1, -1):
-			var stack = inventory.items[i]
-			if stack == null:
+		for item_id in inventory.items.duplicate():
+			var amt = inventory.items[item_id]
+			if amt <= 0:
 				continue
-			var remaining = bld.inventory.add_item(stack.item_id, stack.amount)
-			if remaining < stack.amount:
-				inventory.remove_item(stack.item_id, stack.amount - remaining)
+			var remaining = bld.inventory.add_item(item_id, amt)
+			if remaining < amt:
+				inventory.remove_item(item_id, amt - remaining)
 		
 		if not is_overweight():
 			break
@@ -1003,13 +1004,13 @@ func _store_excess_to_storage_at(bld_pos: Vector2i):
 		return
 	
 	# 清空背包——把背包中所有物品转移到置物架
-	for i in range(inventory.items.size() - 1, -1, -1):
-		var stack = inventory.items[i]
-		if stack == null:
+	for item_id in inventory.items.duplicate():
+		var amt = inventory.items[item_id]
+		if amt <= 0:
 			continue
-		var remaining = bld.inventory.add_item(stack.item_id, stack.amount)
-		if remaining < stack.amount:
-			inventory.remove_item(stack.item_id, stack.amount - remaining)
+		var remaining = bld.inventory.add_item(item_id, amt)
+		if remaining < amt:
+			inventory.remove_item(item_id, amt - remaining)
 
 func _auto_store_overweight():
 	"""超重时自动寻找最近的置物架，创建搬运任务走过去存放"""
@@ -1053,10 +1054,10 @@ func _drop_inventory_to_ground():
 		int(position.x / game.world.tile_size),
 		int(position.y / game.world.tile_size)
 	)
-	for i in range(inventory.items.size() - 1, -1, -1):
-		var stack = inventory.items[i]
-		if stack:
-			game.world.drop_item_on_ground(grid_pos, stack.item_id, stack.amount)
+	for item_id in inventory.items:
+		var amt = inventory.items[item_id]
+		if amt > 0:
+			game.world.drop_item_on_ground(grid_pos, item_id, amt)
 	inventory.clear()
 
 func _find_nearby_storage(max_dist: float = -1.0) -> Array:
@@ -1574,8 +1575,10 @@ func die():
 			int(position.x / game.world.tile_size),
 			int(position.y / game.world.tile_size)
 		)
-		for stack in inventory.items:
-			game.world.drop_item_on_ground(grid_pos, stack.item_id, stack.amount)
+		for item_id in inventory.items:
+			var amt = inventory.items[item_id]
+			if amt > 0:
+				game.world.drop_item_on_ground(grid_pos, item_id, amt)
 	if game:
 		game.settlers.erase(self)
 	queue_free()
