@@ -75,19 +75,18 @@ offset_right = 100.0
 offset_bottom = 120.0
 theme_override_constants/separation = 12
 
-[node name="ResumeBtn" type="Button" parent="MenuButtons"]
-custom_minimum_size = Vector2(200, 45)
-theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_constants/minimum_font_size = 18
-text = "返回游戏"
-size_flags_horizontal = 4
-visible = false
-
 [node name="StartBtn" type="Button" parent="MenuButtons"]
 custom_minimum_size = Vector2(200, 45)
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_constants/minimum_font_size = 18
 text = "开始游戏"
+size_flags_horizontal = 4
+
+[node name="SaveBtn" type="Button" parent="MenuButtons"]
+custom_minimum_size = Vector2(200, 45)
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_constants/minimum_font_size = 18
+text = "保存游戏"
 size_flags_horizontal = 4
 
 [node name="LoadBtn" type="Button" parent="MenuButtons"]
