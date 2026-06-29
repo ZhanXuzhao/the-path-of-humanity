@@ -208,6 +208,8 @@ static func get_work_type_from_task(current_task: Dictionary) -> String:
 		"STORE": return "搬运"
 		"RESEARCH": return "研究"
 		"COMBAT": return "战斗"
+		"EAT_FROM_RACK": return "进食"
+		"SLEEP": return "睡眠"
 		_: return ""
 
 static func get_state_display(state_val: int, current_task: Dictionary = {}) -> String:
@@ -255,6 +257,9 @@ func _move_towards(delta):
 					_tick_go_sleep()
 				"EAT_FROM_RACK":
 					_tick_eat_from_rack()
+				"STORE":
+					# STORE 任务不需要工作刻，到达后立即执行存储
+					_tick_store()
 				_:
 					state = SettlerState.WORKING
 					work_accumulator = 0.0
@@ -768,6 +773,10 @@ func _tick_store():
 		# 如果还超重，继续搬运
 		if is_overweight():
 			_auto_store_overweight()
+			# _auto_store_overweight 可能因存储已满而将物品上交全局，
+			# 此时背包已空不再超重，需要完成任务
+			if not is_overweight():
+				complete_task()
 		else:
 			complete_task()
 
