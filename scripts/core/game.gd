@@ -622,6 +622,47 @@ func _input(event):
 			if hud and hud.pause_btn:
 				hud.pause_btn.text = "▶" if _gm.state == 2 else "⏸"
 			get_viewport().set_input_as_handled()
+		
+		# 快捷键 -：减速
+		if event.keycode == KEY_MINUS:
+			_speed_down()
+			get_viewport().set_input_as_handled()
+		
+		# 快捷键 =：加速
+		if event.keycode == KEY_EQUAL:
+			_speed_up()
+			get_viewport().set_input_as_handled()
+
+# -------- 速度控制（-= 快捷键） --------
+func _speed_up():
+	"""加速：切换到下一档速度"""
+	var speeds = _gm.speed_levels
+	var current = _gm.time_speed
+	var idx = speeds.find(current)
+	if idx >= 0 and idx < len(speeds) - 1:
+		idx += 1
+		_gm.set_time_speed(speeds[idx])
+		_update_speed_label()
+
+func _speed_down():
+	"""减速：切换到上一档速度"""
+	var speeds = _gm.speed_levels
+	var current = _gm.time_speed
+	var idx = speeds.find(current)
+	if idx > 0:
+		idx -= 1
+		_gm.set_time_speed(speeds[idx])
+		_update_speed_label()
+
+func _update_speed_label():
+	"""更新HUD上的速度显示"""
+	var hud = get_node_or_null("UI/HUD")
+	if hud and hud.speed_label:
+		var speed = _gm.time_speed
+		if speed == int(speed):
+			hud.speed_label.text = "×%d" % speed
+		else:
+			hud.speed_label.text = "×%.1f" % speed
 
 # ==================== 存档恢复 ====================
 
