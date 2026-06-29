@@ -25,6 +25,12 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var settler_hp_label: Label = $SettlerInfoPanel/ScrollContainer/VBox/HpBarHBox/HPLabel
 @onready var settler_needs_container: VBoxContainer = $SettlerInfoPanel/ScrollContainer/VBox/NeedsContainer
 
+# 存储建筑信息面板
+@onready var storage_panel: Panel = $StoragePanel
+@onready var storage_name_label: Label = $StoragePanel/ScrollContainer/VBox/NameLabel
+@onready var storage_capacity_label: Label = $StoragePanel/ScrollContainer/VBox/CapacityLabel
+@onready var storage_items_container: VBoxContainer = $StoragePanel/ScrollContainer/VBox/ItemsContainer
+
 var game_manager
 var notification_scene = load("res://scenes/ui/notification.tscn")
 
@@ -81,6 +87,8 @@ func _settler_info_connections():
 	if game:
 		game.settler_selected.connect(_on_settler_selected)
 		game.settler_deselected.connect(_on_settler_deselected)
+		game.building_selected.connect(_on_building_selected)
+		game.building_deselected.connect(_on_building_deselected)
 
 func _on_settler_selected(settler):
 	"""选中定居者时显示信息面板"""
@@ -92,6 +100,62 @@ func _on_settler_deselected():
 	"""取消选中时隐藏信息面板"""
 	settler_info_panel.visible = false
 	_tracked_settler = null
+
+# -------- 存储建筑面板 --------
+func _on_building_selected(bld):
+	"""选中存储建筑时显示物品列表"""
+	# 取消定居者选中以免冲突
+	if settler_info_panel.visible:
+		_on_settler_deselected()
+		var game = get_node("/root/Game")
+		if game:
+			game.selected_settler = null
+	
+	storage_panel.visible = true
+	_update_storage_panel(bld)
+
+func _on_building_deselected():
+	"""取消选中建筑"""
+	storage_panel.visible = false
+
+func _update_storage_panel(bld):
+	"""更新存储建筑面板内容"""
+	if not is_instance_valid(bld):
+		return
+	
+	var data = bld.get_data()
+	storage_name_label.text = data.name if data else "存储"
+	
+	# 容量信息
+	var used = bld.inventory.get_total_items() if bld.inventory else 0
+	var cap = bld.inventory.capacity if bld.inventory else 0
+	storage_capacity_label.text = "容量: %d/%d" % [used, cap]
+	
+	# 物品列表
+	for child in storage_items_container.get_children():
+		child.queue_free()
+	
+	if bld.inventory == null or bld.inventory.is_empty():
+		var empty_label = Label.new()
+		empty_label.text = "  (空)"
+		empty_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+		storage_items_container.add_child(empty_label)
+		return
+	
+	for stack in bld.inventory.items:
+		var item_data = ItemDefinitions.get_item(stack.item_id)
+		var name_str = item_data.name if item_data else stack.item_id
+		var hbox = HBoxContainer.new()
+		var icon_label = Label.new()
+		icon_label.text = "•"
+		icon_label.custom_minimum_size = Vector2(16, 0)
+		var name_label = Label.new()
+		name_label.text = "%s × %d" % [name_str, stack.amount]
+		name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+		name_label.add_theme_constant_override("minimum_font_size", 12)
+		hbox.add_child(icon_label)
+		hbox.add_child(name_label)
+		storage_items_container.add_child(hbox)
 
 func _update_population():
 	"""更新人口显示"""
@@ -167,6 +231,12 @@ func _process(delta):
 		var game = get_node("/root/Game")
 		if game:
 			game.selected_settler = null
+	
+	# 定时更新存储面板信息
+	if Engine.get_physics_frames() % 30 == 0 and storage_panel.visible:
+		var game = get_node("/root/Game")
+		if game and game.selected_building_instance:
+			_update_storage_panel(game.selected_building_instance)
 	
 	# 定时更新人口（不每帧刷新）
 	if Engine.get_physics_frames() % 60 == 0:

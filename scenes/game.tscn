@@ -196,6 +196,51 @@ offset_top = 84.0
 offset_right = 240.0
 offset_bottom = 84.0
 
+[node name="StoragePanel" type="Panel" parent="UI/HUD"]
+visible = false
+anchors_preset = 0
+offset_left = 8.0
+offset_top = 400.0
+offset_right = 260.0
+offset_bottom = 664.0
+theme_override_styles/panel = SubResource(2)
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/StoragePanel"]
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 248.0
+offset_bottom = 260.0
+
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/StoragePanel/ScrollContainer"]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 240.0
+offset_bottom = 200.0
+
+[node name="NameLabel" type="Label" parent="UI/HUD/StoragePanel/ScrollContainer/VBox"]
+offset_right = 240.0
+offset_bottom = 24.0
+theme_override_constants/minimum_font_size = 18
+theme_override_colors/font_color = Color(0.6, 0.9, 0.6, 1)
+text = "置物架"
+
+[node name="CapacityLabel" type="Label" parent="UI/HUD/StoragePanel/ScrollContainer/VBox"]
+offset_top = 28.0
+offset_right = 240.0
+offset_bottom = 48.0
+theme_override_constants/minimum_font_size = 13
+text = "容量: 0/100"
+
+[node name="Sep" type="HSeparator" parent="UI/HUD/StoragePanel/ScrollContainer/VBox"]
+offset_top = 52.0
+offset_right = 240.0
+offset_bottom = 56.0
+
+[node name="ItemsContainer" type="VBoxContainer" parent="UI/HUD/StoragePanel/ScrollContainer/VBox"]
+offset_top = 60.0
+offset_right = 240.0
+offset_bottom = 60.0
+
 [node name="BuildMenu" type="Panel" parent="UI"]
 visible = false
 script = ExtResource("8_17ot")

@@ -160,6 +160,10 @@ func _process(delta):
 			_move_towards(delta)
 		SettlerState.WORKING:
 			_execute_work(delta)
+		SettlerState.SLEEPING:
+			_tick_sleep(delta)
+		SettlerState.EATING:
+			_tick_eat(delta)
 
 # -------- 选中状态 --------
 func set_selected(selected: bool):
@@ -203,10 +207,17 @@ func _move_towards(delta):
 		position += offset.normalized() * move_speed * delta
 	else:
 		position = target_world_pos
-		# 到达目标，如果是工作类任务则开始工作
+		# 到达目标，根据任务类型切换状态
 		if current_task != null:
-			state = SettlerState.WORKING
-			work_accumulator = 0.0
+			var task_type = current_task.get("type", "")
+			match task_type:
+				"SLEEP":
+					_tick_go_sleep()
+				"EAT_FROM_RACK":
+					_tick_eat_from_rack()
+				_:
+					state = SettlerState.WORKING
+					work_accumulator = 0.0
 		else:
 			state = SettlerState.IDLE
 
@@ -240,6 +251,12 @@ func _do_work_tick(task_type: String):
 			_tick_construct()
 		"CRAFT":
 			_tick_craft()
+		"STORE":
+			_tick_store()
+		"EAT_FROM_RACK":
+			_tick_eat_from_rack()
+		"SLEEP":
+			_tick_go_sleep()
 
 func _tick_harvest():
 	"""执行一次采集工作"""
@@ -255,12 +272,16 @@ func _tick_harvest():
 		complete_task()
 		return
 	
-	# 采集到的物品直接上交到聚居地资源库
 	var item_id = result.item_id
 	var amount = result.amount
 	var gm = get_node("/root/GameManager")
-	if gm:
-		gm.add_resource(item_id, amount)
+	
+	# 采集到背包（优先放入个人背包）
+	inventory.add_item(item_id, amount)
+	
+	# 检查是否超重，超重则自动存储到附近置物架
+	if is_overweight():
+		_store_excess_to_storage()
 	
 	# 增加经验
 	add_skill_experience(current_task.get("skill", ""), 1.0)
@@ -362,6 +383,361 @@ func _tick_craft():
 	# 没有找到对应的活跃任务
 	complete_task()
 
+# -------- 库存负重管理 --------
+func get_inventory_weight() -> float:
+	"""计算背包中所有物品的总重量"""
+	var total = 0.0
+	for stack in inventory.items:
+		var data = stack.get_data()
+		if data:
+			total += data.weight * stack.amount
+	return total
+
+func is_overweight() -> bool:
+	"""是否超过负重上限"""
+	return get_inventory_weight() > carry_capacity
+
+func _store_excess_to_storage():
+	"""将背包中超重的部分存入附近置物架，若无可用的则上交全局"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		# 没有存储系统，直接上交全局
+		_dump_inventory_to_global()
+		return
+	
+	# 找附近已完成的存储建筑（置物架/仓库）
+	var storage_buildings = _find_nearby_storage()
+	if storage_buildings.is_empty():
+		_dump_inventory_to_global()
+		return
+	
+	# 从最近的存储建筑开始尝试存入
+	for bld in storage_buildings:
+		if bld.inventory == null or bld.inventory.is_full():
+			continue
+		
+		# 把背包物品转移到置物架（只转移超重部分）
+		var to_store = []
+		var weight = get_inventory_weight()
+		var target_weight = carry_capacity * 0.7  # 降到70%负重
+		
+		for i in range(inventory.items.size() - 1, -1, -1):
+			if weight <= target_weight:
+				break
+			var stack = inventory.items[i]
+			if stack == null:
+				continue
+			var data = stack.get_data()
+			if data == null:
+				continue
+			var stack_weight = data.weight * stack.amount
+			if weight - stack_weight >= target_weight:
+				# 整组转移
+				var remaining = bld.inventory.add_item(stack.item_id, stack.amount)
+				if remaining < stack.amount:
+					inventory.remove_item(stack.item_id, stack.amount - remaining)
+					weight -= stack_weight - remaining * data.weight
+			else:
+				# 转移部分
+				var move_count = floori((weight - target_weight) / data.weight)
+				move_count = max(1, move_count)
+				var remaining = bld.inventory.add_item(stack.item_id, move_count)
+				var actual = move_count - remaining
+				if actual > 0:
+					inventory.remove_item(stack.item_id, actual)
+					weight -= actual * data.weight
+		
+		if not is_overweight():
+			break
+
+func _dump_inventory_to_global():
+	"""背包物品全部上交全局资源（兜底方案）"""
+	var gm = get_node("/root/GameManager")
+	if gm == null:
+		return
+	for i in range(inventory.items.size() - 1, -1, -1):
+		var stack = inventory.items[i]
+		if stack:
+			gm.add_resource(stack.item_id, stack.amount)
+	inventory.clear()
+
+func _find_nearby_storage(max_dist: float = 300.0) -> Array:
+	"""查找附近有空间的存储建筑，按距离排序"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		return []
+	
+	var result = []
+	for bld in game.building_system.get_all_buildings():
+		if not bld.is_completed:
+			continue
+		var data = bld.get_data()
+		if data == null or data.storage_capacity <= 0:
+			continue
+		if bld.inventory == null or bld.inventory.is_full():
+			continue
+		var center = _bld_world_center(bld)
+		var dist = position.distance_to(center)
+		if dist <= max_dist:
+			result.append({"bld": bld, "dist": dist})
+	
+	result.sort_custom(func(a, b): return a.dist < b.dist)
+	var sorted = []
+	for entry in result:
+		sorted.append(entry.bld)
+	return sorted
+
+func _bld_world_center(bld) -> Vector2:
+	"""获取建筑的世界坐标中心"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.world == null:
+		return Vector2.ZERO
+	var ts = game.world.tile_size
+	var size = bld.get_size()
+	return Vector2(
+		bld.grid_pos.x * ts + size.x * ts / 2.0,
+		bld.grid_pos.y * ts + size.y * ts / 2.0
+	)
+
+# -------- 存储任务（搬运） --------
+func _tick_store():
+	"""执行一次存储工作"""
+	var game = get_node_or_null("/root/Game")
+	if game == null:
+		complete_task()
+		return
+	
+	var target_bld_pos: Vector2i = current_task.get("target_bld_pos", Vector2i.ZERO)
+	var item_id: String = current_task.get("item_id", "")
+	var amount: int = current_task.get("amount", 0)
+	
+	if item_id == "" or amount <= 0:
+		complete_task()
+		return
+	
+	# 从背包移除物品并存入建筑
+	var bld = game.building_system.get_building_at(target_bld_pos)
+	if bld == null or bld.inventory == null:
+		complete_task()
+		return
+	
+	var removed = inventory.remove_item(item_id, amount)
+	if removed > 0:
+		bld.inventory.add_item(item_id, removed)
+	
+	complete_task()
+
+# -------- 睡眠系统 --------
+func try_sleep(bld_pos: Vector2i, world_pos: Vector2):
+	"""尝试去睡觉"""
+	current_task = {"type": "SLEEP", "target_bld_pos": bld_pos}
+	target_world_pos = world_pos
+	state = SettlerState.MOVING
+
+func _tick_go_sleep():
+	"""移动到睡眠位置后开始睡觉"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		complete_task()
+		return
+	var bld_pos: Vector2i = current_task.get("target_bld_pos", Vector2i.ZERO)
+	var bld = game.building_system.get_building_at(bld_pos)
+	if bld == null:
+		complete_task()
+		return
+	state = SettlerState.SLEEPING
+
+func _tick_sleep(delta):
+	"""睡眠中恢复精力"""
+	var gm = get_node("/root/GameManager")
+	var delta_hours = 1.0
+	if gm:
+		delta_hours = gm.time_speed * delta * (24.0 / gm.day_length)
+	
+	# 快速恢复精力
+	modify_need("rest", delta_hours * 15.0)
+	
+	# 检查是否天亮了或精力已满
+	if needs["rest"] >= 95.0:
+		complete_task()
+		state = SettlerState.IDLE
+		return
+	
+	# 检查是否白天了
+	if gm:
+		var hour = int(gm.game_time)
+		if hour >= 6 and hour < 18:
+			complete_task()
+			state = SettlerState.IDLE
+
+func find_nearest_residential() -> Dictionary:
+	"""查找最近的居住建筑（帐篷/房屋），返回{pos, world_pos}"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		return {}
+	
+	var residential_ids = ["tent", "house"]
+	var best = null
+	var best_dist = INF
+	
+	for bld in game.building_system.get_all_buildings():
+		if not bld.is_completed:
+			continue
+		if bld.building_id in residential_ids:
+			var center = _bld_world_center(bld)
+			var dist = position.distance_squared_to(center)
+			if dist < best_dist:
+				best_dist = dist
+				best = {"pos": bld.grid_pos, "world_pos": center}
+	
+	return best if best else {}
+
+# -------- 进食系统 --------
+func try_eat():
+	"""尝试进食——检查背包食物、置物架食物、或去采集"""
+	var game = get_node_or_null("/root/Game")
+	if game == null:
+		return
+	
+	# 1. 先吃背包里的食物
+	var food_ids = ["berry", "cooked_meat", "raw_meat", "bread", "vegetable_soup"]
+	for food_id in food_ids:
+		if inventory.has_item(food_id, 1):
+			var removed = inventory.remove_item(food_id, 1)
+			if removed > 0:
+				var data = ItemDefinitions.get_item(food_id)
+				var nutrition = data.nutrition if data else 10.0
+				modify_need("hunger", nutrition)
+				state = SettlerState.EATING
+				# 将进食动画计时器设为2秒
+				_eat_timer = 2.0
+				return
+	
+	# 2. 背包没食物，找置物架
+	var food_source = _find_food_in_storage()
+	if food_source != null:
+		var center = _bld_world_center(food_source.bld)
+		current_task = {
+			"type": "EAT_FROM_RACK",
+			"target_bld_pos": food_source.bld.grid_pos,
+			"food_id": food_source.food_id,
+			"target_world_pos": center
+		}
+		target_world_pos = center
+		state = SettlerState.MOVING
+		return
+	
+	# 3. 都没有的话，去找浆果丛采集
+	_find_and_harvest_berries()
+
+var _eat_timer: float = 0.0
+
+func _tick_eat(delta):
+	"""进食中恢复饱食度"""
+	if _eat_timer > 0:
+		_eat_timer -= delta
+		if _eat_timer <= 0:
+			complete_task()
+			state = SettlerState.IDLE
+
+func _tick_eat_from_rack():
+	"""从置物架取食物并进食"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		complete_task()
+		return
+	
+	var bld_pos: Vector2i = current_task.get("target_bld_pos", Vector2i.ZERO)
+	var food_id: String = current_task.get("food_id", "")
+	if food_id == "":
+		complete_task()
+		return
+	
+	var bld = game.building_system.get_building_at(bld_pos)
+	if bld == null or bld.inventory == null:
+		complete_task()
+		return
+	
+	# 从置物架取一份食物
+	var removed = bld.inventory.remove_item(food_id, 1)
+	if removed > 0:
+		var data = ItemDefinitions.get_item(food_id)
+		var nutrition = data.nutrition if data else 10.0
+		modify_need("hunger", nutrition)
+		_eat_timer = 2.0
+		state = SettlerState.EATING
+	else:
+		complete_task()
+		state = SettlerState.IDLE
+
+func _find_food_in_storage() -> Dictionary:
+	"""在附近的存储建筑中查找食物，返回{bld, food_id}"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		return {}
+	
+	var food_ids = ["berry", "cooked_meat", "raw_meat", "bread", "vegetable_soup"]
+	var storage_buildings = _find_nearby_storage(400.0)
+	
+	for bld in storage_buildings:
+		if bld.inventory == null:
+			continue
+		for food_id in food_ids:
+			if bld.inventory.has_item(food_id, 1):
+				return {"bld": bld, "food_id": food_id}
+	
+	return {}
+
+func _find_and_harvest_berries():
+	"""找最近的浆果丛去采集"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.world == null:
+		return
+	
+	# 搜索周围区块找浆果丛
+	var search_radius = 4
+	var center_chunk = game.world.global_to_chunk(Vector2i(
+		int(position.x / game.world.tile_size),
+		int(position.y / game.world.tile_size)
+	))
+	
+	var best_pos = null
+	var best_dist = INF
+	
+	for cx in range(center_chunk.x - search_radius, center_chunk.x + search_radius + 1):
+		for cy in range(center_chunk.y - search_radius, center_chunk.y + search_radius + 1):
+			var chunk_pos = Vector2i(cx, cy)
+			game.world.ensure_chunk_generated(chunk_pos)
+			var chunk = game.world.get_chunk(chunk_pos)
+			if not chunk.is_generated:
+				continue
+			for local_pos in chunk.resources:
+				var dep = chunk.resources[local_pos]
+				if dep == null or dep.amount <= 0:
+					continue
+				if dep.type != game.world.ResourceNodeType.BERRY_BUSH:
+					continue
+				var global_pos = chunk_pos * game.world.CHUNK_SIZE + local_pos
+				var world_pos = Vector2(
+					global_pos.x * game.world.tile_size + game.world.tile_size / 2.0,
+					global_pos.y * game.world.tile_size + game.world.tile_size / 2.0
+				)
+				var dist = position.distance_squared_to(world_pos)
+				if dist < best_dist:
+					best_dist = dist
+					best_pos = {"global_pos": global_pos, "world_pos": world_pos}
+	
+	if best_pos != null:
+		current_task = {
+			"type": "HARVEST",
+			"target_pos": best_pos.global_pos,
+			"target_world_pos": best_pos.world_pos,
+			"skill": "woodcutting",
+			"priority": 4,
+		}
+		target_world_pos = best_pos.world_pos
+		state = SettlerState.MOVING
+
 func _randomize_name():
 	var first_names_male = ["阿明", "大壮", "铁柱", "志强", "建国"]
 	var first_names_female = ["小芳", "阿珍", "翠花", "秀英", "丽华"]
@@ -453,6 +829,14 @@ func heal(amount: float):
 	hp = min(max_hp, hp + amount)
 
 func die():
+	# 死亡时把背包物品掉到地上（放到全局资源池作为简化）
+	var gm = get_node("/root/GameManager")
+	if gm and inventory:
+		for stack in inventory.items:
+			gm.add_resource(stack.item_id, stack.amount)
+	var game = get_node_or_null("/root/Game")
+	if game:
+		game.settlers.erase(self)
 	queue_free()
 
 # -------- 序列化 --------

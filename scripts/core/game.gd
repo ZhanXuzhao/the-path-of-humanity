@@ -28,6 +28,11 @@ var selected_settler = null
 signal settler_selected(settler)
 signal settler_deselected()
 
+# 选中建筑（置物架等）
+var selected_building_instance = null
+signal building_selected(building_instance)
+signal building_deselected()
+
 func _ready():
 	# 自动加载存档（静默读取，不弹通知）
 	if _gm.state != 1 and _gm._loaded_save_data.is_empty() and _gm.has_save_file():
@@ -76,6 +81,10 @@ func _process(delta):
 	# 检查选中的定居者是否还存活
 	if selected_settler != null and not is_instance_valid(selected_settler):
 		_deselect_settler()
+	
+	# 定居者自主行为（进食、睡眠等）——每30帧检查一次避免频繁打断
+	if Engine.get_physics_frames() % 30 == 0:
+		_update_settler_autonomy()
 	
 	# 分配任务给空闲定居者
 	_assign_ai_tasks()
@@ -169,8 +178,8 @@ func _try_place_building():
 			1)
 
 # -------- 定居者选择 --------
-func _try_select_settler():
-	"""尝试在鼠标位置选择定居者"""
+func _try_select_settler() -> bool:
+	"""尝试在鼠标位置选择定居者，返回是否选中"""
 	var global_pos = get_global_mouse_position()
 	
 	# 查找鼠标位置附近的定居者
@@ -187,8 +196,10 @@ func _try_select_settler():
 	
 	if closest != null:
 		_select_settler(closest)
-	else:
-		_deselect_settler()
+		return true
+	
+	_deselect_settler()
+	return false
 
 func _select_settler(settler):
 	"""选中定居者"""
@@ -209,11 +220,88 @@ func _deselect_settler():
 	selected_settler = null
 	settler_deselected.emit()
 
+# -------- 建筑点击选择（置物架查看） --------
+func _try_select_building():
+	"""尝试在鼠标位置选择建筑（置物架等有库存的建筑）"""
+	var global_pos = get_global_mouse_position()
+	var grid_pos = Vector2i(
+		floori(global_pos.x / world.tile_size),
+		floori(global_pos.y / world.tile_size)
+	)
+	
+	var bld = building_system.get_building_at(grid_pos) if building_system else null
+	if bld == null or not bld.is_completed:
+		_deselect_building()
+		return
+	
+	var data = bld.get_data()
+	if data == null or data.storage_capacity <= 0 or bld.inventory == null:
+		# 不是存储建筑，取消选中
+		_deselect_building()
+		return
+	
+	_select_building(bld)
+
+func _select_building(bld):
+	"""选中存储建筑"""
+	if selected_building_instance == bld:
+		return
+	selected_building_instance = bld
+	building_selected.emit(bld)
+
+func _deselect_building():
+	"""取消选中建筑"""
+	selected_building_instance = null
+	building_deselected.emit()
+
+# ==================== 定居者自主AI系统 ====================
+
+func _update_settler_autonomy():
+	"""更新定居者自主行为（进食、睡眠等基本需求）"""
+	var is_night = not _gm.is_daytime()
+	
+	for s in settlers:
+		if not is_instance_valid(s):
+			continue
+		
+		# 跳过已经在执行非工作状态（进食/睡眠）的定居者
+		if s.state == Settler.SettlerState.SLEEPING or s.state == Settler.SettlerState.EATING:
+			continue
+		
+		# 如果正在工作中，不打断（除非需求极低）
+		if s.state == Settler.SettlerState.WORKING or s.state == Settler.SettlerState.MOVING:
+			# 检查是否有紧急需求
+			if s.needs.get("hunger", 100) < 15 or s.needs.get("rest", 100) < 10:
+				s.complete_task()
+			else:
+				continue
+		
+		# 1. 饥饿处理（饱食度 < 30 且空闲）
+		if s.needs.get("hunger", 100) < 30 and s.state == Settler.SettlerState.IDLE:
+			s.try_eat()
+			continue
+		
+		# 2. 夜晚处理（天黑且空闲→去睡觉）
+		if is_night and s.needs.get("rest", 100) < 70 and s.state == Settler.SettlerState.IDLE:
+			var home = s.find_nearest_residential()
+			if not home.is_empty():
+				s.try_sleep(home.pos, home.world_pos)
+				continue
+			# 没有住所也尝试原地休息
+			if s.needs.get("rest", 100) < 30:
+				s.try_sleep(Vector2i.ZERO, s.position)
+				continue
+
 func _input(event):
 	if event.is_action_pressed("ui_cancel"):
 		# 有选中定居者时，Esc 取消选中
 		if selected_settler != null:
 			_deselect_settler()
+			return
+		
+		# 有选中建筑时，Esc 取消
+		if selected_building_instance != null:
+			_deselect_building()
 			return
 		
 		if build_mode:
@@ -247,7 +335,10 @@ func _input(event):
 	
 	# 定居者点击选择（非建造模式下的左键单击）
 	if event.is_action_pressed("left_click") and not build_mode:
-		_try_select_settler()
+		# 先尝试选定居者，若没选到则尝试选中建筑
+		var had_settler = _try_select_settler()
+		if not had_settler:
+			_try_select_building()
 	
 	# 快捷键 B：打开/关闭建造菜单
 	if event is InputEventKey and event.pressed and not event.echo:
