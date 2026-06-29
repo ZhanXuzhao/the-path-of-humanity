@@ -119,6 +119,7 @@ var ground_items: Dictionary = {}
 var chunks: Dictionary = {}  # Vector2i(区块坐标) -> ChunkData
 var tile_size: int = 32
 var rng := RandomNumberGenerator.new()
+var world_seed: int = 0  # 地图随机种子，新游戏时随机生成
 
 # 可配置参数
 var resource_multiplier: float = 5.0     # 资源初始点数倍率
@@ -145,28 +146,75 @@ func ensure_chunk_generated(chunk_pos: Vector2i):
 	_generate_chunk(chunk)
 
 func _generate_chunk(chunk: ChunkData):
-	# 使用噪声生成地形
-	var seed_val = chunk.pos.x * 10000 + chunk.pos.y
+	# 使用多层噪声生成地形，产生自然连续的地貌
+	# world_seed 确保每次新游戏地图不同；存档时保存 world_seed 保证读档后地图一致
+	var seed_val = chunk.pos.x * 10000 + chunk.pos.y + world_seed * 100000
+	var seed_base = hash(seed_val)
+	
+	# 地势噪声（Elevation）- 决定海拔高度
+	var elevation_noise = FastNoiseLite.new()
+	elevation_noise.seed = seed_base
+	elevation_noise.frequency = 0.045
+	elevation_noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	elevation_noise.fractal_octaves = 4
+	elevation_noise.fractal_lacunarity = 2.0
+	elevation_noise.fractal_gain = 0.5
+	elevation_noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	
+	# 湿度噪声（Moisture）- 决定植被分布
+	var moisture_noise = FastNoiseLite.new()
+	moisture_noise.seed = seed_base + 9999
+	moisture_noise.frequency = 0.07
+	moisture_noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	moisture_noise.fractal_octaves = 3
+	moisture_noise.fractal_lacunarity = 2.0
+	moisture_noise.fractal_gain = 0.5
+	moisture_noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	
+	# 微扰动噪声 - 为地形边缘增加自然过渡细节
+	var detail_noise = FastNoiseLite.new()
+	detail_noise.seed = seed_base + 5555
+	detail_noise.frequency = 0.15
+	detail_noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	detail_noise.fractal_octaves = 2
+	
 	var local_rng = RandomNumberGenerator.new()
-	local_rng.seed = hash(seed_val)
+	local_rng.seed = seed_base
 	
 	for x in CHUNK_SIZE:
 		for y in CHUNK_SIZE:
 			var tile_pos := Vector2i(x, y)
-			# 基础地形 - 大多数为草地
-			var tile = TileType.GRASS
-			var rand_val = local_rng.randf()
+			# 世界坐标（用于噪声采样，保证跨区块连续）
+			var wx = chunk.pos.x * CHUNK_SIZE + x
+			var wy = chunk.pos.y * CHUNK_SIZE + y
 			
-			if rand_val < 0.05:
+			# 采样地势 [-1, 1] + 微扰动
+			var elevation = elevation_noise.get_noise_2d(wx, wy)
+			elevation += detail_noise.get_noise_2d(wx, wy) * 0.08
+			
+			# 根据地势高度分配地形类型，形成自然带状分布
+			var tile: int
+			if elevation < -0.55:
+				tile = TileType.DEEP_WATER
+			elif elevation < -0.25:
 				tile = TileType.WATER
-			elif rand_val < 0.08:
+			elif elevation < -0.10:
 				tile = TileType.SAND
-			elif rand_val < 0.15:
+			elif elevation < 0.40:
+				# 中海拔区：由湿度决定森林、草地或泥土
+				var moisture = moisture_noise.get_noise_2d(wx, wy)
+				if moisture > 0.15:
+					tile = TileType.FOREST
+				elif moisture < -0.35:
+					tile = TileType.DIRT
+				else:
+					tile = TileType.GRASS
+			elif elevation < 0.55:
 				tile = TileType.STONE
-			elif rand_val < 0.30:
-				tile = TileType.FOREST
-			elif rand_val < 0.35:
-				tile = TileType.DIRT
+			elif elevation < 0.75:
+				tile = TileType.MOUNTAIN
+			else:
+				tile = TileType.SNOW
 			
 			chunk.tiles[tile_pos] = tile
 			
@@ -443,11 +491,12 @@ func to_dict() -> Dictionary:
 			})
 		ground_data["%d,%d" % [pos.x, pos.y]] = stacks_data
 	
-	return {"chunks": chunk_list, "ground_items": ground_data}
+	return {"chunks": chunk_list, "ground_items": ground_data, "world_seed": world_seed}
 
 func from_dict(data: Dictionary):
 	chunks.clear()
 	ground_items.clear()
+	world_seed = data.get("world_seed", 0)
 	
 	# 恢复地面物品
 	if data.has("ground_items"):

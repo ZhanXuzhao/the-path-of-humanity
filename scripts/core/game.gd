@@ -116,6 +116,8 @@ func _process(delta):
 	_assign_ai_tasks()
 
 func _generate_initial_area():
+	# 新游戏：随机化地图种子，确保每次地图不同
+	world.world_seed = randi()
 	# 确保出生点周围区块已生成
 	var center_chunk = Vector2i(0, 0)
 	for x in range(-1, 2):
