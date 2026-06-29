@@ -147,13 +147,17 @@ func ensure_chunk_generated(chunk_pos: Vector2i):
 
 func _generate_chunk(chunk: ChunkData):
 	# 使用多层噪声生成地形，产生自然连续的地貌
-	# world_seed 确保每次新游戏地图不同；存档时保存 world_seed 保证读档后地图一致
+	# 所有区块共享同一个全局噪声种子（hash(world_seed)），
+	# 仅靠世界坐标 (wx, wy) 区分采样位置，保证跨区块地形天然连续
+	var noise_seed = hash(world_seed)
+	
+	# 区块级种子仅用于资源哈希，不影响地形连续性
 	var seed_val = chunk.pos.x * 10000 + chunk.pos.y + world_seed * 100000
 	var seed_base = hash(seed_val)
 	
 	# 地势噪声（Elevation）- 决定海拔高度
 	var elevation_noise = FastNoiseLite.new()
-	elevation_noise.seed = seed_base
+	elevation_noise.seed = noise_seed
 	elevation_noise.frequency = 0.045
 	elevation_noise.fractal_type = FastNoiseLite.FRACTAL_FBM
 	elevation_noise.fractal_octaves = 4
@@ -163,7 +167,7 @@ func _generate_chunk(chunk: ChunkData):
 	
 	# 湿度噪声（Moisture）- 决定植被分布
 	var moisture_noise = FastNoiseLite.new()
-	moisture_noise.seed = seed_base + 9999
+	moisture_noise.seed = noise_seed + 9999
 	moisture_noise.frequency = 0.07
 	moisture_noise.fractal_type = FastNoiseLite.FRACTAL_FBM
 	moisture_noise.fractal_octaves = 3
@@ -173,7 +177,7 @@ func _generate_chunk(chunk: ChunkData):
 	
 	# 微扰动噪声 - 为地形边缘增加自然过渡细节
 	var detail_noise = FastNoiseLite.new()
-	detail_noise.seed = seed_base + 5555
+	detail_noise.seed = noise_seed + 5555
 	detail_noise.frequency = 0.15
 	detail_noise.fractal_type = FastNoiseLite.FRACTAL_FBM
 	detail_noise.fractal_octaves = 2
