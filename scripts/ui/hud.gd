@@ -51,6 +51,8 @@ func _ready():
 		build_menu_btn.text = "建造 [B]"
 	if tech_btn:
 		tech_btn.pressed.connect(_on_tech_pressed)
+	if menu_btn:
+		menu_btn.pressed.connect(_on_menu_pressed)
 	
 	# 延迟一帧初始化资源显示（等待 GameManager 完全就绪）
 	call_deferred("_update_resource_display")
@@ -98,6 +100,22 @@ func _on_tech_pressed():
 	var tech_panel = get_node_or_null("/root/Game/UI/TechPanel")
 	if tech_panel:
 		tech_panel.visible = not tech_panel.visible
+
+func _on_menu_pressed():
+	"""菜单按钮：打开游戏中暂停菜单"""
+	var main_menu = get_node_or_null("/root/Game/UI/MainMenu")
+	if main_menu:
+		main_menu.visible = not main_menu.visible
+		if main_menu.visible:
+			game_manager.pause_game()
+			# 关闭其他面板
+			var build_menu = get_node_or_null("/root/Game/UI/BuildMenu")
+			if build_menu:
+				build_menu.visible = false
+			var tech_panel = get_node_or_null("/root/Game/UI/TechPanel")
+			if tech_panel:
+				tech_panel.visible = false
+			main_menu._update_menu_mode()
 
 func _on_notification(msg: String, type: int):
 	var notif = notification_scene.instantiate()

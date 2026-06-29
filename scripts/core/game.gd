@@ -154,13 +154,21 @@ func _input(event):
 		if build_mode:
 			exit_build_mode()
 		else:
+			# 优先关闭暂停菜单
+			var main_menu = get_node_or_null("UI/MainMenu")
+			if main_menu and main_menu.visible:
+				main_menu.visible = false
+				_gm.resume_game()
+				return
 			# 关闭打开的菜单
 			var build_menu = get_node_or_null("UI/BuildMenu")
 			if build_menu and build_menu.visible:
 				build_menu.visible = false
+				return
 			var tech_panel = get_node_or_null("UI/TechPanel")
 			if tech_panel and tech_panel.visible:
 				tech_panel.visible = false
+				return
 	
 	if event.is_action_pressed("left_click") and build_mode:
 		_try_place_building()

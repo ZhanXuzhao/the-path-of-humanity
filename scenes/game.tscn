@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://d0plvqi8nqtxg"]
+[gd_scene load_steps=14 format=3 uid="uid://d0plvqi8nqtxg"]
 
 [ext_resource type="Script" path="res://scripts/core/game.gd" id="1_b4xb6"]
 [ext_resource type="Script" path="res://scripts/core/world.gd" id="2_mhkh2"]
@@ -10,6 +10,29 @@
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="7_86c0l"]
 [ext_resource type="Script" path="res://scripts/ui/build_menu.gd" id="8_17ot"]
 [ext_resource type="Script" path="res://scripts/ui/tech_panel.gd" id="9_3h2wo"]
+[ext_resource type="PackedScene" path="res://scenes/main_menu.tscn" id="10_kae2"]
+
+[sub_resource type="StyleBoxFlat" id="1"]
+content_margin_left = 8.0
+content_margin_top = 8.0
+content_margin_right = 8.0
+content_margin_bottom = 8.0
+bg_color = Color(0.1, 0.1, 0.12, 0.95)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="2"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+bg_color = Color(0.15, 0.15, 0.17, 0.95)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
 
 [node name="Game" type="Node2D"]
 script = ExtResource("1_b4xb6")
@@ -115,6 +138,7 @@ offset_left = 8.0
 offset_top = 60.0
 offset_right = 300.0
 offset_bottom = 600.0
+theme_override_styles/panel = SubResource(1)
 
 [node name="CategoryTabs" type="HBoxContainer" parent="UI/BuildMenu"]
 offset_left = 8.0
@@ -129,6 +153,7 @@ offset_right = 284.0
 offset_bottom = 300.0
 
 [node name="BuildingList" type="VBoxContainer" parent="UI/BuildMenu/ScrollContainer"]
+size_flags_horizontal = 3
 
 [node name="InfoPanel" type="Panel" parent="UI/BuildMenu"]
 visible = false
@@ -136,6 +161,7 @@ offset_left = 8.0
 offset_top = 308.0
 offset_right = 284.0
 offset_bottom = 530.0
+theme_override_styles/panel = SubResource(2)
 
 [node name="Name" type="Label" parent="UI/BuildMenu/InfoPanel"]
 offset_left = 8.0
@@ -150,6 +176,7 @@ offset_left = 8.0
 offset_top = 36.0
 offset_right = 268.0
 offset_bottom = 60.0
+size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
 theme_override_constants/minimum_font_size = 12
 text = "Description"
@@ -160,12 +187,14 @@ offset_left = 8.0
 offset_top = 68.0
 offset_right = 268.0
 offset_bottom = 120.0
+size_flags_horizontal = 3
 
 [node name="BuildBtn" type="Button" parent="UI/BuildMenu/InfoPanel"]
 offset_left = 8.0
 offset_top = 130.0
 offset_right = 268.0
 offset_bottom = 160.0
+size_flags_horizontal = 3
 text = "建造"
 
 [node name="TechPanel" type="Panel" parent="UI"]
@@ -213,3 +242,6 @@ offset_right = 432.0
 offset_bottom = 530.0
 
 [node name="TechList" type="VBoxContainer" parent="UI/TechPanel/ScrollContainer"]
+
+[node name="MainMenu" parent="UI" instance=ExtResource("10_kae2")]
+visible = false
