@@ -43,22 +43,15 @@ func _ready():
 		building_system.building_placed.connect(_on_building_placed)
 		building_system.building_removed.connect(_on_building_removed)
 	
-	# 渲染已生成的区块
-	_render_existing_chunks()
+	# 延迟一帧渲染，确保 Game._ready() 已完成区块生成
+	call_deferred("_render_existing_chunks")
 	
 	# 强制触发 _draw()
 	queue_redraw()
-	
-	print("=== WorldRenderer 初始化完成 ===")
-	print("  区块数: ", world.chunks.size(), " 瓦片精灵: ", tile_sprites.size(), " 资源精灵: ", resource_sprites.size())
 
-func _draw():
-	# 调试：画一个绿色矩形确认渲染器在工作
-	draw_rect(Rect2(320, 180, 128, 128), Color(0, 1, 0, 0.5))
-	draw_rect(Rect2(480, 300, 32, 32), Color(0, 0.5, 1, 0.8))
+
 
 func _render_existing_chunks():
-	print("开始渲染区块, chunks数量: ", world.chunks.size())
 	"""渲染所有已生成的区块"""
 	for chunk_pos in world.chunks:
 		var chunk = world.chunks[chunk_pos]
