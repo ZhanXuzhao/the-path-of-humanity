@@ -63,6 +63,26 @@ var resources = {
 
 func _ready():
 	process_mode = PROCESS_MODE_ALWAYS
+	_setup_autosave()
+	# 窗口关闭时自动保存
+	get_tree().root.close_requested.connect(_on_close_requested)
+
+func _on_close_requested():
+	save_game(true)
+	get_tree().quit()
+
+func _setup_autosave():
+	# 每分钟自动存档计时器
+	var timer = Timer.new()
+	timer.name = "AutosaveTimer"
+	timer.wait_time = 60.0
+	timer.timeout.connect(_on_autosave)
+	timer.one_shot = false
+	add_child(timer)
+
+func _on_autosave():
+	if state == GameState.PLAYING:
+		save_game(true)
 
 func _process(delta):
 	if state != GameState.PLAYING:
@@ -176,11 +196,15 @@ func show_notification(msg: String, type: NotificationType = NotificationType.IN
 # 加载存档时暂存的数据，供 Game 场景恢复
 var _loaded_save_data: Dictionary = {}
 
-func save_game() -> bool:
+func has_save_file() -> bool:
+	return FileAccess.file_exists("user://savegame.dat")
+
+func save_game(silent: bool = false) -> bool:
 	"""保存游戏（收集所有系统数据）"""
 	var game = get_node_or_null("/root/Game")
 	if not game:
-		show_notification("无法保存：未在游戏中", NotificationType.ERROR)
+		if not silent:
+			show_notification("无法保存：未在游戏中", NotificationType.ERROR)
 		return false
 	
 	var save_data = {
@@ -200,10 +224,12 @@ func save_game() -> bool:
 	var file = FileAccess.open("user://savegame.dat", FileAccess.WRITE)
 	if file:
 		file.store_var(save_data)
-		show_notification("游戏已保存", NotificationType.SUCCESS)
+		if not silent:
+			show_notification("游戏已保存", NotificationType.SUCCESS)
 		return true
 	else:
-		show_notification("保存失败！", NotificationType.ERROR)
+		if not silent:
+			show_notification("保存失败！", NotificationType.ERROR)
 		return false
 
 func load_game() -> bool:

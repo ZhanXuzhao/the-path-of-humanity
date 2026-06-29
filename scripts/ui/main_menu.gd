@@ -49,9 +49,12 @@ func _on_resume_pressed():
 
 func _on_start_pressed():
 	if _gm.state == _gm.GameState.MENU:
-		# 主菜单：开始游戏
-		_gm.start_game()
-		get_tree().change_scene_to_file("res://scenes/game.tscn")
+		# 主菜单：尝试自动读取存档，没有则开始新游戏
+		if _gm.has_save_file():
+			_load_game()
+		else:
+			_gm.start_game()
+			get_tree().change_scene_to_file("res://scenes/game.tscn")
 	else:
 		# 游戏中：保存游戏
 		_save_game()
@@ -64,7 +67,8 @@ func _on_quit_pressed():
 		# 主菜单：退出游戏
 		get_tree().quit()
 	else:
-		# 游戏中：返回主菜单
+		# 游戏中：先保存，再返回主菜单
+		_save_game()
 		_gm.state = _gm.GameState.MENU
 		get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
