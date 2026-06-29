@@ -1,0 +1,53 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="ThePathOfHumanity"
+config/features=PackedStringArray("4.6", "Forward Plus")
+config/icon="res://icon.svg"
+config/description="从原始采集到星辰大海 - 一款文明演化模拟游戏"
+run/main_scene="res://scenes/main_menu.tscn"
+
+[autoload]
+
+GameManager="*res://scripts/autoload/game_manager.gd"
+ItemDefinitions="*res://resources/item_definitions.gd"
+
+[input]
+
+left_click={
+"deadzone": 0.5,
+"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"button_index":1,"pressure":0.0,"alt_pressed":false,"shift_pressed":false,"control_pressed":false,"meta_pressed":false,"command_or_automatic":false,"double_click":false,"factor":1.0,"button_mask":0)
+]
+}
+right_click={
+"deadzone": 0.5,
+"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"button_index":2,"pressure":0.0,"alt_pressed":false,"shift_pressed":false,"control_pressed":false,"meta_pressed":false,"command_or_automatic":false,"double_click":false,"factor":1.0,"button_mask":0)
+]
+}
+scroll_wheel={
+"deadzone": 0.5,
+"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"button_index":4,"pressure":0.0,"alt_pressed":false,"shift_pressed":false,"control_pressed":false,"meta_pressed":false,"command_or_automatic":false,"double_click":false,"factor":1.0,"button_mask":0)
+]
+}
+scroll_wheel_down={
+"deadzone": 0.5,
+"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"button_index":5,"pressure":0.0,"alt_pressed":false,"shift_pressed":false,"control_pressed":false,"meta_pressed":false,"command_or_automatic":false,"double_click":false,"factor":1.0,"button_mask":0)
+]
+}
+
+[physics]
+
+3d/physics_engine="Jolt Physics"
+
+[rendering]
+
+rendering_device/driver.windows="d3d12"

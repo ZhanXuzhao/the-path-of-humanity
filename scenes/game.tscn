@@ -1,0 +1,211 @@
+[gd_scene load_steps=10 format=3 uid="uid://d0plvqi8nqtxg"]
+
+[ext_resource type="Script" path="res://scripts/core/game.gd" id="1_b4xb6"]
+[ext_resource type="Script" path="res://scripts/core/world.gd" id="2_mhkh2"]
+[ext_resource type="Script" path="res://scripts/systems/building_system.gd" id="3_ha1wi"]
+[ext_resource type="Script" path="res://scripts/systems/crafting_system.gd" id="4_e0m3h"]
+[ext_resource type="Script" path="res://scripts/systems/tech_system.gd" id="5_hb83g"]
+[ext_resource type="Script" path="res://scripts/core/camera_controller.gd" id="6_1vh7r"]
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="7_86c0l"]
+[ext_resource type="Script" path="res://scripts/ui/build_menu.gd" id="8_17ot"]
+[ext_resource type="Script" path="res://scripts/ui/tech_panel.gd" id="9_3h2wo"]
+
+[node name="Game" type="Node2D"]
+script = ExtResource("1_b4xb6")
+
+[node name="World" type="Node2D" parent="."]
+script = ExtResource("2_mhkh2")
+
+[node name="Camera" type="Camera2D" parent="."]
+position = Vector2(640, 360)
+zoom = Vector2(2, 2)
+script = ExtResource("6_1vh7r")
+
+[node name="Systems" type="Node" parent="."]
+
+[node name="BuildingSystem" type="Node" parent="Systems"]
+script = ExtResource("3_ha1wi")
+
+[node name="CraftingSystem" type="Node" parent="Systems"]
+script = ExtResource("4_e0m3h")
+
+[node name="TechSystem" type="Node" parent="Systems"]
+script = ExtResource("5_hb83g")
+
+[node name="UI" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="HUD" type="CanvasLayer" parent="UI"]
+layer = 1
+script = ExtResource("7_86c0l")
+
+[node name="TopBar" type="HBoxContainer" parent="UI/HUD"]
+anchors_preset = 0
+offset_left = 8.0
+offset_top = 4.0
+offset_right = 640.0
+offset_bottom = 40.0
+theme_override_constants/separation = 16
+
+[node name="TimeLabel" type="Label" parent="UI/HUD/TopBar"]
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_constants/minimum_font_size = 16
+text = "06:00"
+
+[node name="DayLabel" type="Label" parent="UI/HUD/TopBar"]
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_constants/minimum_font_size = 16
+text = "第 1 天"
+
+[node name="PopulationLabel" type="Label" parent="UI/HUD/TopBar"]
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_constants/minimum_font_size = 16
+text = "人口: 3"
+
+[node name="Resources" type="HBoxContainer" parent="UI/HUD/TopBar"]
+size_flags_horizontal = 0
+
+[node name="Notifications" type="VBoxContainer" parent="UI/HUD"]
+anchors_preset = 1
+anchor_top = 0.05
+anchor_right = 1.0
+offset_top = 40.0
+offset_right = -8.0
+alignment = 2
+
+[node name="BottomBar" type="HBoxContainer" parent="UI/HUD"]
+anchors_preset = 12
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = -50.0
+offset_right = 200.0
+offset_bottom = -8.0
+theme_override_constants/separation = 8
+
+[node name="SpeedBtn" type="Button" parent="UI/HUD/BottomBar"]
+custom_minimum_size = Vector2(50, 40)
+text = "×1"
+
+[node name="PauseBtn" type="Button" parent="UI/HUD/BottomBar"]
+custom_minimum_size = Vector2(50, 40)
+text = "⏸"
+
+[node name="BuildBtn" type="Button" parent="UI/HUD/BottomBar"]
+custom_minimum_size = Vector2(70, 40)
+text = "建造"
+
+[node name="TechBtn" type="Button" parent="UI/HUD/BottomBar"]
+custom_minimum_size = Vector2(70, 40)
+text = "科技"
+
+[node name="MenuBtn" type="Button" parent="UI/HUD/BottomBar"]
+custom_minimum_size = Vector2(70, 40)
+text = "菜单"]
+
+[node name="BuildMenu" type="Panel" parent="UI"]
+visible = false
+script = ExtResource("8_17ot")
+offset_left = 8.0
+offset_top = 60.0
+offset_right = 300.0
+offset_bottom = 600.0
+
+[node name="CategoryTabs" type="HBoxContainer" parent="UI/BuildMenu"]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 284.0
+offset_bottom = 36.0
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/BuildMenu"]
+offset_left = 8.0
+offset_top = 44.0
+offset_right = 284.0
+offset_bottom = 300.0
+
+[node name="BuildingList" type="VBoxContainer" parent="UI/BuildMenu/ScrollContainer"]
+
+[node name="InfoPanel" type="Panel" parent="UI/BuildMenu"]
+visible = false
+offset_left = 8.0
+offset_top = 308.0
+offset_right = 284.0
+offset_bottom = 530.0
+
+[node name="Name" type="Label" parent="UI/BuildMenu/InfoPanel"]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 268.0
+offset_bottom = 32.0
+theme_override_constants/minimum_font_size = 16
+text = "Name"
+
+[node name="Description" type="Label" parent="UI/BuildMenu/InfoPanel"]
+offset_left = 8.0
+offset_top = 36.0
+offset_right = 268.0
+offset_bottom = 60.0
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_constants/minimum_font_size = 12
+text = "Description"
+autowrap_mode = 2
+
+[node name="Materials" type="VBoxContainer" parent="UI/BuildMenu/InfoPanel"]
+offset_left = 8.0
+offset_top = 68.0
+offset_right = 268.0
+offset_bottom = 120.0
+
+[node name="BuildBtn" type="Button" parent="UI/BuildMenu/InfoPanel"]
+offset_left = 8.0
+offset_top = 130.0
+offset_right = 268.0
+offset_bottom = 160.0
+text = "建造"
+
+[node name="TechPanel" type="Panel" parent="UI"]
+visible = false
+script = ExtResource("9_3h2wo")
+offset_left = 320.0
+offset_top = 60.0
+offset_right = 760.0
+offset_bottom = 600.0
+
+[node name="CloseBtn" type="Button" parent="UI/TechPanel"]
+offset_left = 400.0
+offset_top = 8.0
+offset_right = 432.0
+offset_bottom = 40.0
+text = "X"
+
+[node name="Title" type="Label" parent="UI/TechPanel"]
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 300.0
+offset_bottom = 36.0
+theme_override_constants/minimum_font_size = 18
+text = "科技树"
+
+[node name="CurrentResearch" type="VBoxContainer" parent="UI/TechPanel"]
+offset_left = 8.0
+offset_top = 44.0
+offset_right = 432.0
+offset_bottom = 90.0
+
+[node name="CurrentLabel" type="Label" parent="UI/TechPanel/CurrentResearch"]
+theme_override_colors/font_color = Color(0.8, 0.8, 0.3, 1)
+text = "当前无研究"
+
+[node name="ProgressBar" type="ProgressBar" parent="UI/TechPanel/CurrentResearch"]
+custom_minimum_size = Vector2(400, 20)
+size_flags_horizontal = 3
+show_percentage = false
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/TechPanel"]
+offset_left = 8.0
+offset_top = 96.0
+offset_right = 432.0
+offset_bottom = 530.0
+
+[node name="TechList" type="VBoxContainer" parent="UI/TechPanel/ScrollContainer"]

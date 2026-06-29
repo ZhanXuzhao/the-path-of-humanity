@@ -1,0 +1,109 @@
+[gd_scene format=3 uid="uid://cm5p4exrbq2j6"]
+
+[ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1"]
+
+[node name="MainMenu" type="Control"]
+script = ExtResource("1")
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="Bg" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.1, 0.1, 0.12, 1)
+
+[node name="Title" type="Label" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.2
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -30.0
+offset_right = 300.0
+offset_bottom = 30.0
+theme_override_colors/font_color = Color(0.85, 0.65, 0.2, 1)
+theme_override_constants/minimum_font_size = 48
+text = "人类来时路"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Subtitle" type="Label" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.25
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = 20.0
+offset_right = 300.0
+offset_bottom = 60.0
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_constants/minimum_font_size = 20
+text = "The Path of Humanity"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Version" type="Label" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.3
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = 50.0
+offset_right = 200.0
+offset_bottom = 80.0
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+theme_override_constants/minimum_font_size = 14
+text = "Alpha 0.1 - 从原始采集到星辰大海"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MenuButtons" type="VBoxContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -60.0
+offset_right = 100.0
+offset_bottom = 120.0
+theme_override_constants/separation = 12
+
+[node name="StartBtn" type="Button" parent="MenuButtons"]
+custom_minimum_size = Vector2(200, 45)
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_constants/minimum_font_size = 18
+text = "开始游戏"
+size_flags_horizontal = 4
+
+[node name="LoadBtn" type="Button" parent="MenuButtons"]
+custom_minimum_size = Vector2(200, 45)
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_constants/minimum_font_size = 18
+text = "读取存档"
+size_flags_horizontal = 4
+
+[node name="QuitBtn" type="Button" parent="MenuButtons"]
+custom_minimum_size = Vector2(200, 45)
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_constants/minimum_font_size = 18
+text = "退出游戏"
+size_flags_horizontal = 4
+
+[node name="TipLabel" type="Label" parent="."]
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = -40.0
+offset_right = -20.0
+offset_bottom = -10.0
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+theme_override_constants/minimum_font_size = 12
+text = "提示: 收集资源、建造设施、发展科技，带领人类走向繁荣！"
+horizontal_alignment = 1

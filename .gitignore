@@ -1,0 +1,22 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+*.translation
+*.import
+export.cfg
+export_presets.cfg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# Build artifacts
+/standalone/
+/build/
