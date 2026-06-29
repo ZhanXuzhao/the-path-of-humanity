@@ -87,6 +87,9 @@ var world = null
 # 存储建筑编号计数器
 var _storage_rack_counter: int = 0
 
+# 已完成存储建筑索引（按 grid_pos 索引，方便快速查找和移除）
+var _completed_storage_index: Dictionary = {}  # Vector2i -> BuildingInstance
+
 func _ready():
 	# 尝试获取世界引用
 	world = get_node_or_null("/root/Game/World")
@@ -174,6 +177,9 @@ func add_construction_progress(pos: Vector2i, amount: float) -> bool:
 	if data != null and bld.construction_progress >= data.work_cost:
 		bld.is_completed = true
 		bld.hp = data.hp
+		# 如果是存储建筑，加入索引
+		if data.storage_capacity > 0:
+			_completed_storage_index[bld.grid_pos] = bld
 		building_completed.emit(bld.grid_pos)
 		return true
 	return false
@@ -247,6 +253,41 @@ func get_buildings_by_type(building_id: String) -> Array:
 			result.append(bld)
 	return result
 
+# -------- 存储建筑查询（使用预索引，O(1)~O(n)） --------
+func get_completed_storage_buildings() -> Array:
+	"""获取所有已完成的存储建筑"""
+	var result: Array[BuildingInstance] = []
+	for pos in _completed_storage_index:
+		result.append(_completed_storage_index[pos])
+	return result
+
+func get_storage_buildings_with_space() -> Array:
+	"""获取有空位的存储建筑"""
+	var result: Array[BuildingInstance] = []
+	for pos in _completed_storage_index:
+		var bld = _completed_storage_index[pos]
+		if bld.inventory != null and not bld.inventory.is_full():
+			result.append(bld)
+	return result
+
+func get_storage_buildings_with_item(item_id: String, min_amount: int = 1) -> Array:
+	"""获取存有指定物品的存储建筑"""
+	var result: Array[BuildingInstance] = []
+	for pos in _completed_storage_index:
+		var bld = _completed_storage_index[pos]
+		if bld.inventory != null and bld.inventory.has_item(item_id, min_amount):
+			result.append(bld)
+	return result
+
+func count_item_in_storage(item_id: String) -> int:
+	"""统计所有存储建筑中指定物品的总数"""
+	var total = 0
+	for pos in _completed_storage_index:
+		var bld = _completed_storage_index[pos]
+		if bld.inventory != null:
+			total += bld.inventory.get_item_count(item_id)
+	return total
+
 # -------- AI辅助查询 --------
 func get_uncompleted_buildings() -> Array:
 	"""获取所有未完成的建筑（施工工地）"""
@@ -286,6 +327,9 @@ func remove_building(pos: Vector2i) -> bool:
 	var data = bld.get_data()
 	var size = data.size if data else Vector2i.ONE
 	
+	# 从存储建筑索引中移除
+	_completed_storage_index.erase(bld.grid_pos)
+	
 	# 清除所有占用格子
 	for x in size.x:
 		for y in size.y:
@@ -320,6 +364,7 @@ func to_dict() -> Dictionary:
 
 func from_dict(data: Dictionary):
 	buildings.clear()
+	_completed_storage_index.clear()
 	for key in data:
 		var b_data = data[key]
 		var pos = Vector2i(b_data.pos.x, b_data.pos.y)
@@ -339,3 +384,9 @@ func from_dict(data: Dictionary):
 		for x in size.x:
 			for y in size.y:
 				buildings[pos + Vector2i(x, y)] = bld
+		
+		# 重建存储建筑索引
+		if bld.is_completed:
+			var bld_data = bld.get_data()
+			if bld_data and bld_data.storage_capacity > 0:
+				_completed_storage_index[bld.grid_pos] = bld

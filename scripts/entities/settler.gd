@@ -768,6 +768,11 @@ func _store_excess_to_storage():
 	
 	# 找附近已完成的存储建筑（置物架/仓库）
 	var storage_buildings = _find_nearby_storage()
+	
+	# 附近找不到时，扩大搜索范围到全图
+	if storage_buildings.is_empty():
+		storage_buildings = _find_nearby_storage(999999.0)
+	
 	if storage_buildings.is_empty():
 		_drop_inventory_to_ground()
 		return
@@ -820,7 +825,8 @@ func _store_excess_to_storage_at(bld_pos: Vector2i):
 	
 	var bld = game.building_system.get_building_at(bld_pos)
 	if bld == null or bld.inventory == null:
-		_drop_inventory_to_ground()
+		# 目标建筑无效（可能被拆了），尝试自动找其他存储建筑
+		_auto_store_overweight()
 		return
 	
 	var target_weight = carry_capacity * 0.7  # 降到70%负重
@@ -859,8 +865,15 @@ func _auto_store_overweight():
 		_drop_inventory_to_ground()
 		return
 	
+	# 先按默认半径找附近的置物架
 	var storage_buildings = _find_nearby_storage()
+	
+	# 如果附近找不到，扩大搜索范围到全图（不设距离限制），让角色跑远路去存放
 	if storage_buildings.is_empty():
+		storage_buildings = _find_nearby_storage(999999.0)
+	
+	if storage_buildings.is_empty():
+		# 真的没有任何存储建筑，才丢到地上
 		_drop_inventory_to_ground()
 		return
 	
@@ -901,15 +914,11 @@ func _find_nearby_storage(max_dist: float = -1.0) -> Array:
 	if game == null or game.building_system == null:
 		return []
 	
+	# 使用 BuildingSystem 预索引的快查方法
+	var storage_blds = game.building_system.get_storage_buildings_with_space()
+	
 	var result = []
-	for bld in game.building_system.get_all_buildings():
-		if not bld.is_completed:
-			continue
-		var data = bld.get_data()
-		if data == null or data.storage_capacity <= 0:
-			continue
-		if bld.inventory == null or bld.inventory.is_full():
-			continue
+	for bld in storage_blds:
 		var center = _bld_world_center(bld)
 		var dist = position.distance_to(center)
 		if dist <= max_dist:
@@ -929,17 +938,11 @@ func _find_storage_with_item(item_id: String, max_dist: float = -1.0) -> Array:
 	if game == null or game.building_system == null:
 		return []
 	
+	# 使用 BuildingSystem 预索引的快查方法
+	var storage_blds = game.building_system.get_storage_buildings_with_item(item_id, 1)
+	
 	var result = []
-	for bld in game.building_system.get_all_buildings():
-		if not bld.is_completed:
-			continue
-		var data = bld.get_data()
-		if data == null or data.storage_capacity <= 0:
-			continue
-		if bld.inventory == null:
-			continue
-		if not bld.inventory.has_item(item_id, 1):
-			continue
+	for bld in storage_blds:
 		var center = _bld_world_center(bld)
 		var dist = position.distance_to(center)
 		if dist <= max_dist:

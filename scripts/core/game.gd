@@ -890,17 +890,11 @@ func _find_material_source(item_id: String):
 	if building_system == null:
 		return null
 	
-	# 1. 查存储建筑
+	# 1. 查存储建筑（使用预索引快查）
 	var best_bld = null
 	var best_dist = INF
-	for bld in building_system.get_all_buildings():
-		if not bld.is_completed:
-			continue
-		var bdata = bld.get_data()
-		if bdata == null or bdata.storage_capacity <= 0:
-			continue
-		if bld.inventory == null or not bld.inventory.has_item(item_id, 1):
-			continue
+	var storage_blds = building_system.get_storage_buildings_with_item(item_id, 1)
+	for bld in storage_blds:
 		var center = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
 		var dist = center.length_squared()
 		if dist < best_dist:
@@ -946,12 +940,4 @@ func _has_material_in_storage(item_id: String) -> bool:
 	"""检查所有已完成的存储建筑中是否有指定材料"""
 	if building_system == null:
 		return false
-	for bld in building_system.get_all_buildings():
-		if not bld.is_completed:
-			continue
-		var bdata = bld.get_data()
-		if bdata == null or bdata.storage_capacity <= 0:
-			continue
-		if bld.inventory != null and bld.inventory.has_item(item_id, 1):
-			return true
-	return false
+	return not building_system.get_storage_buildings_with_item(item_id, 1).is_empty()

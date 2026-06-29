@@ -568,16 +568,9 @@ func _refresh_resource_display():
 	for res_id in tracked_resources:
 		var total = 0
 		
-		# 1. 统计所有已完成的存储建筑中的物品
+		# 1. 统计所有已完成的存储建筑中的物品（使用预索引快查）
 		if game and game.building_system:
-			for bld in game.building_system.get_all_buildings():
-				if not bld.is_completed:
-					continue
-				var bdata = bld.get_data()
-				if bdata == null or bdata.storage_capacity <= 0:
-					continue
-				if bld.inventory:
-					total += bld.inventory.get_item_count(res_id)
+			total += game.building_system.count_item_in_storage(res_id)
 		
 		# 2. 统计地面物品
 		if game and game.world:
