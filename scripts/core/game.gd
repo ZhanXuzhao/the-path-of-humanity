@@ -519,6 +519,22 @@ func _input(event):
 					for i in build_menu.category_tabs.get_child_count():
 						build_menu.category_tabs.get_child(i).button_pressed = false
 				get_viewport().set_input_as_handled()
+		
+		# 快捷键 Space：暂停/继续游戏
+		if event.keycode == KEY_SPACE:
+			# 有菜单打开时，Space 不触发暂停（避免误操作）
+			var build_menu = get_node_or_null("UI/BuildMenu")
+			var tech_panel = get_node_or_null("UI/TechPanel")
+			var work_panel = get_node_or_null("UI/WorkPanel")
+			var main_menu = get_node_or_null("UI/MainMenu")
+			if (build_menu and build_menu.visible) or (tech_panel and tech_panel.visible) or (work_panel and work_panel.visible) or (main_menu and main_menu.visible):
+				return
+			_gm.toggle_pause()
+			# 更新暂停按钮文字
+			var hud = get_node_or_null("UI/HUD")
+			if hud and hud.pause_btn:
+				hud.pause_btn.text = "▶" if _gm.state == 2 else "⏸"
+			get_viewport().set_input_as_handled()
 
 # ==================== 存档恢复 ====================
 

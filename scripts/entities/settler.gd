@@ -276,7 +276,10 @@ func _move_towards(delta):
 	var offset = target_world_pos - position
 	var dist = offset.length()
 	if dist > 2.0:
-		position += offset.normalized() * move_speed * delta
+		# 根据时间加速倍率同步提升移动速度
+		var gm = get_node("/root/GameManager")
+		var speed_mult = gm.time_speed if gm else 1.0
+		position += offset.normalized() * move_speed * delta * speed_mult
 	else:
 		position = target_world_pos
 		# 到达目标，根据任务类型切换状态
@@ -322,7 +325,10 @@ func _execute_work(delta):
 	var skill_level = get_skill(skill_id)
 	var work_speed = max(0.1, skill_level * 0.4)  # 技能越高干得越快
 	
-	work_accumulator += delta * work_speed
+	# 根据时间加速倍率同步提升工作速度
+	var gm = get_node("/root/GameManager")
+	var speed_mult = gm.time_speed if gm else 1.0
+	work_accumulator += delta * work_speed * speed_mult
 	
 	if work_accumulator >= work_tick_interval:
 		work_accumulator -= work_tick_interval
