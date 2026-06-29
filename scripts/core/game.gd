@@ -23,6 +23,10 @@ var mouse_grid_pos: Vector2i
 var settlers = []
 
 func _ready():
+	# 启动游戏状态（支持跳过菜单直接加载）
+	if _gm.state != 1:  # GameState.PLAYING
+		_gm.start_game()
+	
 	# 初始化世界
 	_generate_initial_area()
 	

@@ -14,7 +14,15 @@ config/name="ThePathOfHumanity"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 config/description="从原始采集到星辰大海 - 一款文明演化模拟游戏"
-run/main_scene="res://scenes/main_menu.tscn"
+run/main_scene="res://scenes/game.tscn"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/mode=3
+window/size/always_on_top=false
+window/dpi/allow_hidpi=true
 
 [autoload]
 
