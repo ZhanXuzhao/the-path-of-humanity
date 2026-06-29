@@ -167,19 +167,24 @@ layout_mode = 2
 text = "菜单"
 
 [node name="SettlerInfoPanel" type="Panel" parent="UI/HUD" unique_id=574386277]
-visible = false
-offset_left = 8.0
-offset_top = 400.0
-offset_right = 260.0
-offset_bottom = 928.0
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -470.0
+offset_right = 262.0
+offset_bottom = -10.0
+grow_vertical = 0
 theme_override_styles/panel = SubResource("2")
 
 [node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/SettlerInfoPanel" unique_id=472676839]
 layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
 offset_left = 4.0
 offset_top = 4.0
-offset_right = 248.0
-offset_bottom = 524.0
+offset_right = -4.0
+offset_bottom = -4.0
 
 [node name="VBox" type="VBoxContainer" parent="UI/HUD/SettlerInfoPanel/ScrollContainer" unique_id=2015608733]
 layout_mode = 2
