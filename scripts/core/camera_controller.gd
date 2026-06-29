@@ -7,10 +7,17 @@ var is_dragging: bool = false
 var zoom_level: float = 2.0
 const MIN_ZOOM: float = 0.5
 const MAX_ZOOM: float = 5.0
-const EDGE_SCROLL_MARGIN: int = 20
-const SCROLL_SPEED: float = 300.0
+
+# 从 GameManager.settings 读取滚动参数
+var _scroll_speed: float = 300.0
+var _edge_scroll_margin: int = 20
 
 func _ready():
+	# 从 GameManager 读取配置的滚动参数
+	if GameManager.settings.has("scroll_speed"):
+		_scroll_speed = GameManager.settings.scroll_speed
+	if GameManager.settings.has("edge_scroll_margin"):
+		_edge_scroll_margin = GameManager.settings.edge_scroll_margin
 	# 鼠标中键拖动
 	set_process_input(true)
 
@@ -50,18 +57,18 @@ func _process(delta):
 		move.x += 1
 	
 	if move != Vector2.ZERO:
-		position += move.normalized() * SCROLL_SPEED * delta * (1.0 / zoom_level)
+		position += move.normalized() * _scroll_speed * delta * (1.0 / zoom_level)
 	
 	# 屏幕边缘滚动
 	var viewport_size = get_viewport_rect().size
 	var mouse_pos = get_viewport().get_mouse_position()
 	
-	if mouse_pos.x < EDGE_SCROLL_MARGIN:
-		position.x -= SCROLL_SPEED * delta * (1.0 / zoom_level)
-	elif mouse_pos.x > viewport_size.x - EDGE_SCROLL_MARGIN:
-		position.x += SCROLL_SPEED * delta * (1.0 / zoom_level)
+	if mouse_pos.x < _edge_scroll_margin:
+		position.x -= _scroll_speed * delta * (1.0 / zoom_level)
+	elif mouse_pos.x > viewport_size.x - _edge_scroll_margin:
+		position.x += _scroll_speed * delta * (1.0 / zoom_level)
 	
-	if mouse_pos.y < EDGE_SCROLL_MARGIN:
-		position.y -= SCROLL_SPEED * delta * (1.0 / zoom_level)
-	elif mouse_pos.y > viewport_size.y - EDGE_SCROLL_MARGIN:
-		position.y += SCROLL_SPEED * delta * (1.0 / zoom_level)
+	if mouse_pos.y < _edge_scroll_margin:
+		position.y -= _scroll_speed * delta * (1.0 / zoom_level)
+	elif mouse_pos.y > viewport_size.y - _edge_scroll_margin:
+		position.y += _scroll_speed * delta * (1.0 / zoom_level)

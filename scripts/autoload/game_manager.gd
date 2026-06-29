@@ -31,6 +31,9 @@ var time_speed: float = 1.0        # 时间流逝速度
 var day_length: float = 24.0       # 一天的长度（现实秒）
 var current_day: int = 1           # 当前天数
 
+# 游戏设置（从配置文件加载）
+var settings: Dictionary = {}
+
 # 游戏状态
 var state: GameState = GameState.MENU
 var colony_name: String = "人类聚居地"
@@ -63,9 +66,24 @@ var resources = {
 
 func _ready():
 	process_mode = PROCESS_MODE_ALWAYS
+	_load_settings()
 	_setup_autosave()
 	# 窗口关闭时自动保存
 	get_tree().root.close_requested.connect(_on_close_requested)
+
+func _load_settings():
+	"""从 res://resources/game_settings.cfg 加载游戏设置"""
+	var cfg = ConfigFile.new()
+	var err = cfg.load("res://resources/game_settings.cfg")
+	if err != OK:
+		push_error("无法加载游戏设置文件：", err)
+		return
+	
+	# 相机设置
+	settings["scroll_speed"] = cfg.get_value("camera", "scroll_speed", 300.0)
+	settings["edge_scroll_margin"] = cfg.get_value("camera", "edge_scroll_margin", 20)
+	
+	print("游戏设置已加载")
 
 func _on_close_requested():
 	save_game(true)
