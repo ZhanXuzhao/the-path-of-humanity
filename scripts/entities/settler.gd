@@ -672,16 +672,16 @@ func _tick_sleep(delta):
 	
 	# 检查是否天亮了或精力已满
 	if needs["rest"] >= 95.0:
+		# complete_task() 已处理状态切换
 		complete_task()
-		state = SettlerState.IDLE
 		return
 	
 	# 检查是否白天了
 	if gm:
 		var hour = int(gm.game_time)
 		if hour >= 6 and hour < 18:
+			# complete_task() 已处理状态切换
 			complete_task()
-			state = SettlerState.IDLE
 
 func find_nearest_residential() -> Dictionary:
 	"""查找最近的居住建筑（帐篷/房屋），返回{pos, world_pos}"""
@@ -746,11 +746,14 @@ var _eat_timer: float = 0.0
 
 func _tick_eat(delta):
 	"""进食中恢复饱食度"""
-	if _eat_timer > 0:
-		_eat_timer -= delta
-		if _eat_timer <= 0:
-			complete_task()
-			state = SettlerState.IDLE
+	if _eat_timer <= 0:
+		# 安全兜底：防止因加载存档等导致 _eat_timer 为 0 而卡死
+		complete_task()
+		return
+	_eat_timer -= delta
+	if _eat_timer <= 0:
+		# complete_task() 已处理状态切换（如超重时自动转为 MOVING）
+		complete_task()
 
 func _tick_eat_from_rack():
 	"""从置物架取食物并进食"""
@@ -778,8 +781,8 @@ func _tick_eat_from_rack():
 		_eat_timer = 2.0
 		state = SettlerState.EATING
 	else:
+		# complete_task() 已处理状态切换
 		complete_task()
-		state = SettlerState.IDLE
 
 func _find_food_in_storage() -> Dictionary:
 	"""在附近的存储建筑中查找食物，返回{bld, food_id}"""
