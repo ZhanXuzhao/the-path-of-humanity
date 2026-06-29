@@ -89,6 +89,10 @@ theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_constants/minimum_font_size = 16
 text = "人口: 3"
 
+[node name="FpsLabel" type="Label" parent="UI/HUD/TopBar"]
+theme_override_colors/font_color = Color(0.6, 1, 0.6, 1)
+theme_override_constants/minimum_font_size = 16
+
 [node name="Resources" type="HBoxContainer" parent="UI/HUD/TopBar"]
 size_flags_horizontal = 0
 

@@ -8,6 +8,7 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var time_label: Label = $TopBar/TimeLabel
 @onready var day_label: Label = $TopBar/DayLabel
 @onready var population_label: Label = $TopBar/PopulationLabel
+@onready var fps_label: Label = $TopBar/FpsLabel
 @onready var resource_container: HBoxContainer = $TopBar/Resources
 @onready var notification_container: VBoxContainer = $Notifications
 @onready var speed_btn: Button = $BottomBar/SpeedBtn
@@ -56,6 +57,10 @@ func _ready():
 	
 	# 延迟一帧初始化资源显示（等待 GameManager 完全就绪）
 	call_deferred("_update_resource_display")
+
+func _process(_delta):
+	if fps_label:
+		fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
 
 func _on_time_changed(_hour: float):
 	if time_label:
