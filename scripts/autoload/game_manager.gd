@@ -145,7 +145,17 @@ func start_game():
 	game_time = 6.0
 	current_day = 1
 	time_speed = 1.0
-	stats.survival_days = 0
+	# 重置统计数据
+	stats = {
+		"total_settlers": 0,
+		"max_settlers": 0,
+		"total_built": 0,
+		"total_crafted": 0,
+		"total_researched": 0,
+		"survival_days": 0,
+	}
+	# 清除之前加载的存档数据，确保是全新游戏
+	_loaded_save_data.clear()
 	# 重置资源
 	resources = {
 		"wood": 0,

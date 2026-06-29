@@ -32,17 +32,9 @@ func _on_visibility_changed():
 			tech_panel.visible = false
 
 func _on_start_pressed():
-	# 主菜单 → 开始游戏（自动读档或新游戏）
-	# 游戏中 → 返回游戏
-	if _gm.state == _gm.GameState.MENU:
-		if _gm.has_save_file():
-			_load_game()
-		else:
-			_gm.start_game()
-			get_tree().change_scene_to_file("res://scenes/game.tscn")
-	else:
-		_gm.resume_game()
-		visible = false
+	# 无论主菜单还是暂停菜单，都新建游戏
+	_gm.start_game()
+	get_tree().change_scene_to_file("res://scenes/game.tscn")
 
 func _on_save_pressed():
 	_save_game()

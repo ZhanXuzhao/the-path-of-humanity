@@ -79,7 +79,7 @@ theme_override_constants/separation = 12
 custom_minimum_size = Vector2(200, 45)
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_constants/minimum_font_size = 18
-text = "开始游戏"
+text = "新建游戏"
 size_flags_horizontal = 4
 
 [node name="SaveBtn" type="Button" parent="MenuButtons"]
