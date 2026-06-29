@@ -17,6 +17,14 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var tech_btn: Button = $BottomBar/TechBtn
 @onready var menu_btn: Button = $BottomBar/MenuBtn
 
+# 定居者信息面板
+@onready var settler_info_panel: Panel = $SettlerInfoPanel
+@onready var settler_name_label: Label = $SettlerInfoPanel/ScrollContainer/VBox/NameLabel
+@onready var settler_state_label: Label = $SettlerInfoPanel/ScrollContainer/VBox/StateLabel
+@onready var settler_hp_bar: ProgressBar = $SettlerInfoPanel/ScrollContainer/VBox/HpBarHBox/HPBar
+@onready var settler_hp_label: Label = $SettlerInfoPanel/ScrollContainer/VBox/HpBarHBox/HPLabel
+@onready var settler_needs_container: VBoxContainer = $SettlerInfoPanel/ScrollContainer/VBox/NeedsContainer
+
 var game_manager
 var notification_scene = load("res://scenes/ui/notification.tscn")
 
@@ -57,10 +65,112 @@ func _ready():
 	
 	# 延迟一帧初始化资源显示（等待 GameManager 完全就绪）
 	call_deferred("_update_resource_display")
+	
+	# 定居者选择信号连接
+	_settler_info_connections()
+	
+	# 更新人口显示
+	_update_population()
 
-func _process(_delta):
+# 定居者信息面板相关变量
+var _tracked_settler = null
+var _need_bars: Dictionary = {}  # need_id -> ProgressBar
+
+func _settler_info_connections():
+	var game = get_node("/root/Game")
+	if game:
+		game.settler_selected.connect(_on_settler_selected)
+		game.settler_deselected.connect(_on_settler_deselected)
+
+func _on_settler_selected(settler):
+	"""选中定居者时显示信息面板"""
+	settler_info_panel.visible = true
+	_tracked_settler = settler
+	_build_settler_info_ui(settler)
+
+func _on_settler_deselected():
+	"""取消选中时隐藏信息面板"""
+	settler_info_panel.visible = false
+	_tracked_settler = null
+
+func _update_population():
+	"""更新人口显示"""
+	var game = get_node("/root/Game")
+	if game and population_label:
+		var count = 0
+		for s in game.settlers:
+			if is_instance_valid(s):
+				count += 1
+		population_label.text = "人口: %d" % count
+
+func _build_settler_info_ui(settler):
+	"""构建定居者信息面板（选中不同人时调用）"""
+	if not is_instance_valid(settler):
+		return
+	
+	settler_name_label.text = settler.settler_name
+	settler_state_label.text = "状态: " + Settler.get_state_display(settler.state)
+	settler_hp_label.text = "生命:"
+	settler_hp_bar.max_value = settler.max_hp
+	settler_hp_bar.value = settler.hp
+	
+	# 重建需求条
+	for child in settler_needs_container.get_children():
+		child.queue_free()
+	_need_bars.clear()
+	
+	var need_names = {
+		"hunger": "饱食度",
+		"rest": "精力",
+		"comfort": "舒适度",
+		"social": "社交",
+		"safety": "安全感",
+	}
+	
+	for need_id in settler.needs:
+		var hbox = HBoxContainer.new()
+		var label = Label.new()
+		label.text = need_names.get(need_id, need_id) + ":"
+		label.custom_minimum_size = Vector2(50, 0)
+		label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+		label.add_theme_constant_override("minimum_font_size", 12)
+		
+		var bar = ProgressBar.new()
+		bar.max_value = 100.0
+		bar.value = settler.needs[need_id]
+		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bar.show_percentage = true
+		
+		hbox.add_child(label)
+		hbox.add_child(bar)
+		settler_needs_container.add_child(hbox)
+		_need_bars[need_id] = bar
+
+func _process(delta):
 	if fps_label:
 		fps_label.text = "FPS: %d" % Engine.get_frames_per_second()
+	
+	# 选中定居者时实时更新信息面板
+	if settler_info_panel.visible and is_instance_valid(_tracked_settler):
+		var s = _tracked_settler
+		settler_state_label.text = "状态: " + Settler.get_state_display(s.state)
+		settler_hp_bar.max_value = s.max_hp
+		settler_hp_bar.value = s.hp
+		# 更新需求条数值
+		for need_id in _need_bars:
+			var bar = _need_bars[need_id]
+			if is_instance_valid(bar):
+				bar.value = s.needs.get(need_id, 0.0)
+	elif settler_info_panel.visible and not is_instance_valid(_tracked_settler):
+		# 如果选中的定居者已死亡/消失，自动隐藏面板
+		_on_settler_deselected()
+		var game = get_node("/root/Game")
+		if game:
+			game.selected_settler = null
+	
+	# 定时更新人口（不每帧刷新）
+	if Engine.get_physics_frames() % 60 == 0:
+		_update_population()
 
 func _on_time_changed(_hour: float):
 	if time_label:

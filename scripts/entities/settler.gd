@@ -92,6 +92,9 @@ var work_accumulator: float = 0.0               # 工作累积计时器
 var work_tick_interval: float = 0.5             # 每次工作刻的间隔（秒）
 var is_working_on_construction: bool = false    # 是否正在建造建筑
 
+# 选中状态
+var is_selected: bool = false
+
 # 年龄和寿命
 var age: float
 var lifespan: float = 80.0
@@ -157,6 +160,32 @@ func _process(delta):
 			_move_towards(delta)
 		SettlerState.WORKING:
 			_execute_work(delta)
+
+# -------- 选中状态 --------
+func set_selected(selected: bool):
+	"""设置选中状态，显示/隐藏选择指示圈"""
+	is_selected = selected
+	queue_redraw()
+
+func _draw():
+	"""绘制选择指示圈"""
+	if is_selected:
+		# 外圈发光
+		draw_circle(Vector2.ZERO, TILE_SIZE * 0.55, Color(0.3, 0.8, 1.0, 0.0), false, 2.5)
+		# 选择光环
+		draw_arc(Vector2.ZERO, TILE_SIZE * 0.55, 0, TAU, 36, Color(0.3, 0.8, 1.0, 0.9), 2.5)
+
+static func get_state_display(state_val: int) -> String:
+	"""将状态枚举转换为中文显示文字"""
+	match state_val:
+		SettlerState.IDLE: return "空闲"
+		SettlerState.MOVING: return "移动中"
+		SettlerState.WORKING: return "工作中"
+		SettlerState.EATING: return "进食中"
+		SettlerState.SLEEPING: return "睡眠中"
+		SettlerState.FLEEING: return "逃跑中"
+		SettlerState.COMBAT: return "战斗中"
+		_: return "未知"
 
 # -------- 移动系统 --------
 func move_to(target: Vector2):

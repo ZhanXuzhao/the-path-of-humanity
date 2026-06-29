@@ -23,6 +23,11 @@ var mouse_grid_pos: Vector2i
 # 定居者管理
 var settlers = []
 
+# 选中定居者
+var selected_settler = null
+signal settler_selected(settler)
+signal settler_deselected()
+
 func _ready():
 	# 自动加载存档（静默读取，不弹通知）
 	if _gm.state != 1 and _gm._loaded_save_data.is_empty() and _gm.has_save_file():
@@ -67,6 +72,10 @@ func _process(delta):
 	
 	# 更新定居者需求和AI
 	_update_settlers(delta)
+	
+	# 检查选中的定居者是否还存活
+	if selected_settler != null and not is_instance_valid(selected_settler):
+		_deselect_settler()
 	
 	# 分配任务给空闲定居者
 	_assign_ai_tasks()
@@ -159,8 +168,54 @@ func _try_place_building():
 		_gm.show_notification("无法建造: " + check.reason,
 			1)
 
+# -------- 定居者选择 --------
+func _try_select_settler():
+	"""尝试在鼠标位置选择定居者"""
+	var global_pos = get_global_mouse_position()
+	
+	# 查找鼠标位置附近的定居者
+	var closest = null
+	var closest_dist = 400.0  # 最大选择距离（像素，约12.5格）
+	
+	for s in settlers:
+		if not is_instance_valid(s):
+			continue
+		var dist = s.position.distance_to(global_pos)
+		if dist < closest_dist:
+			closest_dist = dist
+			closest = s
+	
+	if closest != null:
+		_select_settler(closest)
+	else:
+		_deselect_settler()
+
+func _select_settler(settler):
+	"""选中定居者"""
+	if selected_settler == settler:
+		return
+	# 取消之前的选中
+	if selected_settler != null and is_instance_valid(selected_settler):
+		selected_settler.set_selected(false)
+	# 选中新定居者
+	selected_settler = settler
+	settler.set_selected(true)
+	settler_selected.emit(settler)
+
+func _deselect_settler():
+	"""取消选中定居者"""
+	if selected_settler != null and is_instance_valid(selected_settler):
+		selected_settler.set_selected(false)
+	selected_settler = null
+	settler_deselected.emit()
+
 func _input(event):
 	if event.is_action_pressed("ui_cancel"):
+		# 有选中定居者时，Esc 取消选中
+		if selected_settler != null:
+			_deselect_settler()
+			return
+		
 		if build_mode:
 			exit_build_mode()
 			return
@@ -188,6 +243,11 @@ func _input(event):
 	
 	if event.is_action_pressed("left_click") and build_mode:
 		_try_place_building()
+		return
+	
+	# 定居者点击选择（非建造模式下的左键单击）
+	if event.is_action_pressed("left_click") and not build_mode:
+		_try_select_settler()
 	
 	# 快捷键 B：打开/关闭建造菜单
 	if event is InputEventKey and event.pressed and not event.echo:
