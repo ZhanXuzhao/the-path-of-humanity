@@ -28,7 +28,7 @@ enum NotificationType {
 # 时间系统
 var game_time: float = 6.0         # 当前时间（小时，从0开始）
 var time_speed: float = 1.0        # 时间流逝速度
-var day_length: float = 24.0       # 一天的长度（现实秒）
+var day_length: float = 240.0      # 一天的长度（现实秒），默认240秒=4分钟(10现实秒=1游戏小时)
 var current_day: int = 1           # 当前天数
 
 # 游戏设置（从配置文件加载）
@@ -76,6 +76,9 @@ func _load_settings():
 	if err != OK:
 		push_error("无法加载游戏设置文件：", err)
 		return
+	
+	# 时间设置
+	day_length = cfg.get_value("time", "day_length", 240.0)
 	
 	# 相机设置
 	settings["scroll_speed"] = cfg.get_value("camera", "scroll_speed", 300.0)
