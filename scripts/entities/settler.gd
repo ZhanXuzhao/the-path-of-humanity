@@ -214,17 +214,35 @@ func _draw():
 		_draw_target_line()
 
 func _draw_target_line():
-	"""绘制连接到目标位置的指示虚线（选中时显示）"""
+	"""绘制连接到目标位置的指示虚线（选中时显示），有导航路径时沿路径绘制"""
 	if target_world_pos == Vector2.ZERO or position.distance_squared_to(target_world_pos) < 16.0:
 		return
 	
-	var local_target = target_world_pos - position
 	var line_color = Color(0.3, 0.8, 1.0, 0.6)
 	
-	# 虚线
-	draw_dashed_line(Vector2.ZERO, local_target, line_color, 1.5, 4.0, true)
-	# 目标位置标记圆圈
-	draw_circle(local_target, 3.0, line_color)
+	# 如果有导航路径，沿路径点绘制折线
+	if not _path.is_empty():
+		var game = get_node_or_null("/root/Game")
+		var ts = game.world.tile_size if game and game.world else 32.0
+		var prev_point = Vector2.ZERO  # 起点是角色自身位置（局部坐标原点）
+		for grid_pos in _path:
+			var wp = Vector2(
+				grid_pos.x * ts + ts / 2.0,
+				grid_pos.y * ts + ts / 2.0
+			) - position
+			draw_dashed_line(prev_point, wp, line_color, 1.5, 4.0, true)
+			# 路径点小圆点
+			draw_circle(wp, 1.5, line_color)
+			prev_point = wp
+		# 最后一段到最终目标
+		var local_target = target_world_pos - position
+		draw_dashed_line(prev_point, local_target, line_color, 1.5, 4.0, true)
+		draw_circle(local_target, 3.0, line_color)
+	else:
+		# 无路径时直接画直线
+		var local_target = target_world_pos - position
+		draw_dashed_line(Vector2.ZERO, local_target, line_color, 1.5, 4.0, true)
+		draw_circle(local_target, 3.0, line_color)
 
 # 根据任务数据获取工作类别显示文字
 static func get_work_type_from_task(task_data: Dictionary) -> String:
