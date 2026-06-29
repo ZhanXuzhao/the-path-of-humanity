@@ -142,20 +142,43 @@ func _generate_initial_area():
 func _spawn_initial_settlers():
 	# 创建3个初始定居者
 	var work_manager = get_node_or_null("/root/WorkManager")
-	# 世界中心像素坐标
-	var world_center = Vector2(
-		world.WORLD_CHUNKS_X * world.CHUNK_SIZE * world.tile_size / 2.0,
-		world.WORLD_CHUNKS_Y * world.CHUNK_SIZE * world.tile_size / 2.0
+	
+	# 世界中心网格坐标
+	var center_grid = Vector2i(
+		world.WORLD_CHUNKS_X * world.CHUNK_SIZE / 2,
+		world.WORLD_CHUNKS_Y * world.CHUNK_SIZE / 2
 	)
+	
+	# 寻找中心附近最近的可行走格子（避免定居者生成在水上）
+	var spawn_center_grid = _find_walkable_near(center_grid, 20)
+	
+	# 可行走中心像素坐标
+	var spawn_center = Vector2(
+		spawn_center_grid.x * world.tile_size + world.tile_size / 2.0,
+		spawn_center_grid.y * world.tile_size + world.tile_size / 2.0
+	)
+	
 	for i in 3:
 		var settler = Settler.new()
-		settler.position = world_center + Vector2(randf_range(-100, 100), randf_range(-100, 100))
+		settler.position = spawn_center + Vector2(randf_range(-100, 100), randf_range(-100, 100))
 		add_child(settler)
 		settlers.append(settler)
 		if work_manager:
 			work_manager.init_settler(settler.settler_id)
 		_gm.show_notification("新成员加入了聚居地: %s" % settler.settler_name, 
 			3)
+
+func _find_walkable_near(from_grid: Vector2i, max_radius: int) -> Vector2i:
+	"""从 from_grid 开始螺旋搜索，返回半径 max_radius 内第一个可行走网格"""
+	for radius in range(max_radius + 1):
+		for dx in range(-radius, radius + 1):
+			for dy in range(-radius, radius + 1):
+				if abs(dx) != radius and abs(dy) != radius:
+					continue
+				var check = from_grid + Vector2i(dx, dy)
+				if world.is_walkable(check):
+					return check
+	return from_grid  # 兜底：返回原坐标（虽然不太可能，但防止死循环）
 
 # -------- 建造模式 --------
 func enter_build_mode(building_id: String):
