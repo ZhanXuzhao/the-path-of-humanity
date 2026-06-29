@@ -97,8 +97,7 @@ func set_time_speed(speed: float):
 # -------- 辅助方法 --------
 func get_time_string() -> String:
 	var hours = int(game_time)
-	var minutes = int((game_time - hours) * 60)
-	return "%02d:%02d" % [hours, minutes]
+	return "%02d时" % [hours]
 
 func is_daytime() -> bool:
 	return game_time >= 6.0 and game_time < 18.0
