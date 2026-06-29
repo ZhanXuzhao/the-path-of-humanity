@@ -62,6 +62,8 @@ const RESOURCE_EMOJI = {
 	"coal": "⬛",
 }
 
+var _resource_refresh_timer: float = 0.0
+
 func _ready():
 	game_manager = get_node("/root/GameManager")
 	
@@ -69,7 +71,6 @@ func _ready():
 	game_manager.time_changed.connect(_on_time_changed)
 	game_manager.day_changed.connect(_on_day_changed)
 	game_manager.notification.connect(_on_notification)
-	game_manager.resources_changed.connect(_on_resources_changed)
 	
 		# 按钮连接
 	if pause_btn:
@@ -86,8 +87,16 @@ func _ready():
 	if menu_btn:
 		menu_btn.pressed.connect(_on_menu_pressed)
 	
-	# 延迟一帧初始化资源显示（等待 GameManager 完全就绪）
-	call_deferred("_update_resource_display")
+	# 延迟一帧初始化资源显示（等 Game 场景就绪）
+	call_deferred("_refresh_resource_display")
+	
+	# 连接建筑完成和地面物品变化信号，触发实时刷新
+	var game = get_node_or_null("/root/Game")
+	if game:
+		if game.building_system:
+			game.building_system.building_completed.connect(_refresh_resource_display)
+		if game.world:
+			game.world.ground_items_changed.connect(_on_ground_items_changed)
 	
 	# 定居者选择信号连接
 	_settler_info_connections()
@@ -474,6 +483,12 @@ func _process(delta):
 	# 定时更新人口（不每帧刷新）
 	if Engine.get_physics_frames() % 60 == 0:
 		_update_population()
+	
+	# 定时刷新资源显示（来自置物架+地面）
+	_resource_refresh_timer += delta
+	if _resource_refresh_timer >= 2.0:
+		_resource_refresh_timer = 0.0
+		_refresh_resource_display()
 
 func _on_time_changed(_hour: float):
 	if time_label:
@@ -543,26 +558,42 @@ func _on_notification(msg: String, type: int):
 	if is_instance_valid(notif):
 		notif.queue_free()
 
-func _on_resources_changed(resource_id: String, _old_amount: int, new_amount: int):
-	"""单个资源变化时更新对应标签"""
-	var emoji = RESOURCE_EMOJI.get(resource_id, "")
-	for child in resource_container.get_children():
-		if child.name == resource_id:
-			var item_def = ItemDefinitions.get_item(resource_id)
-			var name_str = item_def.name if item_def else resource_id
-			child.text = "%s %s: %d" % [emoji, name_str, new_amount]
-			return
-
-func _update_resource_display():
-	"""初始化或刷新所有资源标签"""
+func _refresh_resource_display():
+	"""扫描所有置物架和地面，更新资源数量显示"""
 	if not game_manager or resource_container == null:
 		return
 	
+	var game = get_node_or_null("/root/Game")
+	
 	for res_id in tracked_resources:
-		var amount = game_manager.resources.get(res_id, 0)
-		var emoji = RESOURCE_EMOJI.get(res_id, "")
+		var total = 0
 		
-		# 查找是否已有对应标签
+		# 1. 统计所有已完成的存储建筑中的物品
+		if game and game.building_system:
+			for bld in game.building_system.get_all_buildings():
+				if not bld.is_completed:
+					continue
+				var bdata = bld.get_data()
+				if bdata == null or bdata.storage_capacity <= 0:
+					continue
+				if bld.inventory:
+					total += bld.inventory.get_item_count(res_id)
+		
+		# 2. 统计地面物品
+		if game and game.world:
+			total += game.world.count_ground_item(res_id)
+		
+		# 3. 统计所有定居者背包中的物品（可选）
+		if game:
+			for s in game.settlers:
+				if is_instance_valid(s) and s.inventory:
+					total += s.inventory.get_item_count(res_id)
+		
+		var emoji = RESOURCE_EMOJI.get(res_id, "")
+		var item_def = ItemDefinitions.get_item(res_id)
+		var name_str = item_def.name if item_def else res_id
+		
+		# 查找或创建标签
 		var existing = null
 		for child in resource_container.get_children():
 			if child.name == res_id:
@@ -570,19 +601,15 @@ func _update_resource_display():
 				break
 		
 		if existing:
-			var item_def = ItemDefinitions.get_item(res_id)
-			var name_str = item_def.name if item_def else res_id
-			existing.text = "%s %s: %d" % [emoji, name_str, amount]
+			existing.text = "%s %s: %d" % [emoji, name_str, total]
 		else:
 			var label = Label.new()
 			label.name = res_id
 			label.add_theme_color_override("font_color", Color.WHITE)
 			label.add_theme_constant_override("minimum_font_size", 14)
-			var item_def = ItemDefinitions.get_item(res_id)
-			var name_str = item_def.name if item_def else res_id
-			label.text = "%s %s: %d" % [emoji, name_str, amount]
+			label.text = "%s %s: %d" % [emoji, name_str, total]
 			resource_container.add_child(label)
 
-func update_resource(resource_id: String, amount: int):
-	"""更新单个资源显示（外部调用，兼容旧接口）"""
-	_on_resources_changed(resource_id, 0, amount)
+func _on_ground_items_changed(_grid_pos: Vector2i):
+	"""地面物品变化时实时刷新资源显示"""
+	_refresh_resource_display()

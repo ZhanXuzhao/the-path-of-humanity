@@ -612,17 +612,17 @@ func _assign_ai_tasks():
 			continue
 		
 		# 如果材料已备齐（已搬运到工地），直接创建建造任务
-		# 如果材料未备齐，检查全局是否有可用材料
+		# 如果材料未备齐，检查存储建筑或地面是否有可用材料
 		if not bld.is_materials_ready():
 			var has_any_material = false
 			var missing = bld.get_missing_materials()
 			for mat_id in missing.keys():
-				# 检查全局资源池
-				if _gm.has_resource(mat_id, 1):
-					has_any_material = true
-					break
 				# 检查所有存储建筑
 				if _has_material_in_storage(mat_id):
+					has_any_material = true
+					break
+				# 检查地面物品
+				if world and world.has_ground_item(mat_id, 1):
 					has_any_material = true
 					break
 			if not has_any_material:
@@ -886,16 +886,11 @@ func _scan_material_hauling_tasks(settlers: Array) -> Array:
 	return result
 
 func _find_material_source(item_id: String):
-	"""查找指定材料的来源位置，返回{type, bld_pos, world_pos}或null"""
-	# 1. 先查全局资源池
-	var gm = get_node("/root/GameManager")
-	if gm and gm.has_resource(item_id, 1):
-		return {"type": "global", "bld_pos": Vector2i.ZERO, "world_pos": Vector2.ZERO}
-	
-	# 2. 查存储建筑
+	"""查找指定材料的来源位置，返回{type, bld_pos, world_pos, grid_pos}或null"""
 	if building_system == null:
 		return null
 	
+	# 1. 查存储建筑
 	var best_bld = null
 	var best_dist = INF
 	for bld in building_system.get_all_buildings():
@@ -918,6 +913,26 @@ func _find_material_source(item_id: String):
 			"bld_pos": best_bld.grid_pos,
 			"world_pos": _grid_to_world(best_bld.grid_pos + best_bld.get_size() / 2)
 		}
+	
+	# 2. 查地面物品
+	if world:
+		var ground_positions = world.get_all_ground_positions_of(item_id)
+		if not ground_positions.is_empty():
+			# 找最近的
+			var best_grid = ground_positions[0]
+			best_dist = INF
+			for gp in ground_positions:
+				var center = _grid_to_world(gp)
+				var dist = center.length_squared()
+				if dist < best_dist:
+					best_dist = dist
+					best_grid = gp
+			return {
+				"type": "ground",
+				"bld_pos": best_grid,
+				"grid_pos": best_grid,
+				"world_pos": _grid_to_world(best_grid)
+			}
 	
 	return null
 

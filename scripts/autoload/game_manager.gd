@@ -6,7 +6,7 @@ signal day_changed(day: int)
 signal time_changed(hour: float)
 signal game_paused(is_paused: bool)
 signal notification(msg: String, type: int)
-signal resources_changed(resource_id: String, old_amount: int, new_amount: int)
+# 资源池已移除，所有资源存在于：置物架、背包、地面
 
 # 游戏状态枚举
 enum GameState {
@@ -46,22 +46,6 @@ var stats = {
 	"total_crafted": 0,
 	"total_researched": 0,
 	"survival_days": 0,
-}
-var resources = {
-	"wood": 0,
-	"stone": 0,
-	"food": 0,
-	"iron_ore": 0,
-	"copper_ore": 0,
-	"coal": 0,
-	"iron_ingot": 0,
-	"copper_ingot": 0,
-	"plank": 0,
-	"brick": 0,
-	"berry": 0,
-	"raw_meat": 0,
-	"cooked_meat": 0,
-	"cloth": 0,
 }
 
 func _ready():
@@ -159,23 +143,6 @@ func start_game():
 	}
 	# 清除之前加载的存档数据，确保是全新游戏
 	_loaded_save_data.clear()
-	# 重置资源
-	resources = {
-		"wood": 0,
-		"stone": 0,
-		"food": 0,
-		"iron_ore": 0,
-		"copper_ore": 0,
-		"coal": 0,
-		"iron_ingot": 0,
-		"copper_ingot": 0,
-		"plank": 0,
-		"brick": 0,
-		"berry": 0,
-		"raw_meat": 0,
-		"cooked_meat": 0,
-		"cloth": 0,
-	}
 	notification.emit("人类之路开启了！", NotificationType.SUCCESS)
 
 func pause_game():
@@ -214,34 +181,39 @@ func get_daylight_factor() -> float:
 	else:
 		return 0.0  # 夜晚
 
-# -------- 资源管理 --------
-func add_resource(resource_id: String, amount: int) -> int:
-	"""添加资源，返回实际添加数量"""
-	if amount <= 0:
-		return 0
-	var old = resources.get(resource_id, 0)
-	resources[resource_id] = old + amount
-	resources_changed.emit(resource_id, old, resources[resource_id])
-	return amount
+# -------- 资源管理（已废弃） --------
+# 资源池已移除，所有资源存在于：置物架、背包、地面
+# 请使用 World/建筑库存/角色背包 来管理资源
+func add_resource(_resource_id: String, _amount: int) -> int:
+	push_warning("add_resource 已废弃：资源应存入置物架或掉落地面")
+	return 0
 
-func remove_resource(resource_id: String, amount: int) -> int:
-	"""移除资源，返回实际移除数量"""
-	if amount <= 0:
-		return 0
-	var old = resources.get(resource_id, 0)
-	var actual = min(old, amount)
-	resources[resource_id] = old - actual
-	resources_changed.emit(resource_id, old, resources[resource_id])
-	return actual
+func remove_resource(_resource_id: String, _amount: int) -> int:
+	push_warning("remove_resource 已废弃：资源应从置物架/背包/地面取出")
+	return 0
 
-func has_resource(resource_id: String, amount: int = 1) -> bool:
-	return resources.get(resource_id, 0) >= amount
+func has_resource(_resource_id: String, _amount: int = 1) -> bool:
+	return false
 
-func get_resource(resource_id: String) -> int:
-	return resources.get(resource_id, 0)
+func get_resource(_resource_id: String) -> int:
+	return 0
 
 func show_notification(msg: String, type: NotificationType = NotificationType.INFO):
 	notification.emit(msg, type)
+
+func _drop_legacy_resources_to_ground(old_resources: Dictionary):
+	"""v1旧存档兼容：将旧版全局资源池的物品掉落在出生点附近地面"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.world == null:
+		return
+	# 出生点附近(0,0)区块
+	var drop_pos = Vector2i(8, 8)
+	for res_id in old_resources:
+		var amount = old_resources[res_id]
+		if amount > 0:
+			game.world.drop_item_on_ground(drop_pos, res_id, amount)
+	if not old_resources.is_empty():
+		show_notification("旧版存档资源已迁移到地面", NotificationType.INFO)
 
 # ==================== 存档系统 ====================
 
@@ -260,11 +232,10 @@ func save_game(silent: bool = false) -> bool:
 		return false
 	
 	var save_data = {
-		"version": 1,
+		"version": 2,  # v2: 移除了全局资源池
 		"game_time": game_time,
 		"current_day": current_day,
 		"time_speed": time_speed,
-		"resources": resources.duplicate(),
 		"stats": stats.duplicate(),
 		"world": game.world.to_dict() if game.world else {},
 		"buildings": game.building_system.to_dict() if game.building_system else {},
@@ -303,9 +274,12 @@ func load_game(silent: bool = false) -> bool:
 	game_time = data.get("game_time", 6.0)
 	current_day = data.get("current_day", 1)
 	time_speed = data.get("time_speed", 1.0)
-	resources = data.get("resources", {})
 	stats = data.get("stats", {})
 	state = GameState.PLAYING
+	
+	# v1 旧存档：将旧版全局资源池掉落地面作为过渡
+	if data.get("version", 1) < 2 and data.has("resources"):
+		_drop_legacy_resources_to_ground(data.resources)
 	
 	# 暂存系统数据供 Game 场景恢复
 	_loaded_save_data = data

@@ -1,10 +1,13 @@
 # 世界系统 - World System
-# 管理游戏地图、区块、资源和地形
+# 管理游戏地图、区块、资源、地形和地面物品
 extends Node2D
 class_name World
 
+const ItemDefinitions = preload("res://resources/item_definitions.gd")
+
 signal tile_changed(pos: Vector2i, tile_type: int)
 signal resource_depleted(pos: Vector2i)
+signal ground_items_changed(grid_pos: Vector2i)
 
 # 世界大小（区块数）
 const CHUNK_SIZE := 16
@@ -78,6 +81,35 @@ class ResourceDeposit:
 			ResourceNodeType.BERRY_BUSH:
 				return "berry"
 		return ""
+
+# ==================== 地面物品系统 ====================
+# 地面物品堆（同一格子同类物品合并）
+class GroundItemStack:
+	var item_id: String
+	var amount: int
+	
+	func _init(id: String, amt: int = 1):
+		item_id = id
+		amount = amt
+	
+	func get_data():
+		return ItemDefinitions.get_item(item_id)
+	
+	func can_merge(other_id: String) -> bool:
+		return item_id == other_id
+	
+	func add(amt: int) -> int:
+		var data = get_data()
+		if data == null:
+			return amt
+		var max_stack = data.max_stack
+		var can_add = max_stack - amount
+		var to_add = mini(can_add, amt)
+		amount += to_add
+		return amt - to_add  # 剩余未添加
+
+# 地面物品：Vector2i(网格坐标) -> Array[GroundItemStack]
+var ground_items: Dictionary = {}
 
 # 存储数据
 var chunks: Dictionary = {}  # Vector2i(区块坐标) -> ChunkData
@@ -249,6 +281,106 @@ func is_walkable(pos: Vector2i) -> bool:
 	var tile = get_tile_at(pos)
 	return tile != TileType.WATER and tile != TileType.DEEP_WATER and tile != TileType.MOUNTAIN
 
+# ==================== 地面物品管理 ====================
+
+func drop_item_on_ground(grid_pos: Vector2i, item_id: String, amount: int) -> int:
+	"""在地面指定格子掉落物品，返回未掉落的剩余数量（超出堆叠上限的部分）"""
+	if amount <= 0 or item_id == "":
+		return amount
+	
+	if not ground_items.has(grid_pos):
+		ground_items[grid_pos] = []
+	
+	var stacks = ground_items[grid_pos]
+	var remaining = amount
+	
+	# 先尝试合并到现有堆叠
+	for stack in stacks:
+		if stack.can_merge(item_id):
+			remaining = stack.add(remaining)
+			if remaining <= 0:
+				ground_items_changed.emit(grid_pos)
+				return 0
+	
+	# 还有剩余则创建新堆叠
+	while remaining > 0:
+		var new_stack := GroundItemStack.new(item_id)
+		remaining = new_stack.add(remaining)
+		stacks.append(new_stack)
+	
+	ground_items_changed.emit(grid_pos)
+	return remaining
+
+func pickup_from_ground(grid_pos: Vector2i, item_id: String, amount: int) -> int:
+	"""从地面拾取物品，返回实际拾取数量"""
+	if amount <= 0 or item_id == "":
+		return 0
+	if not ground_items.has(grid_pos):
+		return 0
+	
+	var stacks = ground_items[grid_pos]
+	var picked = 0
+	
+	for i in range(stacks.size() - 1, -1, -1):
+		var stack = stacks[i]
+		if stack.item_id == item_id:
+			var to_take = mini(stack.amount, amount - picked)
+			stack.amount -= to_take
+			picked += to_take
+			if stack.amount <= 0:
+				stacks.remove_at(i)
+			if picked >= amount:
+				break
+	
+	# 清理空格子
+	if stacks.is_empty():
+		ground_items.erase(grid_pos)
+	
+	if picked > 0:
+		ground_items_changed.emit(grid_pos)
+	return picked
+
+func get_ground_items_at(grid_pos: Vector2i) -> Array:
+	"""获取指定格子上的所有地面物品"""
+	return ground_items.get(grid_pos, []).duplicate()
+
+func count_ground_item(item_id: String) -> int:
+	"""统计全地图某种地面物品的总数"""
+	var total = 0
+	for pos in ground_items:
+		for stack in ground_items[pos]:
+			if stack.item_id == item_id:
+				total += stack.amount
+	return total
+
+func has_ground_item(item_id: String, amount: int = 1) -> bool:
+	"""检查地面上是否有足够数量的某种物品"""
+	return count_ground_item(item_id) >= amount
+
+func find_nearest_ground_item(grid_center: Vector2i, item_id: String, max_radius: int = 10) -> Vector2i:
+	"""从中心网格开始螺旋搜索，寻找最近的包含指定物品的地面格子"""
+	for radius in range(max_radius + 1):
+		for dx in range(-radius, radius + 1):
+			for dy in range(-radius, radius + 1):
+				if abs(dx) != radius and abs(dy) != radius:
+					continue
+				var check_pos = grid_center + Vector2i(dx, dy)
+				if ground_items.has(check_pos):
+					for stack in ground_items[check_pos]:
+						if stack.item_id == item_id and stack.amount > 0:
+							return check_pos
+	return Vector2i(-1, -1)
+
+func get_all_ground_positions_of(item_id: String) -> Array:
+	"""获取所有包含指定物品的地面格子位置列表"""
+	var result: Array = []
+	for pos in ground_items:
+		for stack in ground_items[pos]:
+			if stack.item_id == item_id and stack.amount > 0:
+				result.append(pos)
+				break
+	return result
+
 # -------- 序列化 --------
 func to_dict() -> Dictionary:
 	var chunk_list = []
@@ -273,10 +405,34 @@ func to_dict() -> Dictionary:
 			"buildings": build_data,
 			"generated": chunk.is_generated
 		})
-	return {"chunks": chunk_list}
+	# 序列化地面物品
+	var ground_data = {}
+	for pos in ground_items:
+		var stacks_data = []
+		for stack in ground_items[pos]:
+			stacks_data.append({
+				"id": stack.item_id,
+				"amount": stack.amount
+			})
+		ground_data["%d,%d" % [pos.x, pos.y]] = stacks_data
+	
+	return {"chunks": chunk_list, "ground_items": ground_data}
 
 func from_dict(data: Dictionary):
 	chunks.clear()
+	ground_items.clear()
+	
+	# 恢复地面物品
+	if data.has("ground_items"):
+		for key in data.ground_items:
+			var parts = key.split(",")
+			var pos = Vector2i(int(parts[0]), int(parts[1]))
+			var stacks_data = data.ground_items[key]
+			var stacks: Array[GroundItemStack] = []
+			for sd in stacks_data:
+				var stack := GroundItemStack.new(sd.id, sd.amount)
+				stacks.append(stack)
+			ground_items[pos] = stacks
 	for c_data in data.get("chunks", []):
 		var cpos := Vector2i(c_data.pos_x, c_data.pos_y)
 		var chunk := ChunkData.new(cpos)

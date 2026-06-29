@@ -379,21 +379,31 @@ func _tick_construct():
 	var construct_phase = current_task.get("construct_phase", "")
 	
 	if construct_phase == "fetch":
-		# 到达存储建筑，取材料到背包
-		var storage_pos: Vector2i = current_task.get("fetch_storage_pos", Vector2i.ZERO)
+		# 到达来源地，取材料到背包
+		var fetch_source = current_task.get("fetch_source_type", "storage")
 		var fetch_item = current_task.get("fetch_item_id", "")
 		var fetch_amount = current_task.get("fetch_amount", 0)
 		
 		if fetch_item != "" and fetch_amount > 0:
-			var storage_bld = game.building_system.get_building_at(storage_pos)
-			if storage_bld != null and storage_bld.inventory != null:
-				var available = storage_bld.inventory.get_item_count(fetch_item)
-				var to_take = mini(fetch_amount, available)
-				if to_take > 0:
-					var removed = storage_bld.inventory.remove_item(fetch_item, to_take)
-					if removed > 0:
-						inventory.add_item(fetch_item, removed)
-						current_task["fetch_amount"] = fetch_amount - removed
+			if fetch_source == "ground":
+				# 从地面捡取
+				var ground_pos: Vector2i = current_task.get("fetch_storage_pos", Vector2i.ZERO)
+				var picked = game.world.pickup_from_ground(ground_pos, fetch_item, fetch_amount)
+				if picked > 0:
+					inventory.add_item(fetch_item, picked)
+					current_task["fetch_amount"] = fetch_amount - picked
+			else:
+				# 从存储建筑取
+				var storage_pos: Vector2i = current_task.get("fetch_storage_pos", Vector2i.ZERO)
+				var storage_bld = game.building_system.get_building_at(storage_pos)
+				if storage_bld != null and storage_bld.inventory != null:
+					var available = storage_bld.inventory.get_item_count(fetch_item)
+					var to_take = mini(fetch_amount, available)
+					if to_take > 0:
+						var removed = storage_bld.inventory.remove_item(fetch_item, to_take)
+						if removed > 0:
+							inventory.add_item(fetch_item, removed)
+							current_task["fetch_amount"] = fetch_amount - removed
 		
 		# 转向回建筑工地
 		current_task["construct_phase"] = "return_to_site"
@@ -443,9 +453,9 @@ func _tick_construct():
 			# 检查角色是否已在建筑位置（用于判断全局取料后是否需要移动）
 			var was_at_site = position.distance_to(_bld_world_center(bld)) < 10.0
 			
-			# 背包里的不够，去存储/全局取材料
+			# 背包里的不够，去存储建筑或地面取材料
 			if _construct_fetch_from_storage(bld, missing):
-				# 如果从全局取到了材料且角色已在建筑处，直接存入而不经过移动
+				# 如果角色已在建筑处，尝试直接存入背包中的材料
 				if was_at_site and current_task.get("construct_phase", "") == "return_to_site":
 					_immediate_deposit_materials()
 					# 重新检查材料是否齐了
@@ -497,7 +507,7 @@ func _tick_construct():
 	_construction_retry_count = 0
 
 func _immediate_deposit_materials():
-	"""立即存入背包中标记为建设材料的物品（用于全局取材料后无须移动直接存入）"""
+	"""立即存入背包中标记为建设材料的物品（用于从地面取材料后无须移动直接存入）"""
 	if current_task == null:
 		return
 	var fetch_item = current_task.get("fetch_item_id", "")
@@ -524,39 +534,19 @@ func _immediate_deposit_materials():
 	current_task.erase("construct_phase")
 
 func _construct_fetch_from_storage(bld, missing: Dictionary) -> bool:
-	"""查找最近的存储建筑取建筑材料，返回是否找到材料去向"""
+	"""查找最近的存储建筑或地面取建筑材料，返回是否找到材料去向"""
 	var game = get_node_or_null("/root/Game")
-	if game == null:
-		return false
-	
-	var gm = get_node("/root/GameManager")
-	if gm == null:
+	if game == null or game.world == null:
 		return false
 	
 	var best_storage = null
 	var best_mat_id = ""
 	var best_dist = INF
+	var best_ground_pos = null
 	
 	for mat_id in missing.keys():
 		var needed = missing[mat_id]
-		# 1. 检查全局资源池
-		if gm.has_resource(mat_id, 1):
-			# 从全局取，直接加入背包
-			var available = gm.get_resource(mat_id)
-			var to_take = mini(needed, available)
-			gm.remove_resource(mat_id, to_take)
-			inventory.add_item(mat_id, to_take)
-			# 标记回程（由调用方决定是否立即存入）
-			current_task["construct_phase"] = "return_to_site"
-			current_task["fetch_item_id"] = mat_id
-			current_task["fetch_amount"] = to_take
-			# 由调用方决定是否立即存入还是移动回去
-			var site_center = _bld_world_center(bld)
-			target_world_pos = site_center
-			set_state(SettlerState.MOVING)
-			return true
-		
-		# 2. 检查存储建筑（使用专门用来取料的查询，不过滤已满的仓库）
+		# 1. 检查存储建筑（使用专门用来取料的查询，不过滤已满的仓库）
 		var storage_blds = _find_storage_with_item(mat_id, 99999)
 		for sbld in storage_blds:
 			if sbld.inventory == null:
@@ -567,7 +557,19 @@ func _construct_fetch_from_storage(bld, missing: Dictionary) -> bool:
 				best_dist = dist
 				best_storage = sbld
 				best_mat_id = mat_id
+		
+		# 2. 检查地面物品
+		if best_storage == null:
+			var grid_center = Vector2i(
+				int(position.x / game.world.tile_size),
+				int(position.y / game.world.tile_size)
+			)
+			var ground_pos = game.world.find_nearest_ground_item(grid_center, mat_id, 10)
+			if ground_pos.x >= 0:
+				best_ground_pos = ground_pos
+				best_mat_id = mat_id
 	
+	# 优先去存储建筑取材料
 	if best_storage != null and best_mat_id != "":
 		var needed = missing[best_mat_id]
 		var center = _bld_world_center(best_storage)
@@ -579,8 +581,22 @@ func _construct_fetch_from_storage(bld, missing: Dictionary) -> bool:
 		set_state(SettlerState.MOVING)
 		return true
 	
-	# 3. 检查建筑工地附近的地面资源（如木材/石头堆）
-	# 简化：无可用材料
+	# 其次从地面捡取
+	if best_ground_pos != null and best_mat_id != "":
+		var needed = missing[best_mat_id]
+		var world_pos = Vector2(
+			best_ground_pos.x * game.world.tile_size + game.world.tile_size / 2.0,
+			best_ground_pos.y * game.world.tile_size + game.world.tile_size / 2.0
+		)
+		current_task["fetch_storage_pos"] = best_ground_pos
+		current_task["fetch_item_id"] = best_mat_id
+		current_task["fetch_amount"] = needed
+		current_task["construct_phase"] = "fetch"
+		current_task["fetch_source_type"] = "ground"  # 标记为地面来源
+		target_world_pos = world_pos
+		set_state(SettlerState.MOVING)
+		return true
+	
 	return false
 
 # ========== 搬运物资到建筑 ==========
@@ -606,13 +622,11 @@ func _tick_haul_construct_fetch():
 	
 	var taken = 0
 	
-	if source_type == "global":
-		# 从全局资源池取
-		var gm = get_node("/root/GameManager")
-		if gm and gm.has_resource(item_id, 1):
-			var available = gm.get_resource(item_id)
-			var to_take = mini(amount, available)
-			taken = gm.remove_resource(item_id, to_take)
+	if source_type == "ground":
+		# 从地面捡取
+		var source_pos: Vector2i = current_task.get("source_bld_pos", Vector2i.ZERO)
+		if game.world:
+			taken = game.world.pickup_from_ground(source_pos, item_id, amount)
 			if taken > 0:
 				inventory.add_item(item_id, taken)
 	elif source_type == "storage":
@@ -680,10 +694,9 @@ func _tick_haul_construct():
 					if bld.inventory:
 						bld.inventory.add_item(item_id, removed)
 					else:
-						# 没有库存就直接上交全局
-						var gm = get_node("/root/GameManager")
-						if gm:
-							gm.add_resource(item_id, removed)
+						# 没有库存就掉落在地面
+						if game.world:
+							game.world.drop_item_on_ground(bld.grid_pos, item_id, removed)
 	
 	complete_task()
 
@@ -747,17 +760,16 @@ func is_overweight() -> bool:
 	return get_inventory_weight() > carry_capacity
 
 func _store_excess_to_storage():
-	"""将背包中超重的部分存入附近置物架，若无可用的则上交全局"""
+	"""将背包中超重的部分存入附近置物架，若无可用的则掉落地面"""
 	var game = get_node_or_null("/root/Game")
 	if game == null or game.building_system == null:
-		# 没有存储系统，直接上交全局
-		_dump_inventory_to_global()
+		_drop_inventory_to_ground()
 		return
 	
 	# 找附近已完成的存储建筑（置物架/仓库）
 	var storage_buildings = _find_nearby_storage()
 	if storage_buildings.is_empty():
-		_dump_inventory_to_global()
+		_drop_inventory_to_ground()
 		return
 	
 	# 从最近的存储建筑开始尝试存入
@@ -803,12 +815,12 @@ func _store_excess_to_storage_at(bld_pos: Vector2i):
 	"""将背包中超重的部分存入指定建筑"""
 	var game = get_node_or_null("/root/Game")
 	if game == null or game.building_system == null:
-		_dump_inventory_to_global()
+		_drop_inventory_to_ground()
 		return
 	
 	var bld = game.building_system.get_building_at(bld_pos)
 	if bld == null or bld.inventory == null:
-		_dump_inventory_to_global()
+		_drop_inventory_to_ground()
 		return
 	
 	var target_weight = carry_capacity * 0.7  # 降到70%负重
@@ -844,12 +856,12 @@ func _auto_store_overweight():
 	"""超重时自动寻找最近的置物架，创建搬运任务走过去存放"""
 	var game = get_node_or_null("/root/Game")
 	if game == null or game.building_system == null:
-		_dump_inventory_to_global()
+		_drop_inventory_to_ground()
 		return
 	
 	var storage_buildings = _find_nearby_storage()
 	if storage_buildings.is_empty():
-		_dump_inventory_to_global()
+		_drop_inventory_to_ground()
 		return
 	
 	# 找最近的置物架
@@ -866,15 +878,19 @@ func _auto_store_overweight():
 	target_world_pos = center_pos
 	set_state(SettlerState.MOVING)
 
-func _dump_inventory_to_global():
-	"""背包物品全部上交全局资源（兜底方案）"""
-	var gm = get_node("/root/GameManager")
-	if gm == null:
+func _drop_inventory_to_ground():
+	"""超重且无处可存时，把背包物品掉落在地上"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.world == null:
 		return
+	var grid_pos = Vector2i(
+		int(position.x / game.world.tile_size),
+		int(position.y / game.world.tile_size)
+	)
 	for i in range(inventory.items.size() - 1, -1, -1):
 		var stack = inventory.items[i]
 		if stack:
-			gm.add_resource(stack.item_id, stack.amount)
+			game.world.drop_item_on_ground(grid_pos, stack.item_id, stack.amount)
 	inventory.clear()
 
 func _find_nearby_storage(max_dist: float = -1.0) -> Array:
@@ -1342,12 +1358,15 @@ func heal(amount: float):
 	hp = min(max_hp, hp + amount)
 
 func die():
-	# 死亡时把背包物品掉到地上（放到全局资源池作为简化）
-	var gm = get_node("/root/GameManager")
-	if gm and inventory:
-		for stack in inventory.items:
-			gm.add_resource(stack.item_id, stack.amount)
+	# 死亡时把背包物品掉在地上
 	var game = get_node_or_null("/root/Game")
+	if game and game.world and inventory:
+		var grid_pos = Vector2i(
+			int(position.x / game.world.tile_size),
+			int(position.y / game.world.tile_size)
+		)
+		for stack in inventory.items:
+			game.world.drop_item_on_ground(grid_pos, stack.item_id, stack.amount)
 	if game:
 		game.settlers.erase(self)
 	queue_free()
