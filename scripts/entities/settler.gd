@@ -278,9 +278,9 @@ func _move_towards(delta):
 						# 已到达目标建筑，立即存放入库
 						_tick_haul_construct()
 				_:  # 其他任务类型 → 到达后开始工作
-					# 到达目标后开始工作（受冷却控制，最多等1秒）
-					if set_state(SettlerState.WORKING):
-						work_accumulator = 0.0
+					# 到达目标后强制开始工作（防止被冷却阻挡导致卡在MOVING→autonomy打断循环）
+					set_state(SettlerState.WORKING, true)
+					work_accumulator = 0.0
 		else:
 			set_state(SettlerState.IDLE, true)  # 强制切换
 
@@ -1137,8 +1137,8 @@ func _tick_eat_from_rack():
 	if removed > 0:
 		modify_need("hunger", food_restore)
 		_eat_timer = 2.0
-		# 开始进食（受冷却控制）
-		set_state(SettlerState.EATING)
+		# 到达置物架后开始进食（强制切换，防止被冷却阻挡导致反复取食）
+		set_state(SettlerState.EATING, true)
 	else:
 		# complete_task() 已处理状态切换
 		complete_task()
