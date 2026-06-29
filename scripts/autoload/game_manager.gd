@@ -84,6 +84,10 @@ func _load_settings():
 	settings["storage_search_radius"] = cfg.get_value("settler", "storage_search_radius", 300.0)
 	settings["food_search_radius"] = cfg.get_value("settler", "food_search_radius", 400.0)
 	
+	# 资源采集设置
+	settings["harvest_amount"] = cfg.get_value("resources", "harvest_amount", 5.0)
+	settings["resource_amount_multiplier"] = cfg.get_value("resources", "resource_amount_multiplier", 5.0)
+
 	# 工作优先级设置
 	settings["mining_priority"] = cfg.get_value("work", "mining_priority", 2)
 	settings["woodcutting_priority"] = cfg.get_value("work", "woodcutting_priority", 3)

@@ -71,6 +71,12 @@ func _ready():
 		_generate_initial_area()
 		_spawn_initial_settlers()
 	
+	# 应用世界可配置参数（采集量、资源倍率）
+	world.apply_settings(
+		_gm.settings.get("resource_amount_multiplier", 5.0),
+		_gm.settings.get("harvest_amount", 5.0)
+	)
+	
 	# 初始化系统引用
 	if building_system:
 		building_system.world = world

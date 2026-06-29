@@ -59,12 +59,16 @@ class ResourceDeposit:
 	var amount: float
 	var max_amount: float
 	var harvest_time: float  # 每次采集耗时
+	var harvest_amount: float = 1.0  # 每次采集获得的资源量
 	
 	func _init(t: ResourceNodeType, amt: float, time: float = 2.0):
 		type = t
 		amount = amt
 		max_amount = amt
 		harvest_time = time
+	
+	func set_harvest_amount(amt: float):
+		harvest_amount = amt
 	
 	func get_item_drop() -> String:
 		match type:
@@ -116,8 +120,17 @@ var chunks: Dictionary = {}  # Vector2i(区块坐标) -> ChunkData
 var tile_size: int = 32
 var rng := RandomNumberGenerator.new()
 
+# 可配置参数
+var resource_multiplier: float = 5.0     # 资源初始点数倍率
+var default_harvest_amount: float = 5.0  # 每次采集获得的资源量
+
 func _ready():
 	rng.randomize()
+
+func apply_settings(multiplier: float, harvest_amt: float):
+	"""从 GameManager 加载可配置参数"""
+	resource_multiplier = multiplier
+	default_harvest_amount = harvest_amt
 
 # -------- 区块生成 --------
 func get_chunk(chunk_pos: Vector2i) -> ChunkData:
@@ -157,26 +170,32 @@ func _generate_chunk(chunk: ChunkData):
 			
 			chunk.tiles[tile_pos] = tile
 			
-			# 生成自然资源
+			# 生成自然资源（初始点数 × resource_multiplier）
 			var res_rand = local_rng.randf()
 			if tile == TileType.FOREST and res_rand < 0.6:
-				chunk.resources[tile_pos] = ResourceDeposit.new(
+				var dep = ResourceDeposit.new(
 					ResourceNodeType.TREE,
-					local_rng.randf_range(5.0, 15.0),
+					local_rng.randf_range(5.0, 15.0) * resource_multiplier,
 					2.0
 				)
+				dep.set_harvest_amount(default_harvest_amount)
+				chunk.resources[tile_pos] = dep
 			elif tile == TileType.STONE and res_rand < 0.5:
-				chunk.resources[tile_pos] = ResourceDeposit.new(
+				var dep = ResourceDeposit.new(
 					ResourceNodeType.STONE_DEPOSIT,
-					local_rng.randf_range(10.0, 30.0),
+					local_rng.randf_range(10.0, 30.0) * resource_multiplier,
 					3.0
 				)
+				dep.set_harvest_amount(default_harvest_amount)
+				chunk.resources[tile_pos] = dep
 			elif tile == TileType.GRASS and res_rand < 0.08:
-				chunk.resources[tile_pos] = ResourceDeposit.new(
+				var dep = ResourceDeposit.new(
 					ResourceNodeType.BERRY_BUSH,
-					local_rng.randf_range(3.0, 8.0),
+					local_rng.randf_range(3.0, 8.0) * resource_multiplier,
 					1.5
 				)
+				dep.set_harvest_amount(default_harvest_amount)
+				chunk.resources[tile_pos] = dep
 	
 	# 在草地和泥土上生成一些额外资源
 	for x in CHUNK_SIZE:
@@ -186,23 +205,29 @@ func _generate_chunk(chunk: ChunkData):
 			if tile in [TileType.GRASS, TileType.DIRT] and not chunk.resources.has(tile_pos):
 				var res_rand = local_rng.randf()
 				if res_rand < 0.02:  # 铁矿石
-					chunk.resources[tile_pos] = ResourceDeposit.new(
+					var dep = ResourceDeposit.new(
 						ResourceNodeType.IRON_DEPOSIT,
-						local_rng.randf_range(8.0, 25.0),
+						local_rng.randf_range(8.0, 25.0) * resource_multiplier,
 						4.0
 					)
+					dep.set_harvest_amount(default_harvest_amount)
+					chunk.resources[tile_pos] = dep
 				elif res_rand < 0.035:  # 铜矿石
-					chunk.resources[tile_pos] = ResourceDeposit.new(
+					var dep = ResourceDeposit.new(
 						ResourceNodeType.COPPER_DEPOSIT,
-						local_rng.randf_range(8.0, 25.0),
+						local_rng.randf_range(8.0, 25.0) * resource_multiplier,
 						4.0
 					)
+					dep.set_harvest_amount(default_harvest_amount)
+					chunk.resources[tile_pos] = dep
 				elif res_rand < 0.045:  # 煤矿
-					chunk.resources[tile_pos] = ResourceDeposit.new(
+					var dep = ResourceDeposit.new(
 						ResourceNodeType.COAL_DEPOSIT,
-						local_rng.randf_range(5.0, 20.0),
+						local_rng.randf_range(5.0, 20.0) * resource_multiplier,
 						3.0
 					)
+					dep.set_harvest_amount(default_harvest_amount)
+					chunk.resources[tile_pos] = dep
 	
 	chunk.is_generated = true
 
@@ -255,8 +280,9 @@ func get_building_at(pos: Vector2i) -> String:
 	return chunk.buildings.get(local_pos, "")
 
 # -------- 资源交互 --------
-func harvest_resource(pos: Vector2i, amount: float = 1.0) -> Dictionary:
-	"""采集资源，返回{item_id, amount}，如果资源耗尽返回空"""
+func harvest_resource(pos: Vector2i, amount: float = -1.0) -> Dictionary:
+	"""采集资源，返回{item_id, amount}，如果资源耗尽返回空
+	参数 amount: 传入 >0 使用指定值，传入 <=0 使用资源点自身的 harvest_amount"""
 	var deposit = get_resource_at(pos)
 	if deposit == null or deposit.amount <= 0:
 		return {}
@@ -265,7 +291,8 @@ func harvest_resource(pos: Vector2i, amount: float = 1.0) -> Dictionary:
 	if item_id == "":
 		return {}
 	
-	var harvested = min(amount, deposit.amount)
+	var harvest_amt = deposit.harvest_amount if amount <= 0.0 else amount
+	var harvested = min(harvest_amt, deposit.amount)
 	deposit.amount -= harvested
 	
 	if deposit.amount <= 0:

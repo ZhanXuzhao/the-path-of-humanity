@@ -359,7 +359,8 @@ func _tick_harvest():
 		return
 	
 	var grid_pos: Vector2i = current_task.get("target_pos", Vector2i.ZERO)
-	var result = game.world.harvest_resource(grid_pos, 1.0)
+	# 使用资源点配置的每次采集量（由 GameManager 设置）
+	var result = game.world.harvest_resource(grid_pos)
 	if result.is_empty() or result.amount <= 0:
 		# 资源已耗尽
 		complete_task()
