@@ -90,7 +90,7 @@ func _init():
 
 func _setup_sprite():
 	settler_sprite = Sprite2D.new()
-	settler_sprite.texture = preload("res://scripts/core/texture_generator.gd")._generate_character().get("settler")
+	settler_sprite.texture = preload("res://assets/art/characters/settler.svg")
 	settler_sprite.scale = Vector2(1.5, 1.5)
 	settler_sprite.z_index = 3
 	add_child(settler_sprite)
