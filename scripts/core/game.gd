@@ -44,6 +44,11 @@ var selected_resource_deposit = null  # World.ResourceDeposit
 signal resource_selected(pos: Vector2i, deposit)
 signal resource_deselected()
 
+# 选中地面物品
+var selected_ground_item_pos: Vector2i = Vector2i(-1, -1)
+signal ground_item_selected(pos: Vector2i, stacks)
+signal ground_item_deselected()
+
 # 建筑建造重试冷却（防止反复给同一缺物资建筑分配任务）
 var _construction_retry_cooldown: Dictionary = {}  # "x,y" -> frame_number
 
@@ -110,6 +115,12 @@ func _process(delta):
 		var res = world.get_resource_at(selected_resource_pos)
 		if res == null or res.amount <= 0:
 			_deselect_resource()
+	
+	# 检查选中的地面物品是否还存在（可能已被拾取完）
+	if selected_ground_item_pos.x >= 0:
+		var stacks = world.get_ground_items_at(selected_ground_item_pos)
+		if stacks.is_empty():
+			_deselect_ground_item()
 	
 	# 定居者自主行为（进食、睡眠等）——每2秒检查一次避免频繁打断
 	_autonomy_timer += delta
@@ -305,8 +316,9 @@ func _try_select_building_at(grid_pos: Vector2i):
 	- 已完成且有存储功能 → 存储面板
 	- 未完成（施工中）→ 建筑进度面板
 	"""
-	# 选中建筑时取消资源选中
+	# 选中建筑时取消其他选中
 	_deselect_resource()
+	_deselect_ground_item()
 	
 	var bld = building_system.get_building_at(grid_pos) if building_system else null
 	if bld == null:
@@ -370,6 +382,20 @@ func _deselect_resource():
 		selected_resource_pos = Vector2i(-1, -1)
 		selected_resource_deposit = null
 		resource_deselected.emit()
+
+# -------- 地面物品选择 --------
+func _select_ground_item(pos: Vector2i, stacks):
+	"""选中地面物品"""
+	if selected_ground_item_pos == pos:
+		return
+	selected_ground_item_pos = pos
+	ground_item_selected.emit(pos, stacks)
+
+func _deselect_ground_item():
+	"""取消选中地面物品"""
+	if selected_ground_item_pos.x >= 0:
+		selected_ground_item_pos = Vector2i(-1, -1)
+		ground_item_deselected.emit()
 
 func _on_building_completed(pos: Vector2i):
 	"""建筑完成时：若当前正选中此建筑，自动切换显示"""
@@ -443,6 +469,11 @@ func _input(event):
 			_deselect_resource()
 			return
 		
+		# 有选中地面物品时，Esc 取消
+		if selected_ground_item_pos.x >= 0:
+			_deselect_ground_item()
+			return
+		
 		if build_mode:
 			exit_build_mode()
 			return
@@ -506,6 +537,7 @@ func _input(event):
 		if clicked_settler != null and bld_selectable:
 			# 同时有定居者和建筑 → 轮流选择
 			_deselect_resource()
+			_deselect_ground_item()
 			if selected_settler != null and is_instance_valid(selected_settler):
 				# 当前选中定居者 → 切到建筑
 				_deselect_settler()
@@ -518,27 +550,41 @@ func _input(event):
 		elif clicked_settler != null:
 			# 只有定居者
 			_deselect_resource()
+			_deselect_ground_item()
 			_select_settler(clicked_settler)
 			_deselect_construction()
 		elif clicked_bld != null:
 			# 只有建筑
 			_deselect_resource()
+			_deselect_ground_item()
 			_try_select_building_at(grid_pos)
 		else:
-			# 检查是否有可采集的资源
-			var clicked_resource = world.get_resource_at(grid_pos)
-			if clicked_resource != null and clicked_resource.amount > 0:
-				# 有资源 - 选中它（取消其他选中）
-				_deselect_construction()
-				_deselect_building()
-				_deselect_settler()
-				_select_resource(grid_pos, clicked_resource)
-			else:
-				# 什么都没选中
+			# 检查是否有地面物品（优先级高于资源）
+			var clicked_ground_stacks = world.get_ground_items_at(grid_pos)
+			if not clicked_ground_stacks.is_empty():
+				# 有地面物品 - 选中它
 				_deselect_construction()
 				_deselect_building()
 				_deselect_settler()
 				_deselect_resource()
+				_select_ground_item(grid_pos, clicked_ground_stacks)
+			else:
+				# 检查是否有可采集的资源
+				var clicked_resource = world.get_resource_at(grid_pos)
+				if clicked_resource != null and clicked_resource.amount > 0:
+					# 有资源 - 选中它（取消其他选中）
+					_deselect_construction()
+					_deselect_building()
+					_deselect_settler()
+					_deselect_ground_item()
+					_select_resource(grid_pos, clicked_resource)
+				else:
+					# 什么都没选中
+					_deselect_construction()
+					_deselect_building()
+					_deselect_settler()
+					_deselect_resource()
+					_deselect_ground_item()
 	
 	# 快捷键 Tab：在定居者之间循环切换，镜头居中聚焦
 	if event is InputEventKey and event.pressed and not event.echo:

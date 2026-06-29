@@ -48,6 +48,11 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var resource_amount_label: Label = $ResourcePanel/ScrollContainer/VBox/AmountLabel
 @onready var resource_max_label: Label = $ResourcePanel/ScrollContainer/VBox/MaxLabel
 
+# 地面物品信息面板
+@onready var ground_item_panel: Panel = $GroundItemPanel
+@onready var ground_item_name_label: Label = $GroundItemPanel/ScrollContainer/VBox/NameLabel
+@onready var ground_item_items_container: VBoxContainer = $GroundItemPanel/ScrollContainer/VBox/ItemsContainer
+
 var game_manager
 var notification_scene = load("res://scenes/ui/notification.tscn")
 
@@ -125,9 +130,13 @@ func _settler_info_connections():
 		game.construction_deselected.connect(_on_construction_deselected)
 		game.resource_selected.connect(_on_resource_selected)
 		game.resource_deselected.connect(_on_resource_deselected)
+		game.ground_item_selected.connect(_on_ground_item_selected)
+		game.ground_item_deselected.connect(_on_ground_item_deselected)
 
 func _on_settler_selected(settler):
 	"""选中定居者时显示信息面板"""
+	# 隐藏其他面板
+	ground_item_panel.visible = false
 	settler_info_panel.visible = true
 	_tracked_settler = settler
 	_build_settler_info_ui(settler)
@@ -192,6 +201,7 @@ func _on_building_selected(bld):
 		if game:
 			game.selected_settler = null
 	
+	ground_item_panel.visible = false
 	storage_panel.visible = true
 	_update_storage_panel(bld)
 
@@ -204,6 +214,7 @@ func _on_construction_selected(bld):
 	"""选中在建建筑时显示进度面板"""
 	# 隐藏其他面板
 	storage_panel.visible = false
+	ground_item_panel.visible = false
 	if settler_info_panel.visible:
 		_on_settler_deselected()
 		var game = get_node("/root/Game")
@@ -222,6 +233,7 @@ func _on_resource_selected(_pos: Vector2i, deposit):
 	"""选中资源节点时显示信息面板"""
 	# 隐藏其他面板
 	storage_panel.visible = false
+	ground_item_panel.visible = false
 	if settler_info_panel.visible:
 		_on_settler_deselected()
 		var game = get_node("/root/Game")
@@ -264,6 +276,58 @@ func _update_resource_panel(deposit):
 		resource_amount_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2))
 	else:
 		resource_amount_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))
+
+# -------- 地面物品信息面板 --------
+func _on_ground_item_selected(_pos: Vector2i, stacks):
+	"""选中地面物品时显示信息面板"""
+	# 隐藏其他面板
+	storage_panel.visible = false
+	resource_panel.visible = false
+	if settler_info_panel.visible:
+		_on_settler_deselected()
+		var game = get_node("/root/Game")
+		if game:
+			game.selected_settler = null
+	if construction_panel.visible:
+		construction_panel.visible = false
+	
+	ground_item_panel.visible = true
+	_update_ground_item_panel(stacks)
+
+func _on_ground_item_deselected():
+	"""取消选中地面物品"""
+	ground_item_panel.visible = false
+
+func _update_ground_item_panel(stacks):
+	"""更新地面物品信息面板内容"""
+	if stacks.is_empty():
+		return
+	
+	# 统计该格所有物品的总堆叠数
+	var total_stacks = stacks.size()
+	var total_items = 0
+	for s in stacks:
+		total_items += s.amount
+	ground_item_name_label.text = "地面物品 (%d 种)" % total_stacks
+	
+	# 重建物品列表
+	for child in ground_item_items_container.get_children():
+		child.queue_free()
+	
+	for stack in stacks:
+		var item_data = ItemDefinitions.get_item(stack.item_id)
+		var name_str = item_data.name if item_data else stack.item_id
+		var hbox = HBoxContainer.new()
+		var icon_label = Label.new()
+		icon_label.text = "•"
+		icon_label.custom_minimum_size = Vector2(16, 0)
+		var name_label = Label.new()
+		name_label.text = "%s × %d" % [name_str, stack.amount]
+		name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+		name_label.add_theme_constant_override("minimum_font_size", 12)
+		hbox.add_child(icon_label)
+		hbox.add_child(name_label)
+		ground_item_items_container.add_child(hbox)
 
 func _update_construction_panel(bld):
 	"""更新建筑进度面板内容"""
@@ -460,6 +524,18 @@ func _process(delta):
 		var game = get_node("/root/Game")
 		if game:
 			game.selected_settler = null
+	
+	# 选中地面物品时实时更新物品列表
+	if ground_item_panel.visible:
+		var game = get_node("/root/Game")
+		if game and game.selected_ground_item_pos.x >= 0:
+			var stacks = game.world.get_ground_items_at(game.selected_ground_item_pos)
+			if not stacks.is_empty():
+				_update_ground_item_panel(stacks)
+			else:
+				# 地面物品已被拾取完，隐藏面板
+				_on_ground_item_deselected()
+				game._deselect_ground_item()
 	
 	# 选中资源节点时实时更新资源量
 	if resource_panel.visible:

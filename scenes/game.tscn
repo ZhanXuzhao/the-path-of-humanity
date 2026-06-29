@@ -218,11 +218,14 @@ layout_mode = 2
 layout_mode = 2
 
 [node name="StoragePanel" type="Panel" parent="UI/HUD" unique_id=1748318168]
-visible = false
-offset_left = 8.0
-offset_top = 400.0
-offset_right = 260.0
-offset_bottom = 664.0
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -274.0
+offset_right = 262.0
+offset_bottom = -10.0
+grow_vertical = 0
 theme_override_styles/panel = SubResource("2")
 
 [node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/StoragePanel" unique_id=2047724940]
@@ -323,6 +326,35 @@ text = "剩余: 0"
 layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
 text = "总量: 0"
+
+[node name="GroundItemPanel" type="Panel" parent="UI/HUD" unique_id=1375926148]
+visible = false
+offset_left = 8.0
+offset_top = 400.0
+offset_right = 260.0
+offset_bottom = 520.0
+theme_override_styles/panel = SubResource("2")
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/GroundItemPanel" unique_id=1208393616]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 248.0
+offset_bottom = 116.0
+
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/GroundItemPanel/ScrollContainer" unique_id=1531582831]
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="UI/HUD/GroundItemPanel/ScrollContainer/VBox" unique_id=1859421175]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 1.0, 0.9, 1)
+text = "地面物品"
+
+[node name="Sep" type="HSeparator" parent="UI/HUD/GroundItemPanel/ScrollContainer/VBox" unique_id=1490825932]
+layout_mode = 2
+
+[node name="ItemsContainer" type="VBoxContainer" parent="UI/HUD/GroundItemPanel/ScrollContainer/VBox" unique_id=1894066752]
+layout_mode = 2
 
 [node name="BuildMenu" type="Panel" parent="UI" unique_id=1575822565]
 offset_left = 8.0

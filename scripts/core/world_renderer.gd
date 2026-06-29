@@ -45,6 +45,11 @@ var _resource_selection_overlay: Node2D  # 资源选中叠加层（含标签）
 var _resource_info_label: Label  # 缓存的资源信息标签引用
 var _last_resource_amount: float = -1.0  # 上次显示的资源量，用于避免重复刷新
 
+# 选中地面物品
+var _selected_ground_item_pos: Vector2i = Vector2i(-1, -1)
+var _ground_item_selection_overlay: Node2D  # 地面物品选中叠加层
+var _ground_item_info_label: Label  # 缓存的标签引用
+
 func _ready():
 	# 使用 TextureGenerator 生成所有纹理
 	var all_textures = _TG.generate_all()
@@ -75,6 +80,8 @@ func _ready():
 		game.construction_deselected.connect(_on_construction_deselected)
 		game.resource_selected.connect(_on_resource_selected)
 		game.resource_deselected.connect(_on_resource_deselected)
+		game.ground_item_selected.connect(_on_ground_item_selected)
+		game.ground_item_deselected.connect(_on_ground_item_deselected)
 	
 	# 延迟一帧渲染，确保 Game._ready() 已完成区块生成
 	call_deferred("_render_existing_chunks")
@@ -90,6 +97,12 @@ func _ready():
 	_resource_selection_overlay.z_index = 50
 	_resource_selection_overlay.name = "ResourceSelectionOverlay"
 	add_child(_resource_selection_overlay)
+	
+	# 创建地面物品选中叠加层（z_index 与资源选中相同层）
+	_ground_item_selection_overlay = Node2D.new()
+	_ground_item_selection_overlay.z_index = 51
+	_ground_item_selection_overlay.name = "GroundItemSelectionOverlay"
+	add_child(_ground_item_selection_overlay)
 	
 	# 渲染已有的地面物品（加载存档时可能已有数据）
 	call_deferred("_render_existing_ground_items")
@@ -505,6 +518,88 @@ func _update_resource_label_text(deposit):
 	
 	var res_name = res_names.get(deposit.type, "资源")
 	_resource_info_label.text = "%s: %.0f" % [res_name, deposit.amount]
+
+# -------- 地面物品选中显示 --------
+func _on_ground_item_selected(pos: Vector2i, _stacks):
+	"""地面物品被选中时显示选中框和信息标签"""
+	_selected_ground_item_pos = pos
+	_build_ground_item_selection_overlay()
+
+func _on_ground_item_deselected():
+	"""地面物品取消选中时清除"""
+	_selected_ground_item_pos = Vector2i(-1, -1)
+	_clear_ground_item_selection_overlay()
+
+func _clear_ground_item_selection_overlay():
+	"""清除地面物品选中叠加层"""
+	for child in _ground_item_selection_overlay.get_children():
+		child.queue_free()
+	_ground_item_info_label = null
+
+func _build_ground_item_selection_overlay():
+	"""创建地面物品选中叠加层：青色选中框 + 简要标签"""
+	_clear_ground_item_selection_overlay()
+	
+	if _selected_ground_item_pos.x < 0:
+		return
+	
+	var pixel_pos = Vector2(
+		_selected_ground_item_pos.x * world.tile_size,
+		_selected_ground_item_pos.y * world.tile_size
+	)
+	var tile_size_px = world.tile_size
+	
+	# 青色半透明填充（与资源金色、建筑蓝色区分）
+	var fill = ColorRect.new()
+	fill.color = Color(0.3, 1.0, 0.9, 0.15)
+	fill.position = pixel_pos
+	fill.size = Vector2(tile_size_px, tile_size_px)
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ground_item_selection_overlay.add_child(fill)
+	
+	# 青色边框
+	var bw = 2.0
+	var border_color = Color(0.3, 1.0, 0.9, 0.9)
+	# 上
+	var top = ColorRect.new()
+	top.color = border_color
+	top.position = pixel_pos
+	top.size = Vector2(tile_size_px, bw)
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ground_item_selection_overlay.add_child(top)
+	# 下
+	var bottom = ColorRect.new()
+	bottom.color = border_color
+	bottom.position = pixel_pos + Vector2(0, tile_size_px - bw)
+	bottom.size = Vector2(tile_size_px, bw)
+	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ground_item_selection_overlay.add_child(bottom)
+	# 左
+	var left = ColorRect.new()
+	left.color = border_color
+	left.position = pixel_pos
+	left.size = Vector2(bw, tile_size_px)
+	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ground_item_selection_overlay.add_child(left)
+	# 右
+	var right = ColorRect.new()
+	right.color = border_color
+	right.position = pixel_pos + Vector2(tile_size_px - bw, 0)
+	right.size = Vector2(bw, tile_size_px)
+	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ground_item_selection_overlay.add_child(right)
+	
+	# 地面物品标签
+	_ground_item_info_label = Label.new()
+	_ground_item_info_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.9))
+	_ground_item_info_label.add_theme_constant_override("minimum_font_size", 11)
+	_ground_item_info_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	var label_pos = pixel_pos + Vector2(tile_size_px / 2.0, -18.0)
+	_ground_item_info_label.position = label_pos
+	_ground_item_info_label.size = Vector2(80, 20)
+	_ground_item_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ground_item_info_label.text = "📦 物品"
+	_ground_item_selection_overlay.add_child(_ground_item_info_label)
 
 # ==================== 地面物品渲染 ====================
 
