@@ -82,7 +82,6 @@ static func _load_character() -> Dictionary:
 	chars["player_kid"]        = _load_svg(CHARACTERS_PATH + "player_kid.png")
 	chars["player_little_boy"] = _load_svg(CHARACTERS_PATH + "player_little_boy.png")
 	chars["player_little_girl"]= _load_svg(CHARACTERS_PATH + "player_little_girl.png")
-	chars["player_man2"]       = _load_svg(CHARACTERS_PATH + "player_man2.png")
 	chars["player_woman"]      = _load_svg(CHARACTERS_PATH + "player_woman.png")
 	chars["player_young_man"]  = _load_svg(CHARACTERS_PATH + "player_young_man.png")
 	chars["player_young_man2"] = _load_svg(CHARACTERS_PATH + "player_young_man2.png")

@@ -147,11 +147,9 @@ func _pick_character_texture() -> Texture2D:
 				return load(base_path + "player_little_boy.png")
 			elif age < 14.0:
 				return load(base_path + "player_boy.png")
-			elif age < 40.0:
+			else:
 				var choices = ["player_young_man.png", "player_young_man2.png", "player_young_man3.png"]
 				return load(base_path + choices[randi() % choices.size()])
-			else:
-				return load(base_path + "player_man2.png")
 		Gender.FEMALE:
 			if age < 8.0:
 				return load(base_path + "player_little_girl.png")
