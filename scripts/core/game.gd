@@ -88,10 +88,6 @@ func _update_build_preview():
 	
 	if build_preview:
 		build_preview.position = mouse_grid_pos * world.tile_size
-	
-	# 检查是否可以放置
-	if Input.is_action_just_pressed("left_click"):
-		_try_place_building()
 
 func _try_place_building():
 	if not build_mode or selected_building == "":

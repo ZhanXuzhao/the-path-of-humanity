@@ -26,6 +26,10 @@ func _ready():
 	visible = false
 	_populate_categories()
 	_populate_buildings()
+	
+	# 连接建造按钮信号
+	if build_btn:
+		build_btn.pressed.connect(_on_build_btn_pressed)
 
 func _populate_categories():
 	var categories = [
@@ -81,9 +85,19 @@ func _populate_buildings():
 		building_buttons[bld_id] = btn
 
 func _on_category_selected(category: int):
-	# 取消其他选中
-	for child in category_tabs.get_children():
-		child.button_pressed = false
+	# 更新所有分类按钮的选中状态
+	var cat_list = [
+		ItemDefinitions.BuildingCategory.STORAGE,
+		ItemDefinitions.BuildingCategory.PRODUCTION,
+		ItemDefinitions.BuildingCategory.EXTRACTION,
+		ItemDefinitions.BuildingCategory.DEFENSE,
+		ItemDefinitions.BuildingCategory.RESIDENTIAL,
+		ItemDefinitions.BuildingCategory.INFRASTRUCTURE,
+		ItemDefinitions.BuildingCategory.RESEARCH,
+		ItemDefinitions.BuildingCategory.FURNITURE,
+	]
+	for i in category_tabs.get_child_count():
+		category_tabs.get_child(i).button_pressed = (i < cat_list.size() and cat_list[i] == category)
 	
 	current_category = category
 	_populate_buildings()
