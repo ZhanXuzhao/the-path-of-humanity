@@ -247,6 +247,68 @@ offset_top = 60.0
 offset_right = 240.0
 offset_bottom = 60.0
 
+[node name="ConstructionPanel" type="Panel" parent="UI/HUD"]
+visible = false
+anchors_preset = 0
+offset_left = 8.0
+offset_top = 400.0
+offset_right = 260.0
+offset_bottom = 660.0
+theme_override_styles/panel = SubResource(2)
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/ConstructionPanel"]
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 248.0
+offset_bottom = 256.0
+
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/ConstructionPanel/ScrollContainer"]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 240.0
+offset_bottom = 200.0
+
+[node name="NameLabel" type="Label" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox"]
+offset_right = 240.0
+offset_bottom = 24.0
+theme_override_constants/minimum_font_size = 18
+theme_override_colors/font_color = Color(1.0, 0.7, 0.2, 1)
+text = "建筑名称"
+
+[node name="ProgressBar" type="ProgressBar" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox"]
+offset_top = 28.0
+offset_right = 240.0
+offset_bottom = 48.0
+size_flags_horizontal = 3
+max_value = 1.0
+value = 0.0
+show_percentage = true
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+
+[node name="ProgressLabel" type="Label" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox"]
+offset_top = 52.0
+offset_right = 240.0
+offset_bottom = 72.0
+theme_override_constants/minimum_font_size = 13
+text = "建造进度: 0 / 0"
+
+[node name="MatSep" type="HSeparator" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox"]
+offset_top = 76.0
+offset_right = 240.0
+offset_bottom = 80.0
+
+[node name="MaterialsContainer" type="VBoxContainer" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox"]
+offset_top = 84.0
+offset_right = 240.0
+offset_bottom = 84.0
+
+[node name="StatusLabel" type="Label" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox"]
+offset_top = 88.0
+offset_right = 240.0
+offset_bottom = 108.0
+theme_override_constants/minimum_font_size = 12
+text = ""
+
 [node name="BuildMenu" type="Panel" parent="UI"]
 visible = false
 script = ExtResource("8_17ot")

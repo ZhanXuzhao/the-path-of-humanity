@@ -32,6 +32,14 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var storage_capacity_label: Label = $StoragePanel/ScrollContainer/VBox/CapacityLabel
 @onready var storage_items_container: VBoxContainer = $StoragePanel/ScrollContainer/VBox/ItemsContainer
 
+# 在建建筑进度面板
+@onready var construction_panel: Panel = $ConstructionPanel
+@onready var construction_name_label: Label = $ConstructionPanel/ScrollContainer/VBox/NameLabel
+@onready var construction_progress_bar: ProgressBar = $ConstructionPanel/ScrollContainer/VBox/ProgressBar
+@onready var construction_progress_label: Label = $ConstructionPanel/ScrollContainer/VBox/ProgressLabel
+@onready var construction_materials_container: VBoxContainer = $ConstructionPanel/ScrollContainer/VBox/MaterialsContainer
+@onready var construction_status_label: Label = $ConstructionPanel/ScrollContainer/VBox/StatusLabel
+
 var game_manager
 var notification_scene = load("res://scenes/ui/notification.tscn")
 
@@ -94,6 +102,8 @@ func _settler_info_connections():
 		game.settler_deselected.connect(_on_settler_deselected)
 		game.building_selected.connect(_on_building_selected)
 		game.building_deselected.connect(_on_building_deselected)
+		game.construction_selected.connect(_on_construction_selected)
+		game.construction_deselected.connect(_on_construction_deselected)
 
 func _on_settler_selected(settler):
 	"""选中定居者时显示信息面板"""
@@ -167,6 +177,89 @@ func _on_building_selected(bld):
 func _on_building_deselected():
 	"""取消选中建筑"""
 	storage_panel.visible = false
+
+# -------- 在建建筑进度面板 --------
+func _on_construction_selected(bld):
+	"""选中在建建筑时显示进度面板"""
+	# 隐藏其他面板
+	storage_panel.visible = false
+	if settler_info_panel.visible:
+		_on_settler_deselected()
+		var game = get_node("/root/Game")
+		if game:
+			game.selected_settler = null
+	
+	construction_panel.visible = true
+	_update_construction_panel(bld)
+
+func _on_construction_deselected():
+	"""取消选中在建建筑"""
+	construction_panel.visible = false
+
+func _update_construction_panel(bld):
+	"""更新建筑进度面板内容"""
+	if not is_instance_valid(bld):
+		return
+	
+	var data = bld.get_data()
+	if not data:
+		return
+	
+	# 建筑名称
+	var display_name = bld.display_name if bld.display_name != "" else data.name
+	construction_name_label.text = display_name
+	
+	# 建造进度条
+	var ratio = bld.construction_progress / data.work_cost if data.work_cost > 0 else 0.0
+	ratio = clamp(ratio, 0.0, 1.0)
+	construction_progress_bar.max_value = 1.0
+	construction_progress_bar.value = ratio
+	construction_progress_bar.show_percentage = true
+	construction_progress_label.text = "建造进度: %.0f / %.0f" % [bld.construction_progress, data.work_cost]
+	
+	# 刷新材料列表
+	for child in construction_materials_container.get_children():
+		child.queue_free()
+	
+	if data.materials.is_empty():
+		# 无需材料
+		var no_mat_label = Label.new()
+		no_mat_label.text = "  无需建造材料"
+		no_mat_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+		no_mat_label.add_theme_constant_override("minimum_font_size", 12)
+		construction_materials_container.add_child(no_mat_label)
+		
+		construction_status_label.text = "⏳ 等待工人施工..."
+		construction_status_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.3))
+	else:
+		var all_ready = true
+		for mat_id in data.materials:
+			var needed = data.materials[mat_id]
+			var deposited = bld.deposited_materials.get(mat_id, 0)
+			var item_data = ItemDefinitions.get_item(mat_id)
+			var name_str = item_data.name if item_data else mat_id
+			var is_ready = deposited >= needed
+			if not is_ready:
+				all_ready = false
+			
+			var hbox = HBoxContainer.new()
+			var label = Label.new()
+			label.text = "  %s: %d / %d" % [name_str, deposited, needed]
+			label.add_theme_constant_override("minimum_font_size", 12)
+			if is_ready:
+				label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))
+			else:
+				label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.3))
+			hbox.add_child(label)
+			construction_materials_container.add_child(hbox)
+		
+		# 状态提示
+		if all_ready:
+			construction_status_label.text = "✅ 材料已备齐，等待工人施工..."
+			construction_status_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))
+		else:
+			construction_status_label.text = "⏳ 等待材料搬运到工地..."
+			construction_status_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.3))
 
 func _update_storage_panel(bld):
 	"""更新存储建筑面板内容"""
@@ -304,6 +397,12 @@ func _process(delta):
 		var game = get_node("/root/Game")
 		if game and game.selected_building_instance:
 			_update_storage_panel(game.selected_building_instance)
+	
+	# 定时更新建造进度面板
+	if Engine.get_physics_frames() % 15 == 0 and construction_panel.visible:
+		var game = get_node("/root/Game")
+		if game and game.selected_construction_building:
+			_update_construction_panel(game.selected_construction_building)
 	
 	# 定时更新人口（不每帧刷新）
 	if Engine.get_physics_frames() % 60 == 0:

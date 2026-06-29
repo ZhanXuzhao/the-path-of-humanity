@@ -33,6 +33,11 @@ var selected_building_instance = null
 signal building_selected(building_instance)
 signal building_deselected()
 
+# 选中在建建筑（施工进度）
+var selected_construction_building = null
+signal construction_selected(building_instance)
+signal construction_deselected()
+
 func _ready():
 	# 自动加载存档（静默读取，不弹通知）
 	if _gm.state != 1 and _gm._loaded_save_data.is_empty() and _gm.has_save_file():
@@ -57,6 +62,7 @@ func _ready():
 	# 初始化系统引用
 	if building_system:
 		building_system.world = world
+		building_system.building_completed.connect(_on_building_completed)
 
 func _process(delta):
 	# 建造模式预览
@@ -223,9 +229,12 @@ func _deselect_settler():
 	selected_settler = null
 	settler_deselected.emit()
 
-# -------- 建筑点击选择（置物架查看） --------
+# -------- 建筑点击选择 --------
 func _try_select_building():
-	"""尝试在鼠标位置选择建筑（置物架等有库存的建筑）"""
+	"""尝试在鼠标位置选择建筑
+	- 已完成且有存储功能 → 存储面板
+	- 未完成（施工中）→ 建筑进度面板
+	"""
 	var global_pos = get_global_mouse_position()
 	var grid_pos = Vector2i(
 		floori(global_pos.x / world.tile_size),
@@ -233,17 +242,26 @@ func _try_select_building():
 	)
 	
 	var bld = building_system.get_building_at(grid_pos) if building_system else null
-	if bld == null or not bld.is_completed:
+	if bld == null:
+		_deselect_construction()
 		_deselect_building()
 		return
 	
-	var data = bld.get_data()
-	if data == null or data.storage_capacity <= 0 or bld.inventory == null:
-		# 不是存储建筑，取消选中
+	# 已完成且有存储功能的建筑 → 存储面板
+	if bld.is_completed:
+		var data = bld.get_data()
+		if data != null and data.storage_capacity > 0 and bld.inventory != null:
+			_deselect_construction()
+			_select_building(bld)
+			return
+		# 已完成的非存储建筑 → 取消所有选中
+		_deselect_construction()
 		_deselect_building()
 		return
 	
-	_select_building(bld)
+	# 未完成的建筑（施工中）→ 建筑进度面板
+	_deselect_building()
+	_select_construction(bld)
 
 func _select_building(bld):
 	"""选中存储建筑"""
@@ -256,6 +274,30 @@ func _deselect_building():
 	"""取消选中建筑"""
 	selected_building_instance = null
 	building_deselected.emit()
+
+func _select_construction(bld):
+	"""选中在建建筑，显示进度面板"""
+	if selected_construction_building == bld:
+		return
+	selected_construction_building = bld
+	construction_selected.emit(bld)
+
+func _deselect_construction():
+	"""取消选中在建建筑"""
+	if selected_construction_building != null:
+		selected_construction_building = null
+		construction_deselected.emit()
+
+func _on_building_completed(pos: Vector2i):
+	"""建筑完成时：若当前正选中此建筑，自动切换显示"""
+	if selected_construction_building and selected_construction_building.grid_pos == pos:
+		_deselect_construction()
+		# 如果完成的是存储建筑，自动选中显示存储面板
+		var bld = building_system.get_building_at(pos) if building_system else null
+		if bld:
+			var data = bld.get_data()
+			if data and data.storage_capacity > 0 and bld.inventory:
+				_select_building(bld)
 
 # ==================== 定居者自主AI系统 ====================
 
@@ -307,6 +349,11 @@ func _input(event):
 			_deselect_building()
 			return
 		
+		# 有选中在建建筑时，Esc 取消
+		if selected_construction_building != null:
+			_deselect_construction()
+			return
+		
 		if build_mode:
 			exit_build_mode()
 			return
@@ -346,6 +393,9 @@ func _input(event):
 		var had_settler = _try_select_settler()
 		if not had_settler:
 			_try_select_building()
+		else:
+			# 选中定居者时取消在建建筑选中
+			_deselect_construction()
 	
 	# 快捷键 B：打开/关闭建造菜单
 	if event is InputEventKey and event.pressed and not event.echo:
