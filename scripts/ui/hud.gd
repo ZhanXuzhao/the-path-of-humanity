@@ -40,6 +40,12 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var construction_materials_container: VBoxContainer = $ConstructionPanel/ScrollContainer/VBox/MaterialsContainer
 @onready var construction_status_label: Label = $ConstructionPanel/ScrollContainer/VBox/StatusLabel
 
+# 资源节点信息面板
+@onready var resource_panel: Panel = $ResourcePanel
+@onready var resource_name_label: Label = $ResourcePanel/ScrollContainer/VBox/NameLabel
+@onready var resource_amount_label: Label = $ResourcePanel/ScrollContainer/VBox/AmountLabel
+@onready var resource_max_label: Label = $ResourcePanel/ScrollContainer/VBox/MaxLabel
+
 var game_manager
 var notification_scene = load("res://scenes/ui/notification.tscn")
 
@@ -104,6 +110,8 @@ func _settler_info_connections():
 		game.building_deselected.connect(_on_building_deselected)
 		game.construction_selected.connect(_on_construction_selected)
 		game.construction_deselected.connect(_on_construction_deselected)
+		game.resource_selected.connect(_on_resource_selected)
+		game.resource_deselected.connect(_on_resource_deselected)
 
 func _on_settler_selected(settler):
 	"""选中定居者时显示信息面板"""
@@ -195,6 +203,54 @@ func _on_construction_selected(bld):
 func _on_construction_deselected():
 	"""取消选中在建建筑"""
 	construction_panel.visible = false
+
+# -------- 资源节点信息面板 --------
+func _on_resource_selected(pos: Vector2i, deposit):
+	"""选中资源节点时显示信息面板"""
+	# 隐藏其他面板
+	storage_panel.visible = false
+	if settler_info_panel.visible:
+		_on_settler_deselected()
+		var game = get_node("/root/Game")
+		if game:
+			game.selected_settler = null
+	if construction_panel.visible:
+		construction_panel.visible = false
+	
+	resource_panel.visible = true
+	_update_resource_panel(deposit)
+
+func _on_resource_deselected():
+	"""取消选中资源节点"""
+	resource_panel.visible = false
+
+func _update_resource_panel(deposit):
+	"""更新资源信息面板内容"""
+	if deposit == null:
+		return
+	
+	var res_names = {
+		World.ResourceNodeType.TREE: "树木",
+		World.ResourceNodeType.STONE_DEPOSIT: "石矿",
+		World.ResourceNodeType.IRON_DEPOSIT: "铁矿",
+		World.ResourceNodeType.COPPER_DEPOSIT: "铜矿",
+		World.ResourceNodeType.COAL_DEPOSIT: "煤矿",
+		World.ResourceNodeType.BERRY_BUSH: "浆果丛",
+	}
+	
+	var res_name = res_names.get(deposit.type, "资源")
+	resource_name_label.text = res_name
+	resource_amount_label.text = "剩余: %.0f" % deposit.amount
+	resource_max_label.text = "总量: %.0f" % deposit.max_amount
+	
+	# 根据剩余比例改变颜色
+	var ratio = deposit.amount / max(deposit.max_amount, 1.0)
+	if ratio < 0.2:
+		resource_amount_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
+	elif ratio < 0.5:
+		resource_amount_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2))
+	else:
+		resource_amount_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))
 
 func _update_construction_panel(bld):
 	"""更新建筑进度面板内容"""
@@ -391,6 +447,17 @@ func _process(delta):
 		var game = get_node("/root/Game")
 		if game:
 			game.selected_settler = null
+	
+	# 选中资源节点时实时更新资源量
+	if resource_panel.visible:
+		var game = get_node("/root/Game")
+		if game and game.selected_resource_pos.x >= 0:
+			var deposit = game.world.get_resource_at(game.selected_resource_pos)
+			if deposit != null and deposit.amount > 0:
+				_update_resource_panel(deposit)
+			else:
+				# 资源已耗尽，隐藏面板
+				_on_resource_deselected()
 	
 	# 定时更新存储面板信息
 	if Engine.get_physics_frames() % 30 == 0 and storage_panel.visible:

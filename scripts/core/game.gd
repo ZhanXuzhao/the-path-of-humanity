@@ -38,6 +38,12 @@ var selected_construction_building = null
 signal construction_selected(building_instance)
 signal construction_deselected()
 
+# 选中资源节点
+var selected_resource_pos: Vector2i = Vector2i(-1, -1)
+var selected_resource_deposit = null  # World.ResourceDeposit
+signal resource_selected(pos: Vector2i, deposit)
+signal resource_deselected()
+
 func _ready():
 	# 自动加载存档（静默读取，不弹通知）
 	if _gm.state != 1 and _gm._loaded_save_data.is_empty() and _gm.has_save_file():
@@ -87,6 +93,12 @@ func _process(delta):
 	# 检查选中的定居者是否还存活
 	if selected_settler != null and not is_instance_valid(selected_settler):
 		_deselect_settler()
+	
+	# 检查选中的资源节点是否还存在（可能已被采集完）
+	if selected_resource_pos.x >= 0:
+		var res = world.get_resource_at(selected_resource_pos)
+		if res == null or res.amount <= 0:
+			_deselect_resource()
 	
 	# 定居者自主行为（进食、睡眠等）——每30帧检查一次避免频繁打断
 	if Engine.get_physics_frames() % 30 == 0:
@@ -246,6 +258,9 @@ func _try_select_building_at(grid_pos: Vector2i):
 	- 已完成且有存储功能 → 存储面板
 	- 未完成（施工中）→ 建筑进度面板
 	"""
+	# 选中建筑时取消资源选中
+	_deselect_resource()
+	
 	var bld = building_system.get_building_at(grid_pos) if building_system else null
 	if bld == null:
 		_deselect_construction()
@@ -292,6 +307,22 @@ func _deselect_construction():
 	if selected_construction_building != null:
 		selected_construction_building = null
 		construction_deselected.emit()
+
+# -------- 资源节点选择 --------
+func _select_resource(pos: Vector2i, deposit):
+	"""选中资源节点"""
+	if selected_resource_pos == pos:
+		return
+	selected_resource_pos = pos
+	selected_resource_deposit = deposit
+	resource_selected.emit(pos, deposit)
+
+func _deselect_resource():
+	"""取消选中资源节点"""
+	if selected_resource_pos.x >= 0:
+		selected_resource_pos = Vector2i(-1, -1)
+		selected_resource_deposit = null
+		resource_deselected.emit()
 
 func _on_building_completed(pos: Vector2i):
 	"""建筑完成时：若当前正选中此建筑，自动切换显示"""
@@ -360,6 +391,11 @@ func _input(event):
 			_deselect_construction()
 			return
 		
+		# 有选中资源节点时，Esc 取消
+		if selected_resource_pos.x >= 0:
+			_deselect_resource()
+			return
+		
 		if build_mode:
 			exit_build_mode()
 			return
@@ -422,6 +458,7 @@ func _input(event):
 		
 		if clicked_settler != null and bld_selectable:
 			# 同时有定居者和建筑 → 轮流选择
+			_deselect_resource()
 			if selected_settler != null and is_instance_valid(selected_settler):
 				# 当前选中定居者 → 切到建筑
 				_deselect_settler()
@@ -433,16 +470,28 @@ func _input(event):
 				_select_settler(clicked_settler)
 		elif clicked_settler != null:
 			# 只有定居者
+			_deselect_resource()
 			_select_settler(clicked_settler)
 			_deselect_construction()
 		elif clicked_bld != null:
 			# 只有建筑
+			_deselect_resource()
 			_try_select_building_at(grid_pos)
 		else:
-			# 什么都没选中
-			_deselect_construction()
-			_deselect_building()
-			_deselect_settler()
+			# 检查是否有可采集的资源
+			var clicked_resource = world.get_resource_at(grid_pos)
+			if clicked_resource != null and clicked_resource.amount > 0:
+				# 有资源 - 选中它（取消其他选中）
+				_deselect_construction()
+				_deselect_building()
+				_deselect_settler()
+				_select_resource(grid_pos, clicked_resource)
+			else:
+				# 什么都没选中
+				_deselect_construction()
+				_deselect_building()
+				_deselect_settler()
+				_deselect_resource()
 	
 	# 快捷键 B：打开/关闭建造菜单
 	if event is InputEventKey and event.pressed and not event.echo:

@@ -35,6 +35,12 @@ var _selected_building_pos: Vector2i = Vector2i(-1, -1)
 var _selected_building_size: Vector2i = Vector2i.ONE
 var _selection_overlay: Node2D  # 单独的高层级选中框叠加层
 
+# 选中资源节点
+var _selected_resource_pos: Vector2i = Vector2i(-1, -1)
+var _resource_selection_overlay: Node2D  # 资源选中叠加层（含标签）
+var _resource_info_label: Label  # 缓存的资源信息标签引用
+var _last_resource_amount: float = -1.0  # 上次显示的资源量，用于避免重复刷新
+
 func _ready():
 	# 使用 TextureGenerator 生成所有纹理
 	var all_textures = _TG.generate_all()
@@ -61,6 +67,8 @@ func _ready():
 		game.building_deselected.connect(_on_building_deselected)
 		game.construction_selected.connect(_on_construction_selected)
 		game.construction_deselected.connect(_on_construction_deselected)
+		game.resource_selected.connect(_on_resource_selected)
+		game.resource_deselected.connect(_on_resource_deselected)
 	
 	# 延迟一帧渲染，确保 Game._ready() 已完成区块生成
 	call_deferred("_render_existing_chunks")
@@ -71,10 +79,24 @@ func _ready():
 	_selection_overlay.name = "SelectionOverlay"
 	add_child(_selection_overlay)
 	
+	# 创建资源选中叠加层（在资源之上，建筑之下显示）
+	_resource_selection_overlay = Node2D.new()
+	_resource_selection_overlay.z_index = 50
+	_resource_selection_overlay.name = "ResourceSelectionOverlay"
+	add_child(_resource_selection_overlay)
+	
 	# 强制触发 _draw()
 	queue_redraw()
 
-
+func _process(delta):
+	# 更新选中的资源节点信息标签（资源量可能因采集而变化）
+	if _selected_resource_pos.x >= 0:
+		var deposit = world.get_resource_at(_selected_resource_pos)
+		if deposit != null and deposit.amount > 0:
+			# 只在资源量变化时更新标签文字
+			if deposit.amount != _last_resource_amount:
+				_last_resource_amount = deposit.amount
+				_update_resource_label_text(deposit)
 
 func _render_existing_chunks():
 	"""渲染所有已生成的区块"""
@@ -177,13 +199,6 @@ func _on_tile_changed(pos: Vector2i, tile_type: int):
 		tile_sprites[key].queue_free()
 		tile_sprites.erase(key)
 	_render_tile(pos, tile_type)
-
-func _on_resource_depleted(pos: Vector2i):
-	"""资源耗尽时移除精灵"""
-	var key = pos
-	if resource_sprites.has(key):
-		resource_sprites[key].queue_free()
-		resource_sprites.erase(key)
 
 func _on_building_placed(building_id: String, pos: Vector2i):
 	"""建筑放置时渲染"""
@@ -364,6 +379,124 @@ func _update_selection_overlay():
 	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_selection_overlay.add_child(right)
 
+# -------- 资源节点选中显示 --------
+func _on_resource_selected(pos: Vector2i, deposit):
+	"""资源节点被选中时显示选中框和信息标签"""
+	_selected_resource_pos = pos
+	_last_resource_amount = -1.0  # 重置缓存，确保标签刷新
+	# 每次选中都重建叠加层（位置可能改变）
+	_build_resource_selection_overlay(deposit)
+
+func _on_resource_deselected():
+	"""资源取消选中时清除"""
+	_selected_resource_pos = Vector2i(-1, -1)
+	_clear_resource_selection_overlay()
+	_last_resource_amount = -1.0
+
+func _clear_resource_selection_overlay():
+	"""清除资源选中叠加层"""
+	for child in _resource_selection_overlay.get_children():
+		child.queue_free()
+	_resource_info_label = null
+
+func _on_resource_depleted(pos: Vector2i):
+	"""资源耗尽时移除精灵并取消选中"""
+	# 移除资源精灵（原有逻辑）
+	var key = pos
+	if resource_sprites.has(key):
+		resource_sprites[key].queue_free()
+		resource_sprites.erase(key)
+	
+	# 如果选中的正是这个资源，取消选中
+	if _selected_resource_pos == pos:
+		var game = get_node("/root/Game")
+		if game:
+			game._deselect_resource()
+
+func _build_resource_selection_overlay(deposit):
+	"""创建资源选中叠加层：选中框 + 资源信息标签（仅首次调用）"""
+	_clear_resource_selection_overlay()
+	
+	if _selected_resource_pos.x < 0:
+		return
+	
+	var pixel_pos = Vector2(
+		_selected_resource_pos.x * world.tile_size,
+		_selected_resource_pos.y * world.tile_size
+	)
+	var tile_size_px = world.tile_size
+	
+	# 黄色半透明填充（与建筑蓝色区分，使用金色系）
+	var fill = ColorRect.new()
+	fill.color = Color(1.0, 0.85, 0.3, 0.15)
+	fill.position = pixel_pos
+	fill.size = Vector2(tile_size_px, tile_size_px)
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_resource_selection_overlay.add_child(fill)
+	
+	# 金色边框
+	var bw = 2.0
+	var border_color = Color(1.0, 0.8, 0.2, 0.9)
+	# 上
+	var top = ColorRect.new()
+	top.color = border_color
+	top.position = pixel_pos
+	top.size = Vector2(tile_size_px, bw)
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_resource_selection_overlay.add_child(top)
+	# 下
+	var bottom = ColorRect.new()
+	bottom.color = border_color
+	bottom.position = pixel_pos + Vector2(0, tile_size_px - bw)
+	bottom.size = Vector2(tile_size_px, bw)
+	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_resource_selection_overlay.add_child(bottom)
+	# 左
+	var left = ColorRect.new()
+	left.color = border_color
+	left.position = pixel_pos
+	left.size = Vector2(bw, tile_size_px)
+	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_resource_selection_overlay.add_child(left)
+	# 右
+	var right = ColorRect.new()
+	right.color = border_color
+	right.position = pixel_pos + Vector2(tile_size_px - bw, 0)
+	right.size = Vector2(bw, tile_size_px)
+	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_resource_selection_overlay.add_child(right)
+	
+	# 资源信息标签
+	_resource_info_label = Label.new()
+	_resource_info_label.add_theme_color_override("font_color", Color(1.0, 0.9, 0.5))
+	_resource_info_label.add_theme_constant_override("minimum_font_size", 11)
+	_resource_info_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	var label_pos = pixel_pos + Vector2(tile_size_px / 2.0, -18.0)
+	_resource_info_label.position = label_pos
+	_resource_info_label.size = Vector2(80, 20)
+	_resource_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_resource_selection_overlay.add_child(_resource_info_label)
+	
+	# 初始化文字和缓存
+	_update_resource_label_text(deposit)
+
+func _update_resource_label_text(deposit):
+	"""仅更新资源标签的文字内容"""
+	if _resource_info_label == null or not is_instance_valid(_resource_info_label):
+		return
+	
+	var res_names = {
+		world.ResourceNodeType.TREE: "树木",
+		world.ResourceNodeType.STONE_DEPOSIT: "石矿",
+		world.ResourceNodeType.IRON_DEPOSIT: "铁矿",
+		world.ResourceNodeType.COPPER_DEPOSIT: "铜矿",
+		world.ResourceNodeType.COAL_DEPOSIT: "煤矿",
+		world.ResourceNodeType.BERRY_BUSH: "浆果丛",
+	}
+	
+	var res_name = res_names.get(deposit.type, "资源")
+	_resource_info_label.text = "%s: %.0f" % [res_name, deposit.amount]
+
 # -------- 信号处理 --------
 func _on_building_completed(pos: Vector2i):
 	"""建筑完成时：移除进度条、恢复不透明"""
@@ -404,3 +537,9 @@ func clear_all():
 	# 清除选中框
 	_selected_building_pos = Vector2i(-1, -1)
 	_clear_selection_overlay()
+	
+	# 清除资源选中叠加层
+	_selected_resource_pos = Vector2i(-1, -1)
+	_clear_resource_selection_overlay()
+	_resource_info_label = null
+	_last_resource_amount = -1.0
