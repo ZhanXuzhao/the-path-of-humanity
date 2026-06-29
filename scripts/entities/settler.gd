@@ -1256,13 +1256,11 @@ func _randomize_stats():
 
 # -------- 状态切换控制 --------
 func set_state(new_state: SettlerState, force: bool = false) -> bool:
-	"""设置状态，带1秒最小切换间隔，返回是否成功设置
+	"""设置状态，返回是否成功设置
 	force=true 时强制切换（用于 complete_task 等关键路径）"""
 	var now = Time.get_ticks_msec() / 1000.0
 	if state == new_state:
 		return true  # 相同状态不算切换
-	if not force and now - _last_state_change_time < STATE_CHANGE_COOLDOWN:
-		return false  # 还在冷却中，不允许切换
 	var old_state_str = get_state_display(state, current_task if current_task else {})
 	var new_state_str = get_state_display(new_state, current_task if current_task else {})
 	state = new_state

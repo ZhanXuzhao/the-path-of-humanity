@@ -47,6 +47,9 @@ signal resource_deselected()
 # 建筑建造重试冷却（防止反复给同一缺物资建筑分配任务）
 var _construction_retry_cooldown: Dictionary = {}  # "x,y" -> frame_number
 
+# 自主行为计时器（每2秒执行一次）
+var _autonomy_timer: float = 0.0
+
 func _ready():
 	# 自动加载存档（静默读取，不弹通知）
 	if _gm.state != 1 and _gm._loaded_save_data.is_empty() and _gm.has_save_file():
@@ -103,8 +106,10 @@ func _process(delta):
 		if res == null or res.amount <= 0:
 			_deselect_resource()
 	
-	# 定居者自主行为（进食、睡眠等）——每30帧检查一次避免频繁打断
-	if Engine.get_physics_frames() % 30 == 0:
+	# 定居者自主行为（进食、睡眠等）——每2秒检查一次避免频繁打断
+	_autonomy_timer += delta
+	if _autonomy_timer >= 2.0:
+		_autonomy_timer = 0.0
 		_update_settler_autonomy()
 	
 	# 分配任务给空闲定居者
