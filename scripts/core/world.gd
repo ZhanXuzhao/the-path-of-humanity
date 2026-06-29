@@ -365,6 +365,118 @@ func is_walkable(pos: Vector2i) -> bool:
 	var tile = get_tile_at(pos)
 	return tile != TileType.WATER and tile != TileType.DEEP_WATER and tile != TileType.MOUNTAIN
 
+func find_path(from_pos: Vector2i, to_pos: Vector2i, max_steps: int = 500) -> Array[Vector2i]:
+	"""A*寻路，返回从 from_pos 到 to_pos 的网格路径（不含起点），
+	如果无路可走则返回空数组。
+	max_steps 限制搜索步数防止死循环。"""
+	if from_pos == to_pos:
+		return []
+	if not is_walkable(to_pos):
+		return []
+	
+	var came_from := Dictionary()  # Vector2i -> Vector2i
+	var g_score := Dictionary()    # Vector2i -> float
+	var f_score := Dictionary()    # Vector2i -> float
+	
+	var key_from = _pos_key(from_pos)
+	var key_to = _pos_key(to_pos)
+	g_score[key_from] = 0.0
+	f_score[key_from] = _astar_heuristic(from_pos, to_pos)
+	
+	var open_set := [from_pos]
+	var open_set_keys := {key_from: true}  # 快速查找
+	
+	var steps := 0
+	
+	while open_set.size() > 0 and steps < max_steps:
+		steps += 1
+		
+		# 找 f_score 最小的节点
+		var current = open_set[0]
+		var current_key = _pos_key(current)
+		var best_idx = 0
+		var best_f = f_score.get(current_key, INF)
+		for i in range(1, open_set.size()):
+			var k = _pos_key(open_set[i])
+			var f = f_score.get(k, INF)
+			if f < best_f:
+				best_f = f
+				current = open_set[i]
+				current_key = k
+				best_idx = i
+		
+		# 到达目标
+		if current == to_pos:
+			return _reconstruct_path(came_from, current)
+		
+		# 从 open_set 移除
+		open_set.remove_at(best_idx)
+		open_set_keys.erase(current_key)
+		
+		# 检查邻居（4方向 + 对角线）
+		var neighbors = [
+			current + Vector2i(0, -1),
+			current + Vector2i(0, 1),
+			current + Vector2i(-1, 0),
+			current + Vector2i(1, 0),
+			current + Vector2i(-1, -1),
+			current + Vector2i(1, -1),
+			current + Vector2i(-1, 1),
+			current + Vector2i(1, 1),
+		]
+		
+		# 确保所有区块已生成
+		for n in neighbors:
+			var chunk_n = global_to_chunk(n)
+			ensure_chunk_generated(chunk_n)
+		
+		var current_g = g_score.get(current_key, INF)
+		
+		for neighbor in neighbors:
+			if not is_walkable(neighbor):
+				continue
+			
+			# 对角线移动时检查是否被角落阻挡
+			var diff = neighbor - current
+			if abs(diff.x) == 1 and abs(diff.y) == 1:
+				# 如果两个相邻直角格子都是不可行走的，则不能对角线穿越
+				if not is_walkable(current + Vector2i(diff.x, 0)) and not is_walkable(current + Vector2i(0, diff.y)):
+					continue
+			
+			var n_key = _pos_key(neighbor)
+			var move_cost = 1.0 if (diff.x == 0 or diff.y == 0) else 1.414  # 对角线略贵
+			var tentative_g = current_g + move_cost
+			
+			if tentative_g < g_score.get(n_key, INF):
+				came_from[n_key] = current
+				g_score[n_key] = tentative_g
+				f_score[n_key] = tentative_g + _astar_heuristic(neighbor, to_pos)
+				
+				if not open_set_keys.has(n_key):
+					open_set.append(neighbor)
+					open_set_keys[n_key] = true
+	
+	# 无路可走
+	return []
+
+func _pos_key(pos: Vector2i) -> String:
+	return "%d,%d" % [pos.x, pos.y]
+
+func _astar_heuristic(a: Vector2i, b: Vector2i) -> float:
+	# 八方向曼哈顿距离（允许对角线移动）
+	var dx = abs(a.x - b.x)
+	var dy = abs(a.y - b.y)
+	return max(dx, dy) + (1.414 - 1.0) * min(dx, dy)
+
+func _reconstruct_path(came_from: Dictionary, current: Vector2i) -> Array[Vector2i]:
+	var path: Array[Vector2i] = []
+	var node = current
+	while came_from.has(_pos_key(node)):
+		path.append(node)
+		node = came_from[_pos_key(node)]
+	path.reverse()
+	return path
+
 # ==================== 地面物品管理 ====================
 
 func drop_item_on_ground(grid_pos: Vector2i, item_id: String, amount: int) -> int:

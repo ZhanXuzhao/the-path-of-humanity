@@ -95,6 +95,8 @@ var inventory
 
 # 移动和工作的中间变量
 var target_world_pos: Vector2 = Vector2.ZERO   # 移动目标（像素坐标）
+var _path: Array[Vector2i] = []                # A*寻路路径（网格坐标，不含起点）
+var _path_target_grid: Vector2i = Vector2i(-1, -1)  # 上次计算路径的目标网格
 var work_accumulator: float = 0.0               # 工作累积计时器
 var work_tick_interval: float = 0.5             # 每次工作刻的间隔（秒）
 var is_working_on_construction: bool = false    # 是否正在建造建筑
@@ -175,8 +177,16 @@ func _process(delta):
 	
 	match state:
 		SettlerState.IDLE:
-			# Game 主循环会分配任务，空闲时什么都不做
-			pass
+			# 检查是否站在不可行走的地形上（如加载旧存档等导致）
+			var _game = get_node_or_null("/root/Game")
+			if _game and _game.world:
+				var _grid = Vector2i(
+					int(position.x / _game.world.tile_size),
+					int(position.y / _game.world.tile_size)
+				)
+				if not _game.world.is_walkable(_grid):
+					# 站在水上，尝试向随机方向移动离开
+					_move_away_from_water(_game)
 		SettlerState.MOVING:
 			_move_towards(delta)
 		SettlerState.WORKING:
@@ -265,24 +275,88 @@ static func get_state_display(state_val: int, task_data: Dictionary = {}) -> Str
 func move_to(target: Vector2):
 	"""移动到目标像素位置"""
 	target_world_pos = target
+	# 清除缓存的路径，_move_towards 会重新计算
+	_path.clear()
+	_path_target_grid = Vector2i(-1, -1)
 	set_state(SettlerState.MOVING)
 	if is_selected:
 		queue_redraw()
 
 func _move_towards(delta):
 	if target_world_pos == Vector2.ZERO:
-		set_state(SettlerState.IDLE, true)  # 强制切换，防止无目标时卡在MOVING
+		_path.clear()
+		_path_target_grid = Vector2i(-1, -1)
+		set_state(SettlerState.IDLE, true)
 		return
-	var offset = target_world_pos - position
+	
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.world == null:
+		return
+	
+	var tile_ts = game.world.tile_size
+	var current_grid = Vector2i(
+		int(position.x / tile_ts),
+		int(position.y / tile_ts)
+	)
+	
+	# 检查当前是否站在不可行走的地形上（兜底保护）
+	if not game.world.is_walkable(current_grid):
+		_path.clear()
+		_path_target_grid = Vector2i(-1, -1)
+		# 如果还没有逃逸目标，尝试寻找最近的可行走格子
+		if target_world_pos == Vector2.ZERO:
+			if not _move_away_from_water(game):
+				complete_task()
+			return
+		# 已有逃逸目标，继续移动（允许踏出水面到相邻陆地）
+	
+	# 计算目标网格
+	var target_grid = Vector2i(
+		int(target_world_pos.x / tile_ts),
+		int(target_world_pos.y / tile_ts)
+	)
+	
+	# 如果路径无效或目标变了，重新计算A*路径
+	if _path.is_empty() or target_grid != _path_target_grid:
+		_path_target_grid = target_grid
+		var start_grid = current_grid
+		_path = game.world.find_path(start_grid, target_grid, 800)
+		
+		if _path.is_empty() and start_grid != target_grid:
+			# 无路可走，取消任务
+			complete_task()
+			return
+	
+	# 沿路径前进：目标是路径中下一个网格的中心
+	var target_pixel: Vector2
+	if not _path.is_empty():
+		var next_grid = _path[0]
+		target_pixel = Vector2(
+			next_grid.x * tile_ts + tile_ts / 2.0,
+			next_grid.y * tile_ts + tile_ts / 2.0
+		)
+	else:
+		target_pixel = target_world_pos
+	
+	var offset = target_pixel - position
 	var dist = offset.length()
+	
 	if dist > 2.0:
-		# 根据时间加速倍率同步提升移动速度
 		var gm = get_node("/root/GameManager")
 		var speed_mult = gm.time_speed if gm else 1.0
 		position += offset.normalized() * move_speed * delta * speed_mult
 	else:
+		# 到达当前路径点
+		if not _path.is_empty():
+			_path.remove_at(0)  # 移动到下一个路径点
+			# 继续下一帧处理下一个路径点
+			return
+		
+		# 最终目的地到达
 		position = target_world_pos
-		# 到达目标，根据任务类型切换状态
+		_path.clear()
+		_path_target_grid = Vector2i(-1, -1)
+		
 		if current_task != null:
 			var task_type = current_task.get("type", "")
 			match task_type:
@@ -291,23 +365,18 @@ func _move_towards(delta):
 				"EAT_FROM_RACK":
 					_tick_eat_from_rack()
 				"STORE":
-					# STORE 任务不需要工作刻，到达后立即执行存储
 					_tick_store()
 				"HAUL_CONSTRUCT":
-					# 搬运物资任务：根据当前阶段处理
 					var haul_phase = current_task.get("haul_phase", "fetch")
 					if haul_phase == "fetch":
-						# 已到达来源地，进入取货阶段
 						_tick_haul_construct_fetch()
 					elif haul_phase == "deliver":
-						# 已到达目标建筑，立即存放入库
 						_tick_haul_construct()
-				_:  # 其他任务类型 → 到达后开始工作
-					# 到达目标后强制开始工作（防止被冷却阻挡导致卡在MOVING→autonomy打断循环）
+				_:
 					set_state(SettlerState.WORKING, true)
 					work_accumulator = 0.0
 		else:
-			set_state(SettlerState.IDLE, true)  # 强制切换
+			set_state(SettlerState.IDLE, true)
 
 # -------- 工作系统 --------
 func _execute_work(delta):
@@ -941,6 +1010,34 @@ func _find_storage_with_item(item_id: String, max_dist: float = -1.0) -> Array:
 		sorted.append(entry.bld)
 	return sorted
 
+func _move_away_from_water(game_node) -> bool:
+	"""当站在水面上时，尝试向最近的可行走方向移动"""
+	var tile_ts = game_node.world.tile_size
+	var center_grid = Vector2i(
+		int(position.x / tile_ts),
+		int(position.y / tile_ts)
+	)
+	# 搜索周围6格范围内第一个可行走的格子
+	var directions = [
+		Vector2i(0, -1), Vector2i(0, 1),
+		Vector2i(-1, 0), Vector2i(1, 0),
+		Vector2i(-1, -1), Vector2i(1, -1),
+		Vector2i(-1, 1), Vector2i(1, 1),
+	]
+	for dir in directions:
+		var check_pos = center_grid + dir
+		if game_node.world.is_walkable(check_pos):
+			var target_pixel = Vector2(
+				check_pos.x * tile_ts + tile_ts / 2.0,
+				check_pos.y * tile_ts + tile_ts / 2.0
+			)
+			target_world_pos = target_pixel
+			_path.clear()
+			_path_target_grid = Vector2i(-1, -1)
+			set_state(SettlerState.MOVING, true)
+			return true
+	return false
+
 func _bld_world_center(bld) -> Vector2:
 	"""获取建筑的世界坐标中心"""
 	var game = get_node_or_null("/root/Game")
@@ -1310,10 +1407,21 @@ func add_skill_experience(skill_id: String, amount: float):
 # -------- 任务系统 --------
 func assign_task(task_data: Dictionary) -> bool:
 	"""分配任务，返回是否可以接受"""
+	# 检查目标位置是否可通行（防止将任务分配到水面上）
+	var target_pixel = task_data.get("target_world_pos", Vector2.ZERO)
+	if target_pixel != Vector2.ZERO:
+		var game = get_node_or_null("/root/Game")
+		if game and game.world:
+			var target_grid = Vector2i(
+				int(target_pixel.x / game.world.tile_size),
+				int(target_pixel.y / game.world.tile_size)
+			)
+			if not game.world.is_walkable(target_grid):
+				return false  # 目标不可达，拒绝接受任务
+	
 	current_task = task_data
 	
 	# 设置移动目标（像素坐标）
-	var target_pixel = task_data.get("target_world_pos", Vector2.ZERO)
 	if target_pixel != Vector2.ZERO:
 		target_world_pos = target_pixel
 		set_state(SettlerState.MOVING, true)  # 强制切换，防止冷却导致任务卡住
@@ -1334,6 +1442,8 @@ func complete_task(skip_auto_store: bool = false):
 		_construction_retry_count = max(0, _construction_retry_count - 1)
 	current_task = null
 	target_world_pos = Vector2.ZERO
+	_path.clear()
+	_path_target_grid = Vector2i(-1, -1)
 	set_state(SettlerState.IDLE, true)  # 强制切换，防止冷却导致卡死
 	if is_selected:
 		queue_redraw()
