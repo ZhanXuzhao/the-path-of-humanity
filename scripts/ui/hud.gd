@@ -133,10 +133,17 @@ func _settler_info_connections():
 		game.ground_item_selected.connect(_on_ground_item_selected)
 		game.ground_item_deselected.connect(_on_ground_item_deselected)
 
+func _hide_all_info_panels():
+	"""隐藏所有左下角信息面板，确保同时只显示一个"""
+	settler_info_panel.visible = false
+	storage_panel.visible = false
+	construction_panel.visible = false
+	resource_panel.visible = false
+	ground_item_panel.visible = false
+
 func _on_settler_selected(settler):
 	"""选中定居者时显示信息面板"""
-	# 隐藏其他面板
-	ground_item_panel.visible = false
+	_hide_all_info_panels()
 	settler_info_panel.visible = true
 	_tracked_settler = settler
 	_build_settler_info_ui(settler)
@@ -196,14 +203,7 @@ func _on_settler_deselected():
 # -------- 存储建筑面板 --------
 func _on_building_selected(bld):
 	"""选中存储建筑时显示物品列表"""
-	# 取消定居者选中以免冲突
-	if settler_info_panel.visible:
-		_on_settler_deselected()
-		var game = get_node("/root/Game")
-		if game:
-			game.selected_settler = null
-	
-	ground_item_panel.visible = false
+	_hide_all_info_panels()
 	storage_panel.visible = true
 	_update_storage_panel(bld)
 
@@ -214,15 +214,7 @@ func _on_building_deselected():
 # -------- 在建建筑进度面板 --------
 func _on_construction_selected(bld):
 	"""选中在建建筑时显示进度面板"""
-	# 隐藏其他面板
-	storage_panel.visible = false
-	ground_item_panel.visible = false
-	if settler_info_panel.visible:
-		_on_settler_deselected()
-		var game = get_node("/root/Game")
-		if game:
-			game.selected_settler = null
-	
+	_hide_all_info_panels()
 	construction_panel.visible = true
 	_update_construction_panel(bld)
 
@@ -233,17 +225,7 @@ func _on_construction_deselected():
 # -------- 资源节点信息面板 --------
 func _on_resource_selected(_pos: Vector2i, deposit):
 	"""选中资源节点时显示信息面板"""
-	# 隐藏其他面板
-	storage_panel.visible = false
-	ground_item_panel.visible = false
-	if settler_info_panel.visible:
-		_on_settler_deselected()
-		var game = get_node("/root/Game")
-		if game:
-			game.selected_settler = null
-	if construction_panel.visible:
-		construction_panel.visible = false
-	
+	_hide_all_info_panels()
 	resource_panel.visible = true
 	_update_resource_panel(deposit)
 
@@ -282,17 +264,7 @@ func _update_resource_panel(deposit):
 # -------- 地面物品信息面板 --------
 func _on_ground_item_selected(_pos: Vector2i, stacks):
 	"""选中地面物品时显示信息面板"""
-	# 隐藏其他面板
-	storage_panel.visible = false
-	resource_panel.visible = false
-	if settler_info_panel.visible:
-		_on_settler_deselected()
-		var game = get_node("/root/Game")
-		if game:
-			game.selected_settler = null
-	if construction_panel.visible:
-		construction_panel.visible = false
-	
+	_hide_all_info_panels()
 	ground_item_panel.visible = true
 	_update_ground_item_panel(stacks)
 
