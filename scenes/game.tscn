@@ -102,7 +102,7 @@ text = "科技"
 
 [node name="MenuBtn" type="Button" parent="UI/HUD/BottomBar"]
 custom_minimum_size = Vector2(70, 40)
-text = "菜单"]
+text = "菜单"
 
 [node name="BuildMenu" type="Panel" parent="UI"]
 visible = false

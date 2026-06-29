@@ -2,7 +2,6 @@
 extends Control
 
 @onready var label: Label = $Label
-@onready var animation: AnimationPlayer = $AnimationPlayer
 
 # NotificationType enum values: INFO=0, WARNING=1, ERROR=2, SUCCESS=3, RESEARCH=4, COMBAT=5
 var type_colors = {
