@@ -383,10 +383,6 @@ func _move_towards(delta):
 		
 		if current_task != null:
 			var task_type = current_task.get("type", "")
-			var phase = current_task.get("construct_phase", "?")
-			# 仅在CONSTRUCT任务到达时打日志（确认到达时的phase状态）
-			if task_type == "CONSTRUCT":
-				print("[移动] %s 到达目的地  task_type=%s  construct_phase=%s" % [settler_name, task_type, phase])
 			match task_type:
 				"SLEEP":
 					_tick_go_sleep()
@@ -408,18 +404,12 @@ func _move_towards(delta):
 
 # -------- 工作系统 --------
 func _execute_work(delta):
-	var task_type_log = current_task.get("type","null") if current_task else "null"
-	var phase_log = current_task.get("construct_phase","?") if current_task else "?"
-	print("[工作] %s _execute_work ENTER  state=%s  task=%s  phase=%s  accum=%.3f" % [
-		settler_name, SettlerState.keys()[state] if state < SettlerState.size() else "?", task_type_log, phase_log, work_accumulator])
-	
 	if current_task == null:
 		set_state(SettlerState.IDLE, true)  # 强制切换，防止无任务时卡在WORKING
 		return
 	
 	var task_type = current_task.get("type", "")
 	if task_type == "":
-		print("[工作] %s task_type为空，complete_task" % settler_name)
 		complete_task()
 		return
 	
@@ -496,24 +486,20 @@ func _tick_construct():
 	"""执行一次建造工作——分两阶段：先搬运物资，物资齐了再建造"""
 	var game = get_node_or_null("/root/Game")
 	if game == null or game.building_system == null:
-		print("[建造] %s 游戏/建筑系统为空，取消任务" % settler_name)
 		complete_task()
 		return
 	
 	var grid_pos: Vector2i = current_task.get("target_pos", Vector2i.ZERO)
 	var bld = game.building_system.get_building_at(grid_pos)
 	if bld == null:
-		print("[建造] %s 建筑为空(可能被拆除)，取消任务" % settler_name)
 		complete_task()
 		return
 	if bld.is_completed:
-		print("[建造] %s 建筑已完成，取消任务" % settler_name)
 		complete_task()
 		return
 	
 	var data = bld.get_data()
 	if data == null:
-		print("[建造] %s 建筑数据为空，取消任务" % settler_name)
 		complete_task()
 		return
 	
@@ -521,28 +507,18 @@ func _tick_construct():
 	
 	# ========== 阶段1：搬运建筑材料 ==========
 	var construct_phase = current_task.get("construct_phase", "")
-	var missing_before = bld.get_missing_materials()
-	print("[建造] %s _tick_construct  phase=%s  缺料=%s  背包负重=%.1f/%.1f  背包物品=%s" % [
-		settler_name, construct_phase, 
-		missing_before,
-		get_inventory_weight(), carry_capacity,
-		_get_inventory_summary()])
 	
 	if construct_phase == "fetch":
 		# 到达来源地，取材料到背包（受负重限制）
 		var fetch_source = current_task.get("fetch_source_type", "storage")
 		var fetch_item = current_task.get("fetch_item_id", "")
 		var fetch_amount = current_task.get("fetch_amount", 0)
-		print("[建造] %s fetch阶段:  来源=%s  物品=%s  期望取%d个  背包负重=%.1f/%.1f" % [
-			settler_name, fetch_source, fetch_item, fetch_amount, get_inventory_weight(), carry_capacity])
 		
 		if fetch_item != "" and fetch_amount > 0:
 			# 根据剩余负重计算实际能取多少
 			var max_carry = _get_max_carryable(fetch_item, fetch_amount)
-			print("[建造] %s fetch: max_carry=%d (负重限制后最多取%d)" % [settler_name, max_carry, fetch_amount])
 			if max_carry <= 0:
 				# 背包已满，直接回去工地先存入
-				print("[建造] %s fetch: 背包已满无法取料，直接回工地先存入" % settler_name)
 				current_task["construct_phase"] = "return_to_site"
 				var site_center = _bld_world_center(bld)
 				target_world_pos = site_center
@@ -552,7 +528,6 @@ func _tick_construct():
 				# 从地面捡取
 				var ground_pos: Vector2i = current_task.get("fetch_storage_pos", Vector2i.ZERO)
 				var picked = game.world.pickup_from_ground(ground_pos, fetch_item, max_carry)
-				print("[建造] %s fetch: 从地面(%d,%d)捡取 %s  -> 实际捡到%d个" % [settler_name, ground_pos.x, ground_pos.y, fetch_item, picked])
 				if picked > 0:
 					inventory.add_item(fetch_item, picked)
 					current_task["fetch_amount"] = fetch_amount - picked
@@ -563,16 +538,12 @@ func _tick_construct():
 				if storage_bld != null and storage_bld.inventory != null:
 					var available = storage_bld.inventory.get_item_count(fetch_item)
 					var to_take = mini(max_carry, mini(fetch_amount, available))
-					print("[建造] %s fetch: 存储建筑可用=%d  计划取to_take=%d" % [settler_name, available, to_take])
 					if to_take > 0:
 						var removed = storage_bld.inventory.remove_item(fetch_item, to_take)
-						print("[建造] %s fetch: 实际从存储取出=%d个" % [settler_name, removed])
 						if removed > 0:
 							inventory.add_item(fetch_item, removed)
 							current_task["fetch_amount"] = fetch_amount - removed
 		
-		var after_fetch_amount = current_task.get("fetch_amount", 0)
-		print("[建造] %s fetch结束: 还剩fetch_amount=%d  转向回工地" % [settler_name, after_fetch_amount])
 		# 转向回建筑工地
 		current_task["construct_phase"] = "return_to_site"
 		var site_center = _bld_world_center(bld)
@@ -589,17 +560,10 @@ func _tick_construct():
 		if fetch_item != "":
 			var in_bp = inventory.get_item_count(fetch_item)
 			var to_deposit = in_bp if fetch_amount <= 0 else mini(in_bp, fetch_amount)
-			print("[建造] %s return_to_site:  物品=%s  fetch_amount=%d  背包里有%d个  准备存入%d个" % [settler_name, fetch_item, fetch_amount, in_bp, to_deposit])
 			if to_deposit > 0:
 				var removed = inventory.remove_item(fetch_item, to_deposit)
 				if removed > 0:
 					bld.deposit_material(fetch_item, removed)
-					print("[建造] %s return_to_site: ✅ 成功存入%d个%s  工地已收=%d/%d" % [
-						settler_name, removed, fetch_item,
-						bld.deposited_materials.get(fetch_item, 0),
-						bld.get_data().materials.get(fetch_item, 0) if bld.get_data() else 0])
-			else:
-				print("[建造] %s return_to_site: ⚠️ 背包里没有%s可存(背包总览=%s)" % [settler_name, fetch_item, _get_inventory_summary()])
 		# 清除搬运标记
 		current_task.erase("fetch_storage_pos")
 		current_task.erase("fetch_item_id")
@@ -610,14 +574,12 @@ func _tick_construct():
 	# 检查是否还缺材料
 	var missing = bld.get_missing_materials()
 	if not missing.is_empty():
-		print("[建造] %s 检查缺料: %s  背包= %s" % [settler_name, missing, _get_inventory_summary()])
 		# 先检查背包有没有可用的建筑材料，有的话直接存入
 		var deposited_any = false
 		for mat_id in missing.keys():
 			if inventory.has_item(mat_id, 1):
 				var in_bp = inventory.get_item_count(mat_id)
 				var to_deposit = mini(in_bp, missing[mat_id])
-				print("[建造] %s 背包有%s=%d个  存入%d个到工地" % [settler_name, mat_id, in_bp, to_deposit])
 				if to_deposit > 0:
 					var removed = inventory.remove_item(mat_id, to_deposit)
 					if removed > 0:
@@ -627,20 +589,15 @@ func _tick_construct():
 		if deposited_any:
 			# 重新检查材料是否齐了
 			missing = bld.get_missing_materials()
-			print("[建造] %s 背包存入后  重新检查缺料=%s" % [settler_name, missing])
 		
 		if not missing.is_empty():
 			# 检查角色是否已在建筑位置（用于判断全局取料后是否需要移动）
 			var was_at_site = position.distance_to(_bld_world_center(bld)) < 10.0
-			print("[建造] %s 背包不足，查找材料来源  was_at_site=%s  重试计数=%d/%d" % [settler_name, was_at_site, _construction_retry_count, MAX_CONSTRUCTION_RETRIES])
 			
 			# 背包里的不够，去存储建筑或地面取材料
 			if _construct_fetch_from_storage(bld, missing):
-				var new_phase = current_task.get("construct_phase", "")
-				print("[建造] %s 找到来源，phase=%s  目标=%s" % [settler_name, new_phase, target_world_pos])
 				# 如果角色已在建筑处，尝试直接存入背包中的材料
-				if was_at_site and new_phase == "return_to_site":
-					print("[建造] %s was_at_site + return_to_site 触发立即存入" % settler_name)
+				if was_at_site and current_task.get("construct_phase", "") == "return_to_site":
 					_immediate_deposit_materials()
 					# 重新检查材料是否齐了
 					missing = bld.get_missing_materials()
@@ -649,39 +606,31 @@ func _tick_construct():
 					else:
 						# 材料还不够，继续尝试取料（递归安全，最多1层）
 						if _construct_fetch_from_storage(bld, missing):
-							var new_phase2 = current_task.get("construct_phase", "")
-							if new_phase2 == "return_to_site":
-								print("[建造] %s 第二层立即存入" % settler_name)
+							if current_task.get("construct_phase", "") == "return_to_site":
 								_immediate_deposit_materials()
 								missing = bld.get_missing_materials()
 								if missing.is_empty():
 									pass
 								else:
 									# 第二次尝试后仍缺料且无可取，放弃
-									print("[建造] %s 两次尝试后仍缺料=%s  放弃该建筑" % [settler_name, missing])
 									_construction_retry_count += 1
 									complete_task()
 									return
 							else:
-								print("[建造] %s 第二层phase=%s 非return_to_site  去取料" % [settler_name, new_phase2])
-								return
+								return  # 去取存储建筑的材料
 						else:
-							print("[建造] %s 第二层找不到来源  放弃" % settler_name)
 							_construction_retry_count += 1
 							complete_task()
 							return
 				else:
-					print("[建造] %s 非was_at_site+return_to_site  正常移动取料" % settler_name)
-					return
+					return  # 不在建筑旁，正常移动回去，或者正在前往存储建筑
 			else:
 				# 没有任何材料可用，无法建造——增加重试计数防止反复分配
-				print("[建造] %s 找不到任何材料来源  放弃(重试=%d/%d)" % [settler_name, _construction_retry_count + 1, MAX_CONSTRUCTION_RETRIES])
 				_construction_retry_count += 1
 				complete_task()
 				return
 	
 	# ========== 阶段2：建造（物资已齐） ==========
-	print("[建造] %s 🏗️ 开始建造！ 进度=%.1f  负重=%.1f/%.1f" % [settler_name, bld.construction_progress, get_inventory_weight(), carry_capacity])
 	# 增加建造进度（技能越高建造越快）
 	var skill_level = get_skill("construction")
 	var work_amount = 1.0 + skill_level * 0.3
@@ -690,7 +639,6 @@ func _tick_construct():
 	# 检查是否刚完成
 	if game.building_system.get_building_at(grid_pos) and game.building_system.get_building_at(grid_pos).is_completed:
 		var name_str = bld.display_name if bld.display_name != "" else (data.name if data else "建筑")
-		print("[建造] %s ✅ 建筑 %s 建造完成！" % [settler_name, name_str])
 		if gm:
 			gm.show_notification("%s 建造完成！" % name_str, gm.NotificationType.SUCCESS)
 		complete_task()
@@ -726,15 +674,6 @@ func _immediate_deposit_materials():
 	current_task.erase("fetch_amount")
 	current_task.erase("construct_phase")
 
-func _get_inventory_summary() -> String:
-	var parts: Array[String] = []
-	for stack in inventory.items:
-		if stack and stack.amount > 0:
-			parts.append("%sx%d" % [stack.item_id, stack.amount])
-	if parts.is_empty():
-		return "(空)"
-	return "[" + ", ".join(parts) + "]"
-
 func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 	"""查找最近的存储建筑或地面取建筑材料，返回是否找到材料去向"""
 	var game = get_node_or_null("/root/Game")
@@ -747,7 +686,6 @@ func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 	)
 	
 	# 收集所有候选来源（存储建筑+地面物品），按距离排序
-	# 每个候选: {type, bld/pos, mat_id, needed, target_world_pos, dist_sq}
 	var candidates: Array[Dictionary] = []
 	
 	for mat_id in missing.keys():
@@ -802,7 +740,6 @@ func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 		# 检查负重限额
 		var carry_limit = _get_max_carryable(mat_id, needed)
 		if carry_limit <= 0:
-			print("[建造] %s find_source: 背包已满无法取%s  跳过" % [settler_name, mat_id])
 			continue
 		
 		# 检查路径是否可达
@@ -813,13 +750,11 @@ func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 		if cur_grid != target_grid:
 			var test_path = game.world.find_path(cur_grid, target_grid, 100)
 			if test_path.is_empty():
-				print("[建造] %s find_source: ⚠️ %s 来源不可达(grid=%s→%s)  跳过" % [settler_name, cand.type, cur_grid, target_grid])
 				continue
 		
 		# 选中此来源
 		if cand.type == "storage":
 			var bld = cand.bld
-			print("[建造] %s find_source: ✅ 存储建筑 %s  %sx%d  路径可达" % [settler_name, bld.display_name, mat_id, carry_limit])
 			current_task["fetch_storage_pos"] = cand.bld_pos
 			current_task["fetch_item_id"] = mat_id
 			current_task["fetch_amount"] = carry_limit
@@ -828,7 +763,6 @@ func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 			set_state(SettlerState.MOVING)
 			return true
 		else:
-			print("[建造] %s find_source: ✅ 地面(%d,%d)  %sx%d  路径可达" % [settler_name, cand.bld_pos.x, cand.bld_pos.y, mat_id, carry_limit])
 			current_task["fetch_storage_pos"] = cand.bld_pos
 			current_task["fetch_item_id"] = mat_id
 			current_task["fetch_amount"] = carry_limit
@@ -838,7 +772,6 @@ func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 			set_state(SettlerState.MOVING)
 			return true
 	
-	print("[建造] %s find_source: ❌ 所有来源均不可用(无材料/不可达/负重满)  missing=%s" % [settler_name, missing])
 	return false
 
 # ========== 搬运物资到建筑 ==========
@@ -1590,9 +1523,6 @@ func assign_task(task_data: Dictionary) -> bool:
 			if not game.world.is_walkable(target_grid):
 				return false  # 目标不可达，拒绝接受任务
 	
-	if current_task != null and current_task.get("type", "") == "CONSTRUCT" and task_data.get("type", "") == "CONSTRUCT":
-		print("[任务] %s ⚠️ CONSTRUCT任务被替换! 旧phase=%s  新task_id=%s" % [
-			settler_name, current_task.get("construct_phase", ""), task_data.get("id", "")])
 	current_task = task_data
 	
 	# 设置移动目标（像素坐标）
