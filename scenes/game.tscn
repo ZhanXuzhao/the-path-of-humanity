@@ -74,6 +74,34 @@ offset_right = 640.0
 offset_bottom = 40.0
 theme_override_constants/separation = 16
 
+[node name="SpeedBox" type="HBoxContainer" parent="UI/HUD/TopBar" unique_id=1000000001]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="SpeedDownBtn" type="Button" parent="UI/HUD/TopBar/SpeedBox" unique_id=1000000002]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "<<"
+flat = true
+
+[node name="SpeedLabel" type="Label" parent="UI/HUD/TopBar/SpeedBox" unique_id=1000000003]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "×1"
+vertical_alignment = 1
+
+[node name="SpeedUpBtn" type="Button" parent="UI/HUD/TopBar/SpeedBox" unique_id=1000000004]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = ">>"
+flat = true
+
+[node name="PauseBtn" type="Button" parent="UI/HUD/TopBar" unique_id=1000000005]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+text = "⏸"
+flat = true
+
 [node name="DayLabel" type="Label" parent="UI/HUD/TopBar" unique_id=1870110762]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
@@ -117,16 +145,6 @@ offset_top = -50.0
 offset_right = 200.0
 offset_bottom = -8.0
 theme_override_constants/separation = 8
-
-[node name="SpeedBtn" type="Button" parent="UI/HUD/BottomBar" unique_id=1882711605]
-custom_minimum_size = Vector2(50, 40)
-layout_mode = 2
-text = "×1"
-
-[node name="PauseBtn" type="Button" parent="UI/HUD/BottomBar" unique_id=2002536771]
-custom_minimum_size = Vector2(50, 40)
-layout_mode = 2
-text = "⏸"
 
 [node name="BuildBtn" type="Button" parent="UI/HUD/BottomBar" unique_id=1559971046]
 custom_minimum_size = Vector2(70, 40)

@@ -756,19 +756,19 @@ func _assign_ai_tasks():
 		tasks.remove_at(best_idx)
 		settler.assign_task(best_task)
 
-func _scan_nearby_resources(settlers: Array) -> Array:
+func _scan_nearby_resources(idle_settlers: Array) -> Array:
 	"""扫描定居者周围的可采集资源"""
 	var result: Array = []
 	var scanned_chunks: Dictionary = {}
 	
 	# 决定搜索范围：以所有空闲定居者位置为中心
 	var search_radius = 5  # 区块半径
-	if settlers.is_empty():
+	if idle_settlers.is_empty():
 		return result
 	
 	var center_chunk = world.global_to_chunk(Vector2i(
-		int(settlers[0].position.x / world.tile_size),
-		int(settlers[0].position.y / world.tile_size)
+		int(idle_settlers[0].position.x / world.tile_size),
+		int(idle_settlers[0].position.y / world.tile_size)
 	))
 	
 	for cx in range(center_chunk.x - search_radius, center_chunk.x + search_radius + 1):
@@ -823,7 +823,7 @@ func _scan_nearby_resources(settlers: Array) -> Array:
 	
 	return result
 
-func _scan_material_hauling_tasks(settlers: Array) -> Array:
+func _scan_material_hauling_tasks(_settlers: Array) -> Array:
 	"""扫描需要搬运物资的建筑（施工工地/生产建筑），生成搬运任务"""
 	var result: Array = []
 	if building_system == null:
@@ -836,7 +836,6 @@ func _scan_material_hauling_tasks(settlers: Array) -> Array:
 		if bld.is_materials_ready():
 			continue
 		var missing = bld.get_missing_materials()
-		var bld_center = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
 		
 		for mat_id in missing.keys():
 			var needed = missing[mat_id]
