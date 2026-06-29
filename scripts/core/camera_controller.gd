@@ -12,6 +12,9 @@ const MAX_ZOOM: float = 5.0
 var _scroll_speed: float = 300.0
 var _edge_scroll_margin: int = 20
 
+# 镜头聚焦动画
+var _focus_tween: Tween = null
+
 func _ready():
 	# 从 GameManager 读取配置的滚动参数
 	if GameManager.settings.has("scroll_speed"):
@@ -72,3 +75,13 @@ func _process(delta):
 		position.y -= _scroll_speed * delta * (1.0 / zoom_level)
 	elif mouse_pos.y > viewport_size.y - _edge_scroll_margin:
 		position.y += _scroll_speed * delta * (1.0 / zoom_level)
+
+# -------- 镜头聚焦 --------
+func focus_on(target_pos: Vector2, duration: float = 0.3):
+	"""平滑移动镜头到目标位置，居中聚焦"""
+	if _focus_tween and _focus_tween.is_valid():
+		_focus_tween.kill()
+	_focus_tween = create_tween()
+	_focus_tween.set_ease(Tween.EASE_OUT)
+	_focus_tween.set_trans(Tween.TRANS_CUBIC)
+	_focus_tween.tween_property(self, "position", target_pos, duration)

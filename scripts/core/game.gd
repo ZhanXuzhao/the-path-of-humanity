@@ -238,8 +238,8 @@ func _try_select_settler() -> bool:
 	_deselect_settler()
 	return false
 
-func _select_settler(settler):
-	"""选中定居者"""
+func _select_settler(settler, focus_camera: bool = false):
+	"""选中定居者，可选是否镜头居中聚焦"""
 	if selected_settler == settler:
 		return
 	# 取消之前的选中
@@ -249,6 +249,9 @@ func _select_settler(settler):
 	selected_settler = settler
 	settler.set_selected(true)
 	settler_selected.emit(settler)
+	# 镜头居中聚焦（默认鼠标点击不聚焦，Tab切换时聚焦）
+	if focus_camera and camera and is_instance_valid(camera):
+		camera.focus_on(settler.position)
 
 func _deselect_settler():
 	"""取消选中定居者"""
@@ -256,6 +259,31 @@ func _deselect_settler():
 		selected_settler.set_selected(false)
 	selected_settler = null
 	settler_deselected.emit()
+
+func _switch_to_next_settler():
+	"""Tab切换：按定居者列表顺序切换到下一个定居者，镜头居中聚焦"""
+	if settlers.is_empty():
+		return
+	
+	# 过滤出有效的定居者
+	var valid_settlers = []
+	for s in settlers:
+		if is_instance_valid(s):
+			valid_settlers.append(s)
+	
+	if valid_settlers.is_empty():
+		return
+	
+	# 找到当前选中定居者在有效列表中的索引
+	var current_idx = -1
+	if selected_settler != null and is_instance_valid(selected_settler):
+		current_idx = valid_settlers.find(selected_settler)
+	
+	# 计算下一个索引（循环）
+	var next_idx = (current_idx + 1) % valid_settlers.size()
+	
+	# 使用 _select_settler 并带上聚焦标记
+	_select_settler(valid_settlers[next_idx], true)
 
 # -------- 建筑点击选择 --------
 func _try_select_building():
@@ -506,6 +534,13 @@ func _input(event):
 				_deselect_building()
 				_deselect_settler()
 				_deselect_resource()
+	
+	# 快捷键 Tab：在定居者之间循环切换，镜头居中聚焦
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_TAB:
+			_switch_to_next_settler()
+			get_viewport().set_input_as_handled()
+			return
 	
 	# 快捷键 B：打开/关闭建造菜单
 	if event is InputEventKey and event.pressed and not event.echo:
