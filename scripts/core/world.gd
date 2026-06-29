@@ -178,15 +178,13 @@ func _generate_chunk(chunk: ChunkData):
 	detail_noise.fractal_type = FastNoiseLite.FRACTAL_FBM
 	detail_noise.fractal_octaves = 2
 	
-	var local_rng = RandomNumberGenerator.new()
-	local_rng.seed = seed_base
-	
 	for x in CHUNK_SIZE:
 		for y in CHUNK_SIZE:
 			var tile_pos := Vector2i(x, y)
 			# 世界坐标（用于噪声采样，保证跨区块连续）
 			var wx = chunk.pos.x * CHUNK_SIZE + x
 			var wy = chunk.pos.y * CHUNK_SIZE + y
+			var world_pos = Vector2i(wx, wy)
 			
 			# 采样地势 [-1, 1] + 微扰动
 			var elevation = elevation_noise.get_noise_2d(wx, wy)
@@ -218,12 +216,14 @@ func _generate_chunk(chunk: ChunkData):
 			
 			chunk.tiles[tile_pos] = tile
 			
-			# 生成自然资源（初始点数 × resource_multiplier）
-			var res_rand = local_rng.randf()
+			# 使用世界坐标哈希替代顺序RNG，保证跨区块边界的资源分布连续性
+			var res_rand = _world_rand(world_pos, seed_base, 0)
+			
+			# 根据地形概率生成自然资源
 			if tile == TileType.FOREST and res_rand < 0.6:
 				var dep = ResourceDeposit.new(
 					ResourceNodeType.TREE,
-					local_rng.randf_range(5.0, 15.0) * resource_multiplier,
+					_world_rand_range(world_pos, seed_base, 1, 5.0, 15.0) * resource_multiplier,
 					2.0
 				)
 				dep.set_harvest_amount(default_harvest_amount)
@@ -231,7 +231,7 @@ func _generate_chunk(chunk: ChunkData):
 			elif tile == TileType.STONE and res_rand < 0.5:
 				var dep = ResourceDeposit.new(
 					ResourceNodeType.STONE_DEPOSIT,
-					local_rng.randf_range(10.0, 30.0) * resource_multiplier,
+					_world_rand_range(world_pos, seed_base, 1, 10.0, 30.0) * resource_multiplier,
 					3.0
 				)
 				dep.set_harvest_amount(default_harvest_amount)
@@ -239,45 +239,50 @@ func _generate_chunk(chunk: ChunkData):
 			elif tile == TileType.GRASS and res_rand < 0.08:
 				var dep = ResourceDeposit.new(
 					ResourceNodeType.BERRY_BUSH,
-					local_rng.randf_range(3.0, 8.0) * resource_multiplier,
+					_world_rand_range(world_pos, seed_base, 1, 3.0, 8.0) * resource_multiplier,
 					1.5
 				)
 				dep.set_harvest_amount(default_harvest_amount)
 				chunk.resources[tile_pos] = dep
-	
-	# 在草地和泥土上生成一些额外资源
-	for x in CHUNK_SIZE:
-		for y in CHUNK_SIZE:
-			var tile_pos := Vector2i(x, y)
-			var tile = chunk.tiles.get(tile_pos, TileType.GRASS)
-			if tile in [TileType.GRASS, TileType.DIRT] and not chunk.resources.has(tile_pos):
-				var res_rand = local_rng.randf()
-				if res_rand < 0.02:  # 铁矿石
+			# 矿石资源 - 与自然资源合并到同一循环，使用独立哈希通道保证跨区块连续性
+			elif tile in [TileType.GRASS, TileType.DIRT] and not chunk.resources.has(tile_pos):
+				var ore_rand = _world_rand(world_pos, seed_base, 2)
+				if ore_rand < 0.02:  # 铁矿石
 					var dep = ResourceDeposit.new(
 						ResourceNodeType.IRON_DEPOSIT,
-						local_rng.randf_range(8.0, 25.0) * resource_multiplier,
+						_world_rand_range(world_pos, seed_base, 3, 8.0, 25.0) * resource_multiplier,
 						4.0
 					)
 					dep.set_harvest_amount(default_harvest_amount)
 					chunk.resources[tile_pos] = dep
-				elif res_rand < 0.035:  # 铜矿石
+				elif ore_rand < 0.035:  # 铜矿石
 					var dep = ResourceDeposit.new(
 						ResourceNodeType.COPPER_DEPOSIT,
-						local_rng.randf_range(8.0, 25.0) * resource_multiplier,
+						_world_rand_range(world_pos, seed_base, 3, 8.0, 25.0) * resource_multiplier,
 						4.0
 					)
 					dep.set_harvest_amount(default_harvest_amount)
 					chunk.resources[tile_pos] = dep
-				elif res_rand < 0.045:  # 煤矿
+				elif ore_rand < 0.045:  # 煤矿
 					var dep = ResourceDeposit.new(
 						ResourceNodeType.COAL_DEPOSIT,
-						local_rng.randf_range(5.0, 20.0) * resource_multiplier,
+						_world_rand_range(world_pos, seed_base, 3, 5.0, 20.0) * resource_multiplier,
 						3.0
 					)
 					dep.set_harvest_amount(default_harvest_amount)
 					chunk.resources[tile_pos] = dep
 	
 	chunk.is_generated = true
+
+# -------- 确定性随机数辅助函数（基于世界坐标，保证跨区块边界连续）--------
+func _world_rand(pos: Vector2i, base_seed: int, channel: int) -> float:
+	"""基于世界坐标的确定性伪随机数 [0, 1)"""
+	var h = hash(pos) ^ hash(base_seed + channel)
+	return (h % 1000000) / 1000000.0
+
+func _world_rand_range(pos: Vector2i, base_seed: int, channel: int, from: float, to: float) -> float:
+	"""基于世界坐标的确定性范围内随机值"""
+	return lerpf(from, to, _world_rand(pos, base_seed, channel))
 
 # -------- 世界坐标操作 --------
 func global_to_chunk(global_pos: Vector2i) -> Vector2i:
