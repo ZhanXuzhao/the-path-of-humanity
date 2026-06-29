@@ -1,29 +1,18 @@
-[gd_scene load_steps=15 format=3 uid="uid://d0plvqi8nqtxg"]
+[gd_scene format=3 uid="uid://d0plvqi8nqtxg"]
 
-[ext_resource type="Script" path="res://scripts/core/game.gd" id="1_b4xb6"]
-[ext_resource type="Script" path="res://scripts/core/world.gd" id="2_mhkh2"]
-[ext_resource type="Script" path="res://scripts/core/world_renderer.gd" id="2b_x4c7"]
-[ext_resource type="Script" path="res://scripts/systems/building_system.gd" id="3_ha1wi"]
-[ext_resource type="Script" path="res://scripts/systems/crafting_system.gd" id="4_e0m3h"]
-[ext_resource type="Script" path="res://scripts/systems/tech_system.gd" id="5_hb83g"]
-[ext_resource type="Script" path="res://scripts/core/camera_controller.gd" id="6_1vh7r"]
-[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="7_86c0l"]
-[ext_resource type="Script" path="res://scripts/ui/build_menu.gd" id="8_17ot"]
-[ext_resource type="Script" path="res://scripts/ui/tech_panel.gd" id="9_3h2wo"]
-[ext_resource type="PackedScene" path="res://scenes/main_menu.tscn" id="10_kae2"]
-[ext_resource type="Script" path="res://scripts/ui/minimap.gd" id="11_x8m9"]
-[ext_resource type="Script" path="res://scripts/ui/work_panel.gd" id="12_0k7l"]
-
-[sub_resource type="StyleBoxFlat" id="1"]
-content_margin_left = 8.0
-content_margin_top = 8.0
-content_margin_right = 8.0
-content_margin_bottom = 8.0
-bg_color = Color(0.1, 0.1, 0.12, 0.95)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
+[ext_resource type="Script" uid="uid://cpf6rca0le05k" path="res://scripts/core/game.gd" id="1_b4xb6"]
+[ext_resource type="Script" uid="uid://bwm5tvsu2ji3k" path="res://scripts/core/world_renderer.gd" id="2b_x4c7"]
+[ext_resource type="Script" uid="uid://0jugfry13j6w" path="res://scripts/core/world.gd" id="2_mhkh2"]
+[ext_resource type="Script" uid="uid://by2wyj6r4gpwx" path="res://scripts/systems/building_system.gd" id="3_ha1wi"]
+[ext_resource type="Script" uid="uid://7mc252ltmfc1" path="res://scripts/systems/crafting_system.gd" id="4_e0m3h"]
+[ext_resource type="Script" uid="uid://5orcpiknumiw" path="res://scripts/systems/tech_system.gd" id="5_hb83g"]
+[ext_resource type="Script" uid="uid://cf4tmnood3su4" path="res://scripts/core/camera_controller.gd" id="6_1vh7r"]
+[ext_resource type="Script" uid="uid://iv0ujm5u7034" path="res://scripts/ui/hud.gd" id="7_86c0l"]
+[ext_resource type="Script" uid="uid://bap7dnh5i8oey" path="res://scripts/ui/build_menu.gd" id="8_17ot"]
+[ext_resource type="Script" uid="uid://bapics7r1hr1g" path="res://scripts/ui/tech_panel.gd" id="9_3h2wo"]
+[ext_resource type="PackedScene" uid="uid://cm5p4exrbq2j6" path="res://scenes/main_menu.tscn" id="10_kae2"]
+[ext_resource type="Script" uid="uid://b8ill76nlbxvo" path="res://scripts/ui/minimap.gd" id="11_x8m9"]
+[ext_resource type="Script" uid="uid://b2alnb6envcwj" path="res://scripts/ui/work_panel.gd" id="12_0k7l"]
 
 [sub_resource type="StyleBoxFlat" id="2"]
 content_margin_left = 6.0
@@ -36,485 +25,450 @@ corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
-[node name="Game" type="Node2D"]
+[sub_resource type="StyleBoxFlat" id="1"]
+content_margin_left = 8.0
+content_margin_top = 8.0
+content_margin_right = 8.0
+content_margin_bottom = 8.0
+bg_color = Color(0.1, 0.1, 0.12, 0.95)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="Game" type="Node2D" unique_id=1037815751]
 script = ExtResource("1_b4xb6")
 
-[node name="World" type="Node2D" parent="."]
+[node name="World" type="Node2D" parent="." unique_id=23888823]
 script = ExtResource("2_mhkh2")
 
-[node name="WorldRenderer" type="Node2D" parent="World"]
+[node name="WorldRenderer" type="Node2D" parent="World" unique_id=936688862]
 script = ExtResource("2b_x4c7")
 
-[node name="Camera" type="Camera2D" parent="."]
+[node name="Camera" type="Camera2D" parent="." unique_id=1717165746]
 position = Vector2(640, 360)
 zoom = Vector2(2, 2)
 script = ExtResource("6_1vh7r")
 
-[node name="Systems" type="Node" parent="."]
+[node name="Systems" type="Node" parent="." unique_id=1845904995]
 
-[node name="BuildingSystem" type="Node" parent="Systems"]
+[node name="BuildingSystem" type="Node" parent="Systems" unique_id=1938285744]
 script = ExtResource("3_ha1wi")
 
-[node name="CraftingSystem" type="Node" parent="Systems"]
+[node name="CraftingSystem" type="Node" parent="Systems" unique_id=1704808070]
 script = ExtResource("4_e0m3h")
 
-[node name="TechSystem" type="Node" parent="Systems"]
+[node name="TechSystem" type="Node" parent="Systems" unique_id=1563652506]
 script = ExtResource("5_hb83g")
 
-[node name="UI" type="CanvasLayer" parent="."]
+[node name="UI" type="CanvasLayer" parent="." unique_id=1010494645]
 layer = 10
 
-[node name="HUD" type="CanvasLayer" parent="UI"]
-layer = 1
+[node name="HUD" type="CanvasLayer" parent="UI" unique_id=417828679]
 script = ExtResource("7_86c0l")
 
-[node name="TopBar" type="HBoxContainer" parent="UI/HUD"]
-anchors_preset = 0
+[node name="TopBar" type="HBoxContainer" parent="UI/HUD" unique_id=898087521]
 offset_left = 8.0
 offset_top = 4.0
 offset_right = 640.0
 offset_bottom = 40.0
 theme_override_constants/separation = 16
 
-[node name="DayLabel" type="Label" parent="UI/HUD/TopBar"]
+[node name="DayLabel" type="Label" parent="UI/HUD/TopBar" unique_id=1870110762]
+layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_constants/minimum_font_size = 16
 text = "第 1 天"
 
-[node name="TimeLabel" type="Label" parent="UI/HUD/TopBar"]
+[node name="TimeLabel" type="Label" parent="UI/HUD/TopBar" unique_id=1487336474]
+layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_constants/minimum_font_size = 16
 text = "06"
 
-[node name="PopulationLabel" type="Label" parent="UI/HUD/TopBar"]
+[node name="PopulationLabel" type="Label" parent="UI/HUD/TopBar" unique_id=1126527451]
+layout_mode = 2
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_constants/minimum_font_size = 16
 text = "人口: 3"
 
-[node name="FpsLabel" type="Label" parent="UI/HUD/TopBar"]
+[node name="FpsLabel" type="Label" parent="UI/HUD/TopBar" unique_id=1453202937]
+layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 1, 0.6, 1)
-theme_override_constants/minimum_font_size = 16
 
-[node name="Resources" type="HBoxContainer" parent="UI/HUD/TopBar"]
+[node name="Resources" type="HBoxContainer" parent="UI/HUD/TopBar" unique_id=1068114163]
+layout_mode = 2
 size_flags_horizontal = 0
 
-[node name="Notifications" type="VBoxContainer" parent="UI/HUD"]
-anchors_preset = 1
+[node name="Notifications" type="VBoxContainer" parent="UI/HUD" unique_id=1929267143]
+anchors_preset = -1
 anchor_top = 0.05
 anchor_right = 1.0
+anchor_bottom = 0.05
 offset_top = 40.0
 offset_right = -8.0
 alignment = 2
 
-[node name="BottomBar" type="HBoxContainer" parent="UI/HUD"]
-anchors_preset = 12
+[node name="BottomBar" type="HBoxContainer" parent="UI/HUD" unique_id=1976130901]
+anchors_preset = 7
 anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
+anchor_bottom = 1.0
 offset_left = -200.0
 offset_top = -50.0
 offset_right = 200.0
 offset_bottom = -8.0
 theme_override_constants/separation = 8
 
-[node name="SpeedBtn" type="Button" parent="UI/HUD/BottomBar"]
+[node name="SpeedBtn" type="Button" parent="UI/HUD/BottomBar" unique_id=1882711605]
 custom_minimum_size = Vector2(50, 40)
+layout_mode = 2
 text = "×1"
 
-[node name="PauseBtn" type="Button" parent="UI/HUD/BottomBar"]
+[node name="PauseBtn" type="Button" parent="UI/HUD/BottomBar" unique_id=2002536771]
 custom_minimum_size = Vector2(50, 40)
+layout_mode = 2
 text = "⏸"
 
-[node name="BuildBtn" type="Button" parent="UI/HUD/BottomBar"]
+[node name="BuildBtn" type="Button" parent="UI/HUD/BottomBar" unique_id=1559971046]
 custom_minimum_size = Vector2(70, 40)
+layout_mode = 2
 text = "建造"
 
-[node name="TechBtn" type="Button" parent="UI/HUD/BottomBar"]
+[node name="TechBtn" type="Button" parent="UI/HUD/BottomBar" unique_id=1339452257]
 custom_minimum_size = Vector2(70, 40)
+layout_mode = 2
 text = "科技"
 
-[node name="WorkBtn" type="Button" parent="UI/HUD/BottomBar"]
+[node name="WorkBtn" type="Button" parent="UI/HUD/BottomBar" unique_id=719785845]
 custom_minimum_size = Vector2(70, 40)
+layout_mode = 2
 text = "工作"
 
-[node name="MenuBtn" type="Button" parent="UI/HUD/BottomBar"]
+[node name="MenuBtn" type="Button" parent="UI/HUD/BottomBar" unique_id=1461223249]
 custom_minimum_size = Vector2(70, 40)
+layout_mode = 2
 text = "菜单"
 
-[node name="SettlerInfoPanel" type="Panel" parent="UI/HUD"]
+[node name="SettlerInfoPanel" type="Panel" parent="UI/HUD" unique_id=574386277]
 visible = false
-anchors_preset = 0
 offset_left = 8.0
 offset_top = 400.0
 offset_right = 260.0
 offset_bottom = 928.0
-theme_override_styles/panel = SubResource(2)
+theme_override_styles/panel = SubResource("2")
 
-[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/SettlerInfoPanel"]
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/SettlerInfoPanel" unique_id=472676839]
+layout_mode = 0
 offset_left = 4.0
 offset_top = 4.0
 offset_right = 248.0
 offset_bottom = 524.0
 
-[node name="VBox" type="VBoxContainer" parent="UI/HUD/SettlerInfoPanel/ScrollContainer"]
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 240.0
-offset_bottom = 200.0
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/SettlerInfoPanel/ScrollContainer" unique_id=2015608733]
+layout_mode = 2
 
-[node name="NameLabel" type="Label" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox"]
-offset_right = 240.0
-offset_bottom = 24.0
-theme_override_constants/minimum_font_size = 18
-theme_override_colors/font_color = Color(0.3, 0.8, 1.0, 1)
+[node name="NameLabel" type="Label" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox" unique_id=88663475]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.8, 1, 1)
 text = "姓名"
 
-[node name="StateLabel" type="Label" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox"]
-offset_top = 28.0
-offset_right = 240.0
-offset_bottom = 48.0
-theme_override_constants/minimum_font_size = 14
+[node name="StateLabel" type="Label" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox" unique_id=1775528312]
+layout_mode = 2
 text = "状态: 空闲"
 
-[node name="HpBarHBox" type="HBoxContainer" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox"]
-offset_top = 52.0
-offset_right = 240.0
-offset_bottom = 72.0
+[node name="HpBarHBox" type="HBoxContainer" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox" unique_id=1063121601]
+layout_mode = 2
 
-[node name="HPLabel" type="Label" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox/HpBarHBox"]
+[node name="HPLabel" type="Label" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox/HpBarHBox" unique_id=961899891]
 custom_minimum_size = Vector2(50, 0)
-theme_override_constants/minimum_font_size = 12
+layout_mode = 2
 text = "生命:"
 
-[node name="HPBar" type="ProgressBar" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox/HpBarHBox"]
+[node name="HPBar" type="ProgressBar" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox/HpBarHBox" unique_id=1574167264]
+layout_mode = 2
 size_flags_horizontal = 3
-max_value = 100.0
 value = 100.0
-show_percentage = true
 
-[node name="NeedsSep" type="HSeparator" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox"]
-offset_top = 76.0
-offset_right = 240.0
-offset_bottom = 80.0
+[node name="NeedsSep" type="HSeparator" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox" unique_id=891492511]
+layout_mode = 2
 
-[node name="NeedsContainer" type="VBoxContainer" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox"]
-offset_top = 84.0
-offset_right = 240.0
-offset_bottom = 84.0
+[node name="NeedsContainer" type="VBoxContainer" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox" unique_id=947407570]
+layout_mode = 2
 
-[node name="StoragePanel" type="Panel" parent="UI/HUD"]
+[node name="StoragePanel" type="Panel" parent="UI/HUD" unique_id=1748318168]
 visible = false
-anchors_preset = 0
 offset_left = 8.0
 offset_top = 400.0
 offset_right = 260.0
 offset_bottom = 664.0
-theme_override_styles/panel = SubResource(2)
+theme_override_styles/panel = SubResource("2")
 
-[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/StoragePanel"]
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/StoragePanel" unique_id=2047724940]
+layout_mode = 0
 offset_left = 4.0
 offset_top = 4.0
 offset_right = 248.0
 offset_bottom = 260.0
 
-[node name="VBox" type="VBoxContainer" parent="UI/HUD/StoragePanel/ScrollContainer"]
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 240.0
-offset_bottom = 200.0
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/StoragePanel/ScrollContainer" unique_id=1087801572]
+layout_mode = 2
 
-[node name="NameLabel" type="Label" parent="UI/HUD/StoragePanel/ScrollContainer/VBox"]
-offset_right = 240.0
-offset_bottom = 24.0
-theme_override_constants/minimum_font_size = 18
+[node name="NameLabel" type="Label" parent="UI/HUD/StoragePanel/ScrollContainer/VBox" unique_id=1335022264]
+layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.9, 0.6, 1)
 text = "置物架"
 
-[node name="CapacityLabel" type="Label" parent="UI/HUD/StoragePanel/ScrollContainer/VBox"]
-offset_top = 28.0
-offset_right = 240.0
-offset_bottom = 48.0
-theme_override_constants/minimum_font_size = 13
+[node name="CapacityLabel" type="Label" parent="UI/HUD/StoragePanel/ScrollContainer/VBox" unique_id=132957544]
+layout_mode = 2
 text = "容量: 0/100"
 
-[node name="Sep" type="HSeparator" parent="UI/HUD/StoragePanel/ScrollContainer/VBox"]
-offset_top = 52.0
-offset_right = 240.0
-offset_bottom = 56.0
+[node name="Sep" type="HSeparator" parent="UI/HUD/StoragePanel/ScrollContainer/VBox" unique_id=1414735806]
+layout_mode = 2
 
-[node name="ItemsContainer" type="VBoxContainer" parent="UI/HUD/StoragePanel/ScrollContainer/VBox"]
-offset_top = 60.0
-offset_right = 240.0
-offset_bottom = 60.0
+[node name="ItemsContainer" type="VBoxContainer" parent="UI/HUD/StoragePanel/ScrollContainer/VBox" unique_id=1100274830]
+layout_mode = 2
 
-[node name="ConstructionPanel" type="Panel" parent="UI/HUD"]
+[node name="ConstructionPanel" type="Panel" parent="UI/HUD" unique_id=1485081183]
 visible = false
-anchors_preset = 0
 offset_left = 8.0
 offset_top = 400.0
 offset_right = 260.0
 offset_bottom = 660.0
-theme_override_styles/panel = SubResource(2)
+theme_override_styles/panel = SubResource("2")
 
-[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/ConstructionPanel"]
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/ConstructionPanel" unique_id=1645260682]
+layout_mode = 0
 offset_left = 4.0
 offset_top = 4.0
 offset_right = 248.0
 offset_bottom = 256.0
 
-[node name="VBox" type="VBoxContainer" parent="UI/HUD/ConstructionPanel/ScrollContainer"]
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 240.0
-offset_bottom = 200.0
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/ConstructionPanel/ScrollContainer" unique_id=2092929567]
+layout_mode = 2
 
-[node name="NameLabel" type="Label" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox"]
-offset_right = 240.0
-offset_bottom = 24.0
-theme_override_constants/minimum_font_size = 18
-theme_override_colors/font_color = Color(1.0, 0.7, 0.2, 1)
+[node name="NameLabel" type="Label" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox" unique_id=624324788]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.7, 0.2, 1)
 text = "建筑名称"
 
-[node name="ProgressBar" type="ProgressBar" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox"]
-offset_top = 28.0
-offset_right = 240.0
-offset_bottom = 48.0
+[node name="ProgressBar" type="ProgressBar" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox" unique_id=1917386187]
+layout_mode = 2
 size_flags_horizontal = 3
-max_value = 1.0
-value = 0.0
-show_percentage = true
 theme_override_colors/font_color = Color(1, 1, 1, 1)
+max_value = 1.0
 
-[node name="ProgressLabel" type="Label" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox"]
-offset_top = 52.0
-offset_right = 240.0
-offset_bottom = 72.0
-theme_override_constants/minimum_font_size = 13
+[node name="ProgressLabel" type="Label" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox" unique_id=1809243575]
+layout_mode = 2
 text = "建造进度: 0 / 0"
 
-[node name="MatSep" type="HSeparator" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox"]
-offset_top = 76.0
-offset_right = 240.0
-offset_bottom = 80.0
+[node name="MatSep" type="HSeparator" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox" unique_id=1659241749]
+layout_mode = 2
 
-[node name="MaterialsContainer" type="VBoxContainer" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox"]
-offset_top = 84.0
-offset_right = 240.0
-offset_bottom = 84.0
+[node name="MaterialsContainer" type="VBoxContainer" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox" unique_id=712142110]
+layout_mode = 2
 
-[node name="StatusLabel" type="Label" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox"]
-offset_top = 88.0
-offset_right = 240.0
-offset_bottom = 108.0
-theme_override_constants/minimum_font_size = 12
-text = ""
+[node name="StatusLabel" type="Label" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox" unique_id=1976277253]
+layout_mode = 2
 
-[node name="ResourcePanel" type="Panel" parent="UI/HUD"]
+[node name="ResourcePanel" type="Panel" parent="UI/HUD" unique_id=219414468]
 visible = false
-anchors_preset = 0
 offset_left = 8.0
 offset_top = 400.0
 offset_right = 260.0
 offset_bottom = 520.0
-theme_override_styles/panel = SubResource(2)
+theme_override_styles/panel = SubResource("2")
 
-[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/ResourcePanel"]
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/ResourcePanel" unique_id=1078830668]
+layout_mode = 0
 offset_left = 4.0
 offset_top = 4.0
 offset_right = 248.0
 offset_bottom = 116.0
 
-[node name="VBox" type="VBoxContainer" parent="UI/HUD/ResourcePanel/ScrollContainer"]
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 240.0
-offset_bottom = 200.0
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/ResourcePanel/ScrollContainer" unique_id=1082579750]
+layout_mode = 2
 
-[node name="NameLabel" type="Label" parent="UI/HUD/ResourcePanel/ScrollContainer/VBox"]
-offset_right = 240.0
-offset_bottom = 24.0
-theme_override_constants/minimum_font_size = 18
-theme_override_colors/font_color = Color(1.0, 0.85, 0.3, 1)
+[node name="NameLabel" type="Label" parent="UI/HUD/ResourcePanel/ScrollContainer/VBox" unique_id=1196155579]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
 text = "资源名称"
 
-[node name="AmountLabel" type="Label" parent="UI/HUD/ResourcePanel/ScrollContainer/VBox"]
-offset_top = 28.0
-offset_right = 240.0
-offset_bottom = 48.0
-theme_override_constants/minimum_font_size = 14
+[node name="AmountLabel" type="Label" parent="UI/HUD/ResourcePanel/ScrollContainer/VBox" unique_id=1277553348]
+layout_mode = 2
 text = "剩余: 0"
 
-[node name="MaxLabel" type="Label" parent="UI/HUD/ResourcePanel/ScrollContainer/VBox"]
-offset_top = 52.0
-offset_right = 240.0
-offset_bottom = 72.0
-theme_override_constants/minimum_font_size = 14
+[node name="MaxLabel" type="Label" parent="UI/HUD/ResourcePanel/ScrollContainer/VBox" unique_id=958619928]
+layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
 text = "总量: 0"
 
-[node name="BuildMenu" type="Panel" parent="UI"]
-visible = false
-script = ExtResource("8_17ot")
+[node name="BuildMenu" type="Panel" parent="UI" unique_id=1575822565]
 offset_left = 8.0
 offset_top = 60.0
 offset_right = 300.0
 offset_bottom = 600.0
-theme_override_styles/panel = SubResource(1)
+theme_override_styles/panel = SubResource("1")
+script = ExtResource("8_17ot")
 
-[node name="CategoryTabs" type="HBoxContainer" parent="UI/BuildMenu"]
+[node name="CategoryTabs" type="HBoxContainer" parent="UI/BuildMenu" unique_id=1313390395]
+layout_mode = 0
 offset_left = 8.0
 offset_top = 8.0
 offset_right = 284.0
 offset_bottom = 36.0
 
-[node name="ScrollContainer" type="ScrollContainer" parent="UI/BuildMenu"]
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/BuildMenu" unique_id=771658116]
+layout_mode = 0
 offset_left = 8.0
 offset_top = 44.0
 offset_right = 284.0
 offset_bottom = 300.0
 
-[node name="BuildingList" type="VBoxContainer" parent="UI/BuildMenu/ScrollContainer"]
+[node name="BuildingList" type="VBoxContainer" parent="UI/BuildMenu/ScrollContainer" unique_id=619936079]
+layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="InfoPanel" type="Panel" parent="UI/BuildMenu"]
-visible = false
+[node name="InfoPanel" type="Panel" parent="UI/BuildMenu" unique_id=1022902918]
+layout_mode = 0
 offset_left = 8.0
 offset_top = 308.0
 offset_right = 284.0
 offset_bottom = 530.0
-theme_override_styles/panel = SubResource(2)
+theme_override_styles/panel = SubResource("2")
 
-[node name="Name" type="Label" parent="UI/BuildMenu/InfoPanel"]
+[node name="Name" type="Label" parent="UI/BuildMenu/InfoPanel" unique_id=238635072]
+layout_mode = 0
 offset_left = 8.0
 offset_top = 8.0
 offset_right = 268.0
 offset_bottom = 32.0
-theme_override_constants/minimum_font_size = 16
 text = "Name"
 
-[node name="Description" type="Label" parent="UI/BuildMenu/InfoPanel"]
+[node name="Description" type="Label" parent="UI/BuildMenu/InfoPanel" unique_id=1942688644]
+layout_mode = 0
 offset_left = 8.0
 offset_top = 36.0
 offset_right = 268.0
 offset_bottom = 60.0
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
-theme_override_constants/minimum_font_size = 12
 text = "Description"
 autowrap_mode = 2
 
-[node name="Materials" type="VBoxContainer" parent="UI/BuildMenu/InfoPanel"]
+[node name="Materials" type="VBoxContainer" parent="UI/BuildMenu/InfoPanel" unique_id=259916165]
+layout_mode = 0
 offset_left = 8.0
 offset_top = 68.0
 offset_right = 268.0
 offset_bottom = 120.0
 size_flags_horizontal = 3
 
-[node name="BuildBtn" type="Button" parent="UI/BuildMenu/InfoPanel"]
-offset_left = 8.0
-offset_top = 130.0
-offset_right = 268.0
-offset_bottom = 160.0
-size_flags_horizontal = 3
-text = "建造"
-
-[node name="TechPanel" type="Panel" parent="UI"]
+[node name="TechPanel" type="Panel" parent="UI" unique_id=1011689373]
 visible = false
-script = ExtResource("9_3h2wo")
 offset_left = 320.0
 offset_top = 60.0
 offset_right = 760.0
 offset_bottom = 600.0
+script = ExtResource("9_3h2wo")
 
-[node name="CloseBtn" type="Button" parent="UI/TechPanel"]
+[node name="CloseBtn" type="Button" parent="UI/TechPanel" unique_id=659763677]
+layout_mode = 0
 offset_left = 400.0
 offset_top = 8.0
 offset_right = 432.0
 offset_bottom = 40.0
 text = "X"
 
-[node name="Title" type="Label" parent="UI/TechPanel"]
+[node name="Title" type="Label" parent="UI/TechPanel" unique_id=421472516]
+layout_mode = 0
 offset_left = 8.0
 offset_top = 8.0
 offset_right = 300.0
 offset_bottom = 36.0
-theme_override_constants/minimum_font_size = 18
 text = "科技树"
 
-[node name="CurrentResearch" type="VBoxContainer" parent="UI/TechPanel"]
+[node name="CurrentResearch" type="VBoxContainer" parent="UI/TechPanel" unique_id=921976347]
+layout_mode = 0
 offset_left = 8.0
 offset_top = 44.0
 offset_right = 432.0
 offset_bottom = 90.0
 
-[node name="CurrentLabel" type="Label" parent="UI/TechPanel/CurrentResearch"]
+[node name="CurrentLabel" type="Label" parent="UI/TechPanel/CurrentResearch" unique_id=1824579442]
+layout_mode = 2
 theme_override_colors/font_color = Color(0.8, 0.8, 0.3, 1)
 text = "当前无研究"
 
-[node name="ProgressBar" type="ProgressBar" parent="UI/TechPanel/CurrentResearch"]
+[node name="ProgressBar" type="ProgressBar" parent="UI/TechPanel/CurrentResearch" unique_id=1424131696]
 custom_minimum_size = Vector2(400, 20)
+layout_mode = 2
 size_flags_horizontal = 3
 show_percentage = false
 
-[node name="ScrollContainer" type="ScrollContainer" parent="UI/TechPanel"]
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/TechPanel" unique_id=1173081113]
+layout_mode = 0
 offset_left = 8.0
 offset_top = 96.0
 offset_right = 432.0
 offset_bottom = 530.0
 
-[node name="TechList" type="VBoxContainer" parent="UI/TechPanel/ScrollContainer"]
+[node name="TechList" type="VBoxContainer" parent="UI/TechPanel/ScrollContainer" unique_id=1901578293]
+layout_mode = 2
 
-[node name="WorkPanel" type="Panel" parent="UI"]
+[node name="WorkPanel" type="Panel" parent="UI" unique_id=567230329]
 visible = false
-script = ExtResource("12_0k7l")
 offset_left = 40.0
 offset_top = 60.0
 offset_right = 940.0
 offset_bottom = 660.0
+script = ExtResource("12_0k7l")
 
-[node name="TitleBar" type="HBoxContainer" parent="UI/WorkPanel"]
+[node name="TitleBar" type="HBoxContainer" parent="UI/WorkPanel" unique_id=900230771]
+layout_mode = 0
 offset_left = 12.0
 offset_top = 8.0
 offset_right = 888.0
 offset_bottom = 36.0
 
-[node name="Title" type="Label" parent="UI/WorkPanel/TitleBar"]
+[node name="Title" type="Label" parent="UI/WorkPanel/TitleBar" unique_id=1206977215]
+layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/minimum_font_size = 18
-theme_override_colors/font_color = Color(0.3, 0.8, 1.0, 1)
+theme_override_colors/font_color = Color(0.3, 0.8, 1, 1)
 text = "工作优先级"
 
-[node name="CloseBtn" type="Button" parent="UI/WorkPanel/TitleBar"]
+[node name="CloseBtn" type="Button" parent="UI/WorkPanel/TitleBar" unique_id=2061285974]
 custom_minimum_size = Vector2(30, 30)
+layout_mode = 2
 text = "✕"
 
-[node name="ScrollContainer" type="ScrollContainer" parent="UI/WorkPanel"]
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/WorkPanel" unique_id=1284186716]
+layout_mode = 0
 offset_left = 12.0
 offset_top = 44.0
 offset_right = 888.0
 offset_bottom = 580.0
 
-[node name="WorkGrid" type="GridContainer" parent="UI/WorkPanel/ScrollContainer"]
-columns = 10
-offset_left = 0.0
-offset_top = 0.0
-offset_right = 872.0
-offset_bottom = 400.0
+[node name="WorkGrid" type="GridContainer" parent="UI/WorkPanel/ScrollContainer" unique_id=610940900]
+layout_mode = 2
 theme_override_constants/h_separation = 2
 theme_override_constants/v_separation = 2
+columns = 10
 
-[node name="BottomBar" type="HBoxContainer" parent="UI/WorkPanel"]
+[node name="BottomBar" type="HBoxContainer" parent="UI/WorkPanel" unique_id=1729236418]
+layout_mode = 0
 offset_left = 12.0
 offset_top = 588.0
 offset_right = 888.0
 offset_bottom = 620.0
 
-[node name="ResetAllBtn" type="Button" parent="UI/WorkPanel/BottomBar"]
+[node name="ResetAllBtn" type="Button" parent="UI/WorkPanel/BottomBar" unique_id=1499309424]
+layout_mode = 2
 text = "全部重置为默认"
 
-[node name="Minimap" type="Control" parent="UI"]
-mouse_filter = 0
+[node name="Minimap" type="Control" parent="UI" unique_id=848653378]
+layout_mode = 3
+anchors_preset = 0
 script = ExtResource("11_x8m9")
 
-[node name="MainMenu" parent="UI" instance=ExtResource("10_kae2")]
+[node name="MainMenu" parent="UI" unique_id=356253564 instance=ExtResource("10_kae2")]
 visible = false
+layout_mode = 3
