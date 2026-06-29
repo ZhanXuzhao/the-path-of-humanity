@@ -193,7 +193,7 @@ func _try_select_settler() -> bool:
 	
 	# 查找鼠标位置附近的定居者
 	var closest = null
-	var closest_dist = 400.0  # 最大选择距离（像素，约12.5格）
+	var closest_dist = world.tile_size * 0.6  # 约19像素，匹配角色视觉大小
 	
 	for s in settlers:
 		if not is_instance_valid(s):

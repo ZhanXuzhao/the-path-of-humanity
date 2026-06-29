@@ -30,6 +30,10 @@ var building_sprites: Dictionary = {}  # Vector2i -> Sprite2D
 var construction_overlays: Dictionary = {}  # Vector2i(建筑主格) -> Node2D(进度条容器)
 var PROGRESS_BAR_HEIGHT: float = 6.0
 
+# 选中框
+var _selected_building_pos: Vector2i = Vector2i(-1, -1)
+var _selected_building_size: Vector2i = Vector2i.ONE
+
 func _ready():
 	# 使用 TextureGenerator 生成所有纹理
 	var all_textures = _TG.generate_all()
@@ -48,6 +52,14 @@ func _ready():
 		building_system.building_removed.connect(_on_building_removed)
 		building_system.building_completed.connect(_on_building_completed)
 		building_system.construction_progress_updated.connect(_on_construction_progress_updated)
+	
+	# 连接选中信号
+	var game = get_node("/root/Game")
+	if game:
+		game.building_selected.connect(_on_building_selected)
+		game.building_deselected.connect(_on_building_deselected)
+		game.construction_selected.connect(_on_construction_selected)
+		game.construction_deselected.connect(_on_construction_deselected)
 	
 	# 延迟一帧渲染，确保 Game._ready() 已完成区块生成
 	call_deferred("_render_existing_chunks")
@@ -262,6 +274,48 @@ func _get_progress_color(ratio: float) -> Color:
 	else:
 		return Color(0.3, 1.0, 0.3, 0.9)  # 绿色（接近完成）
 
+# -------- 选中框 --------
+func _on_building_selected(bld):
+	"""建筑被选中时记录位置"""
+	_selected_building_pos = bld.grid_pos
+	_selected_building_size = bld.get_size()
+	queue_redraw()
+
+func _on_building_deselected():
+	"""建筑取消选中时清除"""
+	_selected_building_pos = Vector2i(-1, -1)
+	queue_redraw()
+
+func _on_construction_selected(bld):
+	"""在建建筑被选中时记录位置"""
+	_selected_building_pos = bld.grid_pos
+	_selected_building_size = bld.get_size()
+	queue_redraw()
+
+func _on_construction_deselected():
+	"""在建建筑取消选中时清除"""
+	_selected_building_pos = Vector2i(-1, -1)
+	queue_redraw()
+
+func _draw():
+	"""绘制选中框"""
+	if _selected_building_pos.x < 0:
+		return
+	
+	var pixel_pos = Vector2(
+		_selected_building_pos.x * world.tile_size,
+		_selected_building_pos.y * world.tile_size
+	)
+	var pixel_size = Vector2(
+		_selected_building_size.x * world.tile_size,
+		_selected_building_size.y * world.tile_size
+	)
+	var rect = Rect2(pixel_pos, pixel_size)
+	# 淡蓝色半透明填充
+	draw_rect(rect, Color(0.3, 0.8, 1.0, 0.12), true)
+	# 蓝色边框
+	draw_rect(rect, Color(0.3, 0.8, 1.0, 0.9), false, 2.0)
+
 # -------- 信号处理 --------
 func _on_building_completed(pos: Vector2i):
 	"""建筑完成时：移除进度条、恢复不透明"""
@@ -298,3 +352,7 @@ func clear_all():
 	for key in construction_overlays:
 		construction_overlays[key].overlay.queue_free()
 	construction_overlays.clear()
+	
+	# 清除选中框
+	_selected_building_pos = Vector2i(-1, -1)
+	queue_redraw()

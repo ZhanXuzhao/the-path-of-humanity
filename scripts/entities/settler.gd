@@ -181,12 +181,14 @@ func set_selected(selected: bool):
 	queue_redraw()
 
 func _draw():
-	"""绘制选择指示圈"""
+	"""绘制选择指示框"""
 	if is_selected:
-		# 外圈发光
-		draw_circle(Vector2.ZERO, TILE_SIZE * 0.55, Color(0.3, 0.8, 1.0, 0.0), false, 2.5)
-		# 选择光环
-		draw_arc(Vector2.ZERO, TILE_SIZE * 0.55, 0, TAU, 36, Color(0.3, 0.8, 1.0, 0.9), 2.5)
+		var half_size = TILE_SIZE * 0.5
+		var rect = Rect2(-half_size, -half_size, TILE_SIZE, TILE_SIZE)
+		# 淡蓝色半透明填充
+		draw_rect(rect, Color(0.3, 0.8, 1.0, 0.15), true)
+		# 蓝色边框
+		draw_rect(rect, Color(0.3, 0.8, 1.0, 0.9), false, 2.0)
 
 # 根据任务数据获取工作类别显示文字
 static func get_work_type_from_task(current_task: Dictionary) -> String:
