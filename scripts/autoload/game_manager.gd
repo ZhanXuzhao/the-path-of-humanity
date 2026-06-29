@@ -232,16 +232,18 @@ func save_game(silent: bool = false) -> bool:
 			show_notification("保存失败！", NotificationType.ERROR)
 		return false
 
-func load_game() -> bool:
+func load_game(silent: bool = false) -> bool:
 	"""读取存档（恢复 GameManager 状态，暂存系统数据）"""
 	var file = FileAccess.open("user://savegame.dat", FileAccess.READ)
 	if not file:
-		show_notification("未找到存档", NotificationType.ERROR)
+		if not silent:
+			show_notification("未找到存档", NotificationType.ERROR)
 		return false
 	
 	var data = file.get_var()
 	if typeof(data) != TYPE_DICTIONARY:
-		show_notification("存档数据损坏", NotificationType.ERROR)
+		if not silent:
+			show_notification("存档数据损坏", NotificationType.ERROR)
 		return false
 	
 	# 恢复 GameManager 状态
@@ -255,7 +257,8 @@ func load_game() -> bool:
 	# 暂存系统数据供 Game 场景恢复
 	_loaded_save_data = data
 	
-	show_notification("存档已读取", NotificationType.SUCCESS)
+	if not silent:
+		show_notification("存档已读取", NotificationType.SUCCESS)
 	return true
 
 static func _serialize_settlers(settler_list: Array) -> Array:

@@ -24,7 +24,11 @@ var mouse_grid_pos: Vector2i
 var settlers = []
 
 func _ready():
-	# 启动游戏状态（支持跳过菜单直接加载）
+	# 自动加载存档（静默读取，不弹通知）
+	if _gm.state != 1 and _gm._loaded_save_data.is_empty() and _gm.has_save_file():
+		_gm.load_game(true)
+	
+	# 启动游戏状态
 	if _gm.state != 1:  # GameState.PLAYING
 		_gm.start_game()
 	
@@ -159,22 +163,28 @@ func _input(event):
 	if event.is_action_pressed("ui_cancel"):
 		if build_mode:
 			exit_build_mode()
-		else:
-			# 优先关闭暂停菜单
-			var main_menu = get_node_or_null("UI/MainMenu")
-			if main_menu and main_menu.visible:
-				main_menu.visible = false
-				_gm.resume_game()
-				return
-			# 关闭打开的菜单
-			var build_menu = get_node_or_null("UI/BuildMenu")
-			if build_menu and build_menu.visible:
-				build_menu.visible = false
-				return
-			var tech_panel = get_node_or_null("UI/TechPanel")
-			if tech_panel and tech_panel.visible:
-				tech_panel.visible = false
-				return
+			return
+		
+		# 优先关闭暂停菜单
+		var main_menu = get_node_or_null("UI/MainMenu")
+		if main_menu and main_menu.visible:
+			main_menu.visible = false
+			_gm.resume_game()
+			return
+		# 关闭打开的菜单
+		var build_menu = get_node_or_null("UI/BuildMenu")
+		if build_menu and build_menu.visible:
+			build_menu.visible = false
+			return
+		var tech_panel = get_node_or_null("UI/TechPanel")
+		if tech_panel and tech_panel.visible:
+			tech_panel.visible = false
+			return
+		
+		# 无菜单打开时，Esc 打开暂停菜单
+		if main_menu:
+			main_menu.visible = true
+			_gm.pause_game()
 	
 	if event.is_action_pressed("left_click") and build_mode:
 		_try_place_building()

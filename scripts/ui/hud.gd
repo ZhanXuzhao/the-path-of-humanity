@@ -108,14 +108,6 @@ func _on_menu_pressed():
 		main_menu.visible = not main_menu.visible
 		if main_menu.visible:
 			game_manager.pause_game()
-			# 关闭其他面板
-			var build_menu = get_node_or_null("/root/Game/UI/BuildMenu")
-			if build_menu:
-				build_menu.visible = false
-			var tech_panel = get_node_or_null("/root/Game/UI/TechPanel")
-			if tech_panel:
-				tech_panel.visible = false
-			main_menu._update_menu_mode()
 
 func _on_notification(msg: String, type: int):
 	var notif = notification_scene.instantiate()
