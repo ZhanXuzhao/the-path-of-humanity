@@ -118,18 +118,22 @@ func _process(delta):
 func _generate_initial_area():
 	# 新游戏：随机化地图种子，确保每次地图不同
 	world.world_seed = randi()
-	# 确保出生点周围区块已生成
-	var center_chunk = Vector2i(0, 0)
-	for x in range(-1, 2):
-		for y in range(-1, 2):
-			world.ensure_chunk_generated(center_chunk + Vector2i(x, y))
+	# 确保整个世界所有区块均已生成
+	for x in world.WORLD_CHUNKS_X:
+		for y in world.WORLD_CHUNKS_Y:
+			world.ensure_chunk_generated(Vector2i(x, y))
 
 func _spawn_initial_settlers():
 	# 创建3个初始定居者
 	var work_manager = get_node_or_null("/root/WorkManager")
+	# 世界中心像素坐标
+	var world_center = Vector2(
+		world.WORLD_CHUNKS_X * world.CHUNK_SIZE * world.tile_size / 2.0,
+		world.WORLD_CHUNKS_Y * world.CHUNK_SIZE * world.tile_size / 2.0
+	)
 	for i in 3:
 		var settler = Settler.new()
-		settler.position = Vector2(randf_range(300, 500), randf_range(300, 500))
+		settler.position = world_center + Vector2(randf_range(-100, 100), randf_range(-100, 100))
 		add_child(settler)
 		settlers.append(settler)
 		if work_manager:
