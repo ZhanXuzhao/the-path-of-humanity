@@ -99,6 +99,14 @@ var work_accumulator: float = 0.0               # 工作累积计时器
 var work_tick_interval: float = 0.5             # 每次工作刻的间隔（秒）
 var is_working_on_construction: bool = false    # 是否正在建造建筑
 
+# 状态切换冷却（至少间隔1秒）
+var _last_state_change_time: float = 0.0
+const STATE_CHANGE_COOLDOWN: float = 1.0
+
+# 对当前任务目标建筑的尝试计数器（防止反复分配同一缺物资建筑）
+var _construction_retry_count: int = 0
+const MAX_CONSTRUCTION_RETRIES: int = 2
+
 # 选中状态
 var is_selected: bool = false
 
@@ -204,6 +212,7 @@ static func get_work_type_from_task(current_task: Dictionary) -> String:
 				"woodcutting": return "伐木"
 				_: return "采集"
 		"CONSTRUCT": return "建造"
+		"HAUL_CONSTRUCT": return "搬运"
 		"CRAFT": return "制作"
 		"STORE": return "搬运"
 		"RESEARCH": return "研究"
@@ -231,17 +240,16 @@ static func get_state_display(state_val: int, current_task: Dictionary = {}) -> 
 		SettlerState.FLEEING: return "逃跑中"
 		SettlerState.COMBAT: return "战斗中"
 		_: return "未知"
-		_: return "未知"
 
 # -------- 移动系统 --------
 func move_to(target: Vector2):
 	"""移动到目标像素位置"""
 	target_world_pos = target
-	state = SettlerState.MOVING
+	set_state(SettlerState.MOVING)
 
 func _move_towards(delta):
 	if target_world_pos == Vector2.ZERO:
-		state = SettlerState.IDLE
+		set_state(SettlerState.IDLE, true)  # 强制切换，防止无目标时卡在MOVING
 		return
 	var offset = target_world_pos - position
 	var dist = offset.length()
@@ -260,16 +268,26 @@ func _move_towards(delta):
 				"STORE":
 					# STORE 任务不需要工作刻，到达后立即执行存储
 					_tick_store()
-				_:
-					state = SettlerState.WORKING
-					work_accumulator = 0.0
+				"HAUL_CONSTRUCT":
+					# 搬运物资任务：根据当前阶段处理
+					var haul_phase = current_task.get("haul_phase", "fetch")
+					if haul_phase == "fetch":
+						# 已到达来源地，进入取货阶段
+						_tick_haul_construct_fetch()
+					elif haul_phase == "deliver":
+						# 已到达目标建筑，立即存放入库
+						_tick_haul_construct()
+				_:  # 其他任务类型 → 到达后开始工作
+					# 到达目标后开始工作（受冷却控制，最多等1秒）
+					if set_state(SettlerState.WORKING):
+						work_accumulator = 0.0
 		else:
-			state = SettlerState.IDLE
+			set_state(SettlerState.IDLE, true)  # 强制切换
 
 # -------- 工作系统 --------
 func _execute_work(delta):
 	if current_task == null:
-		state = SettlerState.IDLE
+		set_state(SettlerState.IDLE, true)  # 强制切换，防止无任务时卡在WORKING
 		return
 	
 	var task_type = current_task.get("type", "")
@@ -298,6 +316,8 @@ func _do_work_tick(task_type: String):
 			_tick_craft()
 		"STORE":
 			_tick_store()
+		"HAUL_CONSTRUCT":
+			_tick_haul_construct()
 		"EAT_FROM_RACK":
 			_tick_eat_from_rack()
 		"SLEEP":
@@ -379,7 +399,7 @@ func _tick_construct():
 		current_task["construct_phase"] = "return_to_site"
 		var site_center = _bld_world_center(bld)
 		target_world_pos = site_center
-		state = SettlerState.MOVING
+		set_state(SettlerState.MOVING)
 		return
 	
 	if construct_phase == "return_to_site":
@@ -420,11 +440,42 @@ func _tick_construct():
 			missing = bld.get_missing_materials()
 		
 		if not missing.is_empty():
-			# 背包里的不够，去存储建筑取材料
+			# 检查角色是否已在建筑位置（用于判断全局取料后是否需要移动）
+			var was_at_site = position.distance_to(_bld_world_center(bld)) < 10.0
+			
+			# 背包里的不够，去存储/全局取材料
 			if _construct_fetch_from_storage(bld, missing):
-				return  # 正在前往存储建筑取材料
+				# 如果从全局取到了材料且角色已在建筑处，直接存入而不经过移动
+				if was_at_site and current_task.get("construct_phase", "") == "return_to_site":
+					_immediate_deposit_materials()
+					# 重新检查材料是否齐了
+					missing = bld.get_missing_materials()
+					if missing.is_empty():
+						pass  # 材料齐了，继续建造
+					else:
+						# 材料还不够，继续尝试取料（递归安全，最多1层）
+						if _construct_fetch_from_storage(bld, missing):
+							if current_task.get("construct_phase", "") == "return_to_site":
+								_immediate_deposit_materials()
+								missing = bld.get_missing_materials()
+								if missing.is_empty():
+									pass
+								else:
+									# 第二次尝试后仍缺料且无可取，放弃
+									_construction_retry_count += 1
+									complete_task()
+									return
+							else:
+								return  # 去取存储建筑的材料
+						else:
+							_construction_retry_count += 1
+							complete_task()
+							return
+				else:
+					return  # 不在建筑旁，正常移动回去，或者正在前往存储建筑
 			else:
-				# 没有任何材料可用，无法建造
+				# 没有任何材料可用，无法建造——增加重试计数防止反复分配
+				_construction_retry_count += 1
 				complete_task()
 				return
 	
@@ -442,6 +493,35 @@ func _tick_construct():
 		complete_task()
 	
 	add_skill_experience("construction", 1.0)
+	# 成功建造了一次，重置重试计数
+	_construction_retry_count = 0
+
+func _immediate_deposit_materials():
+	"""立即存入背包中标记为建设材料的物品（用于全局取材料后无须移动直接存入）"""
+	if current_task == null:
+		return
+	var fetch_item = current_task.get("fetch_item_id", "")
+	var fetch_amount = current_task.get("fetch_amount", 0)
+	if fetch_item == "" or fetch_amount <= 0:
+		return
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		return
+	var grid_pos: Vector2i = current_task.get("target_pos", Vector2i.ZERO)
+	var bld = game.building_system.get_building_at(grid_pos)
+	if bld == null:
+		return
+	var in_bp = inventory.get_item_count(fetch_item)
+	var to_deposit = mini(in_bp, fetch_amount)
+	if to_deposit > 0:
+		var removed = inventory.remove_item(fetch_item, to_deposit)
+		if removed > 0:
+			bld.deposit_material(fetch_item, removed)
+	# 清除搬运标记
+	current_task.erase("fetch_storage_pos")
+	current_task.erase("fetch_item_id")
+	current_task.erase("fetch_amount")
+	current_task.erase("construct_phase")
 
 func _construct_fetch_from_storage(bld, missing: Dictionary) -> bool:
 	"""查找最近的存储建筑取建筑材料，返回是否找到材料去向"""
@@ -466,28 +546,27 @@ func _construct_fetch_from_storage(bld, missing: Dictionary) -> bool:
 			var to_take = mini(needed, available)
 			gm.remove_resource(mat_id, to_take)
 			inventory.add_item(mat_id, to_take)
-			# 标记回程，下一帧会存入建筑
+			# 标记回程（由调用方决定是否立即存入）
 			current_task["construct_phase"] = "return_to_site"
 			current_task["fetch_item_id"] = mat_id
 			current_task["fetch_amount"] = to_take
-			# 重新走向建筑工地
+			# 由调用方决定是否立即存入还是移动回去
 			var site_center = _bld_world_center(bld)
 			target_world_pos = site_center
-			state = SettlerState.MOVING
+			set_state(SettlerState.MOVING)
 			return true
 		
-		# 2. 检查存储建筑
-		var storage_blds = _find_nearby_storage(99999)
+		# 2. 检查存储建筑（使用专门用来取料的查询，不过滤已满的仓库）
+		var storage_blds = _find_storage_with_item(mat_id, 99999)
 		for sbld in storage_blds:
 			if sbld.inventory == null:
 				continue
-			if sbld.inventory.has_item(mat_id, 1):
-				var center = _bld_world_center(sbld)
-				var dist = position.distance_squared_to(center)
-				if dist < best_dist:
-					best_dist = dist
-					best_storage = sbld
-					best_mat_id = mat_id
+			var center = _bld_world_center(sbld)
+			var dist = position.distance_squared_to(center)
+			if dist < best_dist:
+				best_dist = dist
+				best_storage = sbld
+				best_mat_id = mat_id
 	
 	if best_storage != null and best_mat_id != "":
 		var needed = missing[best_mat_id]
@@ -497,12 +576,116 @@ func _construct_fetch_from_storage(bld, missing: Dictionary) -> bool:
 		current_task["fetch_amount"] = needed
 		current_task["construct_phase"] = "fetch"
 		target_world_pos = center
-		state = SettlerState.MOVING
+		set_state(SettlerState.MOVING)
 		return true
 	
 	# 3. 检查建筑工地附近的地面资源（如木材/石头堆）
 	# 简化：无可用材料
 	return false
+
+# ========== 搬运物资到建筑 ==========
+func _tick_haul_construct_fetch():
+	"""搬运物资：到达来源地后取货，然后前往目标建筑"""
+	if current_task == null:
+		complete_task()
+		return
+	
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		complete_task()
+		return
+	
+	var source_type = current_task.get("source_type", "global")
+	var item_id: String = current_task.get("item_id", "")
+	var amount: int = current_task.get("amount", 0)
+	var target_bld_pos: Vector2i = current_task.get("target_bld_pos", Vector2i.ZERO)
+	
+	if item_id == "" or amount <= 0:
+		complete_task()
+		return
+	
+	var taken = 0
+	
+	if source_type == "global":
+		# 从全局资源池取
+		var gm = get_node("/root/GameManager")
+		if gm and gm.has_resource(item_id, 1):
+			var available = gm.get_resource(item_id)
+			var to_take = mini(amount, available)
+			taken = gm.remove_resource(item_id, to_take)
+			if taken > 0:
+				inventory.add_item(item_id, taken)
+	elif source_type == "storage":
+		# 从存储建筑取
+		var source_pos: Vector2i = current_task.get("source_bld_pos", Vector2i.ZERO)
+		var source_bld = game.building_system.get_building_at(source_pos)
+		if source_bld != null and source_bld.inventory != null:
+			var available = source_bld.inventory.get_item_count(item_id)
+			var to_take = mini(amount, available)
+			if to_take > 0:
+				taken = source_bld.inventory.remove_item(item_id, to_take)
+				if taken > 0:
+					inventory.add_item(item_id, taken)
+	
+	if taken <= 0:
+		# 没取到物资，任务失败
+		complete_task()
+		return
+	
+	# 标记已取到的物资量
+	current_task["haul_phase"] = "deliver"
+	current_task["fetch_amount"] = taken
+	
+	# 转向目标建筑
+	var bld = game.building_system.get_building_at(target_bld_pos)
+	if bld == null:
+		complete_task()
+		return
+	var target_center = _bld_world_center(bld)
+	target_world_pos = target_center
+	set_state(SettlerState.MOVING)
+
+func _tick_haul_construct():
+	"""搬运物资：到达目标建筑后存入物资"""
+	if current_task == null:
+		complete_task()
+		return
+	
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		complete_task()
+		return
+	
+	var target_bld_pos: Vector2i = current_task.get("target_bld_pos", Vector2i.ZERO)
+	var item_id: String = current_task.get("item_id", "")
+	var fetch_amount: int = current_task.get("fetch_amount", 0)
+	
+	var bld = game.building_system.get_building_at(target_bld_pos)
+	if bld == null:
+		complete_task()
+		return
+	
+	if item_id != "" and fetch_amount > 0:
+		var in_bp = inventory.get_item_count(item_id)
+		var to_deposit = mini(in_bp, fetch_amount)
+		if to_deposit > 0:
+			var removed = inventory.remove_item(item_id, to_deposit)
+			if removed > 0:
+				# 判断是建筑工地（未完成）还是生产建筑（已完成）
+				if not bld.is_completed:
+					# 施工工地 - 使用deposit_material
+					bld.deposit_material(item_id, removed)
+				else:
+					# 生产建筑 - 放入建筑库存
+					if bld.inventory:
+						bld.inventory.add_item(item_id, removed)
+					else:
+						# 没有库存就直接上交全局
+						var gm = get_node("/root/GameManager")
+						if gm:
+							gm.add_resource(item_id, removed)
+	
+	complete_task()
 
 func _tick_craft():
 	"""执行一次制作工作"""
@@ -681,7 +864,7 @@ func _auto_store_overweight():
 		"skill": "",
 	}
 	target_world_pos = center_pos
-	state = SettlerState.MOVING
+	set_state(SettlerState.MOVING)
 
 func _dump_inventory_to_global():
 	"""背包物品全部上交全局资源（兜底方案）"""
@@ -695,7 +878,7 @@ func _dump_inventory_to_global():
 	inventory.clear()
 
 func _find_nearby_storage(max_dist: float = -1.0) -> Array:
-	"""查找附近有空间的存储建筑，按距离排序"""
+	"""查找附近有空间的存储建筑（用于存放物品），按距离排序"""
 	if max_dist < 0:
 		max_dist = _settler_setting("storage_search_radius", 300.0)
 	var game = get_node_or_null("/root/Game")
@@ -710,6 +893,36 @@ func _find_nearby_storage(max_dist: float = -1.0) -> Array:
 		if data == null or data.storage_capacity <= 0:
 			continue
 		if bld.inventory == null or bld.inventory.is_full():
+			continue
+		var center = _bld_world_center(bld)
+		var dist = position.distance_to(center)
+		if dist <= max_dist:
+			result.append({"bld": bld, "dist": dist})
+	
+	result.sort_custom(func(a, b): return a.dist < b.dist)
+	var sorted = []
+	for entry in result:
+		sorted.append(entry.bld)
+	return sorted
+
+func _find_storage_with_item(item_id: String, max_dist: float = -1.0) -> Array:
+	"""查找所有存有指定物品的存储建筑（不过滤已满），按距离排序——用于取材料"""
+	if max_dist < 0:
+		max_dist = _settler_setting("storage_search_radius", 300.0)
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		return []
+	
+	var result = []
+	for bld in game.building_system.get_all_buildings():
+		if not bld.is_completed:
+			continue
+		var data = bld.get_data()
+		if data == null or data.storage_capacity <= 0:
+			continue
+		if bld.inventory == null:
+			continue
+		if not bld.inventory.has_item(item_id, 1):
 			continue
 		var center = _bld_world_center(bld)
 		var dist = position.distance_to(center)
@@ -758,7 +971,7 @@ func _tick_store():
 	if dist_to_bld > max_store_dist:
 		# 距离太远，重新走向建筑
 		target_world_pos = bld_center
-		state = SettlerState.MOVING
+		set_state(SettlerState.MOVING)
 		return
 	
 	if item_id != "" and amount > 0:
@@ -785,7 +998,7 @@ func try_sleep(bld_pos: Vector2i, world_pos: Vector2):
 	"""尝试去睡觉"""
 	current_task = {"type": "SLEEP", "target_bld_pos": bld_pos}
 	target_world_pos = world_pos
-	state = SettlerState.MOVING
+	set_state(SettlerState.MOVING)
 
 func _tick_go_sleep():
 	"""移动到睡眠位置后开始睡觉"""
@@ -798,7 +1011,8 @@ func _tick_go_sleep():
 	if bld == null:
 		complete_task()
 		return
-	state = SettlerState.SLEEPING
+	# 到达床位后开始睡觉（受冷却控制，最多等1秒）
+	set_state(SettlerState.SLEEPING)
 
 func _tick_sleep(delta):
 	"""睡眠中恢复精力"""
@@ -811,17 +1025,19 @@ func _tick_sleep(delta):
 	var sleep_restore = _settler_setting("sleep_restore_per_hour", 15.0)
 	modify_need("rest", delta_hours * sleep_restore)
 	
+	# 最少睡满1秒（防止刚入睡就被打断导致睡眠循环）
+	var now = Time.get_ticks_msec() / 1000.0
+	var min_sleep_time = 1.0
+	
 	# 检查是否天亮了或精力已满
-	if needs["rest"] >= 95.0:
-		# complete_task() 已处理状态切换
+	if needs["rest"] >= 95.0 and now - _last_state_change_time >= min_sleep_time:
 		complete_task()
 		return
 	
-	# 检查是否白天了
-	if gm:
+	# 检查是否白天了（最少睡满1秒防循环）
+	if gm and now - _last_state_change_time >= min_sleep_time:
 		var hour = int(gm.game_time)
 		if hour >= 6 and hour < 18:
-			# complete_task() 已处理状态切换
 			complete_task()
 
 func find_nearest_residential() -> Dictionary:
@@ -861,7 +1077,8 @@ func try_eat():
 			var removed = inventory.remove_item(food_id, 1)
 			if removed > 0:
 				modify_need("hunger", food_restore)
-				state = SettlerState.EATING
+				# 从背包进食（受冷却控制）
+				set_state(SettlerState.EATING)
 				# 将进食动画计时器设为2秒
 				_eat_timer = 2.0
 				return
@@ -877,7 +1094,7 @@ func try_eat():
 			"target_world_pos": center
 		}
 		target_world_pos = center
-		state = SettlerState.MOVING
+		set_state(SettlerState.MOVING)
 		return
 	
 	# 3. 都没有的话，去找浆果丛采集
@@ -920,7 +1137,8 @@ func _tick_eat_from_rack():
 	if removed > 0:
 		modify_need("hunger", food_restore)
 		_eat_timer = 2.0
-		state = SettlerState.EATING
+		# 开始进食（受冷却控制）
+		set_state(SettlerState.EATING)
 	else:
 		# complete_task() 已处理状态切换
 		complete_task()
@@ -992,7 +1210,7 @@ func _find_and_harvest_berries():
 			"priority": 4,
 		}
 		target_world_pos = best_pos.world_pos
-		state = SettlerState.MOVING
+		set_state(SettlerState.MOVING)
 
 func _randomize_name():
 	var first_names_male = ["阿明", "大壮", "铁柱", "志强", "建国"]
@@ -1036,6 +1254,23 @@ func _randomize_stats():
 		skills[skill] = rng.randf_range(1.0, 5.0)
 	_apply_config_settings()
 
+# -------- 状态切换控制 --------
+func set_state(new_state: SettlerState, force: bool = false) -> bool:
+	"""设置状态，带1秒最小切换间隔，返回是否成功设置
+	force=true 时强制切换（用于 complete_task 等关键路径）"""
+	var now = Time.get_ticks_msec() / 1000.0
+	if state == new_state:
+		return true  # 相同状态不算切换
+	if not force and now - _last_state_change_time < STATE_CHANGE_COOLDOWN:
+		return false  # 还在冷却中，不允许切换
+	var old_state_str = get_state_display(state, current_task if current_task else {})
+	var new_state_str = get_state_display(new_state, current_task if current_task else {})
+	state = new_state
+	_last_state_change_time = now
+	if is_selected and old_state_str != new_state_str:
+		print("[%s] 状态切换: %s -> %s (%.1fs)%s" % [settler_name, old_state_str, new_state_str, now, " (强制)" if force else ""])
+	return true
+
 # -------- 需求更新 --------
 func update_needs(delta_hours: float):
 	"""更新需求值（每帧调用）"""
@@ -1077,10 +1312,10 @@ func assign_task(task_data: Dictionary) -> bool:
 	var target_pixel = task_data.get("target_world_pos", Vector2.ZERO)
 	if target_pixel != Vector2.ZERO:
 		target_world_pos = target_pixel
-		state = SettlerState.MOVING
+		set_state(SettlerState.MOVING, true)  # 强制切换，防止冷却导致任务卡住
 	else:
 		# 没有目标位置则直接开始工作
-		state = SettlerState.WORKING
+		set_state(SettlerState.WORKING, true)  # 强制切换，防止冷却导致任务卡住
 		work_accumulator = 0.0
 	
 	task_assigned.emit(task_data.get("id", ""))
@@ -1089,8 +1324,10 @@ func assign_task(task_data: Dictionary) -> bool:
 func complete_task(skip_auto_store: bool = false):
 	if current_task:
 		task_completed.emit(current_task.get("id", ""))
+		# 成功完成任务，减少重试计数
+		_construction_retry_count = max(0, _construction_retry_count - 1)
 	current_task = null
-	state = SettlerState.IDLE
+	set_state(SettlerState.IDLE, true)  # 强制切换，防止冷却导致卡死
 	
 	# 如果超重，自动寻找置物架去存放物品
 	# 但跳过紧急需求打断时的自动搬运，让角色先满足基本需求

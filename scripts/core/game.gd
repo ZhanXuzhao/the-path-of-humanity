@@ -44,6 +44,9 @@ var selected_resource_deposit = null  # World.ResourceDeposit
 signal resource_selected(pos: Vector2i, deposit)
 signal resource_deselected()
 
+# 建筑建造重试冷却（防止反复给同一缺物资建筑分配任务）
+var _construction_retry_cooldown: Dictionary = {}  # "x,y" -> frame_number
+
 func _ready():
 	# 自动加载存档（静默读取，不弹通知）
 	if _gm.state != 1 and _gm._loaded_save_data.is_empty() and _gm.has_save_file():
@@ -578,14 +581,29 @@ func _assign_ai_tasks():
 	
 	var work_manager = get_node_or_null("/root/WorkManager")
 	
+	# 清理过期的建造重试冷却（保留近300帧的记录）
+	var current_frame = Engine.get_physics_frames()
+	var expired_keys = []
+	for key in _construction_retry_cooldown:
+		if current_frame - _construction_retry_cooldown[key] > 300:
+			expired_keys.append(key)
+	for key in expired_keys:
+		_construction_retry_cooldown.erase(key)
+	
 	# 收集所有可用任务
 	var tasks = []
 	
-	# 1. 建造任务——物资不足时不创建任务，让角色优先做其他工作
+	# 1. 建造任务——物资不足时不创建任务，带重试冷却
 	var uncompleted = building_system.get_uncompleted_buildings() if building_system else []
 	for bld in uncompleted:
 		var data = bld.get_data()
 		if data == null:
+			continue
+		
+		var bld_key = "%d,%d" % [bld.grid_pos.x, bld.grid_pos.y]
+		
+		# 检查重试冷却：如果上次尝试失败且还在冷却期，跳过
+		if _construction_retry_cooldown.has(bld_key):
 			continue
 		
 		# 如果材料已备齐（已搬运到工地），直接创建建造任务
@@ -603,7 +621,9 @@ func _assign_ai_tasks():
 					has_any_material = true
 					break
 			if not has_any_material:
-				continue  # 没有任何材料可用，跳过此建筑，角色去做其他工作
+				# 没有任何材料可用，加入冷却防止反复尝试
+				_construction_retry_cooldown[bld_key] = current_frame
+				continue  # 跳过此建筑，角色去做其他工作
 		
 		var center_pixel = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
 		tasks.append({
@@ -638,7 +658,11 @@ func _assign_ai_tasks():
 				"work_type": WorkManager.WorkType.CRAFTING,
 			})
 	
-	# 3. 采集任务 - 在地图已生成区块中找最近的资源
+	# 3. 搬运任务——为缺少物资的建筑/工地运送材料
+	var haul_tasks = _scan_material_hauling_tasks(idle_settlers)
+	tasks.append_array(haul_tasks)
+	
+	# 4. 采集任务 - 在地图已生成区块中找最近的资源
 	var harvest_tasks = _scan_nearby_resources(idle_settlers)
 	tasks.append_array(harvest_tasks)
 	
@@ -676,6 +700,10 @@ func _assign_ai_tasks():
 				var job = t.get("crafting_job")
 				if job and job.assigned_settler_id != "":
 					continue
+			
+			# 建造任务：如果该定居者对同一建筑已重试过多次，跳过
+			if t.get("type") == "CONSTRUCT" and settler._construction_retry_count >= settler.MAX_CONSTRUCTION_RETRIES:
+				continue
 			
 			var task_pos = t.get("target_world_pos", Vector2.ZERO)
 			var dist = settler.position.distance_squared_to(task_pos) if task_pos != Vector2.ZERO else 0
@@ -769,6 +797,124 @@ func _scan_nearby_resources(settlers: Array) -> Array:
 				})
 	
 	return result
+
+func _scan_material_hauling_tasks(settlers: Array) -> Array:
+	"""扫描需要搬运物资的建筑（施工工地/生产建筑），生成搬运任务"""
+	var result: Array = []
+	if building_system == null:
+		return result
+	
+	var haul_tasks_added: Dictionary = {}  # 防止重复添加
+	
+	# 1. 施工工地——检查缺哪些材料
+	for bld in building_system.get_uncompleted_buildings():
+		if bld.is_materials_ready():
+			continue
+		var missing = bld.get_missing_materials()
+		var bld_center = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
+		
+		for mat_id in missing.keys():
+			var needed = missing[mat_id]
+			var task_key = "haul_construct_%d_%d_%s" % [bld.grid_pos.x, bld.grid_pos.y, mat_id]
+			if haul_tasks_added.has(task_key):
+				continue
+			
+			# 检查是否有来源可取材料
+			var source_pos = _find_material_source(mat_id)
+			if source_pos == null:
+				continue  # 没有任何来源
+			
+			haul_tasks_added[task_key] = true
+			var source_world_pos = source_pos.world_pos if source_pos.has("world_pos") else Vector2.ZERO
+			result.append({
+				"id": task_key,
+				"type": "HAUL_CONSTRUCT",
+				"target_pos": bld.grid_pos,
+				"target_world_pos": source_world_pos,  # 先去来源地
+				"target_bld_pos": bld.grid_pos,
+				"source_type": source_pos.type,
+				"source_bld_pos": source_pos.get("bld_pos", Vector2i.ZERO),
+				"item_id": mat_id,
+				"amount": needed,
+				"haul_phase": "fetch",  # 初始阶段：取货
+				"skill": "",
+				"work_type": WorkManager.WorkType.HAULING,
+			})
+	
+	# 2. 生产建筑——检查缺输入材料
+	for bld in building_system.get_completed_production_buildings():
+		var data = bld.get_data()
+		if data == null or data.consumes.is_empty():
+			continue
+		
+		for mat_id in data.consumes:
+			var needed = data.consumes[mat_id]
+			# 检查库存是否缺少
+			if bld.inventory != null and bld.inventory.has_item(mat_id, needed):
+				continue  # 材料充足
+			
+			var task_key = "haul_prod_%d_%d_%s" % [bld.grid_pos.x, bld.grid_pos.y, mat_id]
+			if haul_tasks_added.has(task_key):
+				continue
+			
+			var source_pos = _find_material_source(mat_id)
+			if source_pos == null:
+				continue
+			
+			haul_tasks_added[task_key] = true
+			var source_world_pos = source_pos.world_pos if source_pos.has("world_pos") else Vector2.ZERO
+			result.append({
+				"id": task_key,
+				"type": "HAUL_CONSTRUCT",
+				"target_pos": bld.grid_pos,
+				"target_world_pos": source_world_pos,  # 先去来源地
+				"target_bld_pos": bld.grid_pos,
+				"source_type": source_pos.type,
+				"source_bld_pos": source_pos.get("bld_pos", Vector2i.ZERO),
+				"item_id": mat_id,
+				"amount": needed,
+				"haul_phase": "fetch",  # 初始阶段：取货
+				"skill": "",
+				"work_type": WorkManager.WorkType.HAULING,
+			})
+	
+	return result
+
+func _find_material_source(item_id: String):
+	"""查找指定材料的来源位置，返回{type, bld_pos, world_pos}或null"""
+	# 1. 先查全局资源池
+	var gm = get_node("/root/GameManager")
+	if gm and gm.has_resource(item_id, 1):
+		return {"type": "global", "bld_pos": Vector2i.ZERO, "world_pos": Vector2.ZERO}
+	
+	# 2. 查存储建筑
+	if building_system == null:
+		return null
+	
+	var best_bld = null
+	var best_dist = INF
+	for bld in building_system.get_all_buildings():
+		if not bld.is_completed:
+			continue
+		var bdata = bld.get_data()
+		if bdata == null or bdata.storage_capacity <= 0:
+			continue
+		if bld.inventory == null or not bld.inventory.has_item(item_id, 1):
+			continue
+		var center = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
+		var dist = center.length_squared()
+		if dist < best_dist:
+			best_dist = dist
+			best_bld = bld
+	
+	if best_bld != null:
+		return {
+			"type": "storage",
+			"bld_pos": best_bld.grid_pos,
+			"world_pos": _grid_to_world(best_bld.grid_pos + best_bld.get_size() / 2)
+		}
+	
+	return null
 
 func _grid_to_world(grid_pos: Vector2i) -> Vector2:
 	"""将网格坐标转换为世界像素坐标（格子中心）"""
