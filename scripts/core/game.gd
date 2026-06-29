@@ -723,6 +723,10 @@ func _assign_ai_tasks():
 	var haul_tasks = _scan_material_hauling_tasks(idle_settlers)
 	tasks.append_array(haul_tasks)
 	
+	# 3.5 地面物品清理——将地面上的物品搬运到最近的储物架
+	var ground_cleanup_tasks = _scan_ground_item_storage_tasks(idle_settlers, haul_tasks)
+	tasks.append_array(ground_cleanup_tasks)
+	
 	# 4. 采集任务 - 在地图已生成区块中找最近的资源
 	var harvest_tasks = _scan_nearby_resources(idle_settlers)
 	tasks.append_array(harvest_tasks)
@@ -938,6 +942,79 @@ func _scan_material_hauling_tasks(_settlers: Array) -> Array:
 				"item_id": mat_id,
 				"amount": needed,
 				"haul_phase": "fetch",  # 初始阶段：取货
+				"skill": "",
+				"work_type": WorkManager.WorkType.HAULING,
+			})
+	
+	return result
+
+func _scan_ground_item_storage_tasks(_idle_settlers: Array, existing_haul_tasks: Array) -> Array:
+	"""扫描地面上散落的物品，找到有空间的储物架，创建搬运存储任务"""
+	if building_system == null or world == null:
+		return []
+	
+	# 收集已有搬运任务中已经分配的地面物品位置，避免重复
+	var already_claimed: Dictionary = {}  # "item_id@x,y" -> true
+	for t in existing_haul_tasks:
+		if t.get("source_type") == "ground":
+			var src_pos = t.get("source_bld_pos", Vector2i.ZERO)
+			var item = t.get("item_id", "")
+			if item != "":
+				already_claimed["%s@%d,%d" % [item, src_pos.x, src_pos.y]] = true
+	
+	# 收集所有有空间的储物架
+	var storage_rack_list = building_system.get_storage_buildings_with_space()
+	if storage_rack_list.is_empty():
+		return []  # 没有储物架，不创建任务
+	
+	var result: Array = []
+	
+	# 遍历所有地面物品位置
+	for pos in world.ground_items:
+		var stacks = world.ground_items[pos]
+		if stacks.is_empty():
+			continue
+		
+		for stack in stacks:
+			if stack.amount <= 0:
+				continue
+			
+			var item_id = stack.item_id
+			var claim_key = "%s@%d,%d" % [item_id, pos.x, pos.y]
+			if already_claimed.has(claim_key):
+				continue
+			
+			# 找最近的可用储物架
+			var best_storage = null
+			var best_dist = INF
+			var ground_world = _grid_to_world(pos)
+			
+			for bld in storage_rack_list:
+				if bld.inventory == null or bld.inventory.is_full():
+					continue
+				var bld_center = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
+				var dist = ground_world.distance_squared_to(bld_center)
+				if dist < best_dist:
+					best_dist = dist
+					best_storage = bld
+			
+			if best_storage == null:
+				continue  # 没有可用储物架
+			
+			already_claimed[claim_key] = true
+			
+			var to_haul = mini(stack.amount, 50)  # 一次最多搬运50个
+			result.append({
+				"id": "ground_store_%s_%d_%d" % [item_id, pos.x, pos.y],
+				"type": "HAUL_CONSTRUCT",
+				"target_pos": best_storage.grid_pos,
+				"target_world_pos": _grid_to_world(pos),  # 先去地面位置
+				"target_bld_pos": best_storage.grid_pos,
+				"source_type": "ground",
+				"source_bld_pos": pos,
+				"item_id": item_id,
+				"amount": to_haul,
+				"haul_phase": "fetch",
 				"skill": "",
 				"work_type": WorkManager.WorkType.HAULING,
 			})
