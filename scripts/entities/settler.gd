@@ -545,11 +545,13 @@ func _tick_construct():
 	
 	if construct_phase == "return_to_site":
 		# 刚从存储建筑取了材料回来，存入建筑工地
+		# 不依赖 fetch_amount 判断（它可能在 fetch 阶段被减到0），
+		# 直接检查背包里实际携带的材料并存入
 		var fetch_item = current_task.get("fetch_item_id", "")
 		var fetch_amount = current_task.get("fetch_amount", 0)
-		if fetch_item != "" and fetch_amount > 0:
+		if fetch_item != "":
 			var in_bp = inventory.get_item_count(fetch_item)
-			var to_deposit = mini(in_bp, fetch_amount)
+			var to_deposit = in_bp if fetch_amount <= 0 else mini(in_bp, fetch_amount)
 			if to_deposit > 0:
 				var removed = inventory.remove_item(fetch_item, to_deposit)
 				if removed > 0:
