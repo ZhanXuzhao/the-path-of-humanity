@@ -23,6 +23,7 @@ class BuildingInstance:
 	var production_timer: float = 0.0
 	var inventory = null
 	var assigned_settlers: Array[String] = []  # settler IDs
+	var deposited_materials: Dictionary = {}  # 已搬运到工地的建筑材料 {item_id: amount}
 	
 	func get_data():
 		return ItemDefinitions.get_building(building_id)
@@ -35,6 +36,38 @@ class BuildingInstance:
 		if rotation == 90 or rotation == 270:
 			return Vector2i(data.size.y, data.size.x)
 		return data.size
+	
+	func get_missing_materials() -> Dictionary:
+		"""返回还缺少的建筑材料 {item_id: amount}"""
+		var data = get_data()
+		if data == null or data.materials.is_empty():
+			return {}
+		var missing = {}
+		for mat_id in data.materials:
+			var needed = data.materials[mat_id]
+			var deposited = deposited_materials.get(mat_id, 0)
+			var still_needed = needed - deposited
+			if still_needed > 0:
+				missing[mat_id] = still_needed
+		return missing
+	
+	func is_materials_ready() -> bool:
+		"""检查是否所有建筑材料都已备齐"""
+		return get_missing_materials().is_empty()
+	
+	func deposit_material(item_id: String, amount: int) -> int:
+		"""存入建筑材料，返回未消耗的剩余数量"""
+		var data = get_data()
+		if data == null:
+			return amount
+		var needed = data.materials.get(item_id, 0)
+		var deposited = deposited_materials.get(item_id, 0)
+		var can_take = needed - deposited
+		if can_take <= 0:
+			return amount  # 已够，全部退回
+		var to_add = mini(amount, can_take)
+		deposited_materials[item_id] = deposited + to_add
+		return amount - to_add  # 返回多余的部分
 	
 	func _init(id: String, pos: Vector2i):
 		building_id = id
@@ -116,6 +149,10 @@ func add_construction_progress(pos: Vector2i, amount: float) -> bool:
 		return false
 	if bld.is_completed:
 		return true
+	
+	# 物资未备齐不能建造
+	if not bld.is_materials_ready():
+		return false
 	
 	bld.construction_progress += amount
 	var data = bld.get_data()
@@ -266,7 +303,8 @@ func to_dict() -> Dictionary:
 				"progress": bld.construction_progress,
 				"completed": bld.is_completed,
 				"prod_timer": bld.production_timer,
-				"inventory": bld.inventory.to_dict() if bld.inventory else null
+				"inventory": bld.inventory.to_dict() if bld.inventory else null,
+				"deposited_materials": bld.deposited_materials.duplicate()
 			}
 	return data
 
@@ -281,6 +319,8 @@ func from_dict(data: Dictionary):
 		bld.construction_progress = b_data.progress
 		bld.is_completed = b_data.completed
 		bld.production_timer = b_data.prod_timer
+		if b_data.has("deposited_materials"):
+			bld.deposited_materials = b_data.deposited_materials.duplicate()
 		if b_data.inventory != null and bld.inventory != null:
 			bld.inventory.from_dict(b_data.inventory)
 		

@@ -326,7 +326,7 @@ func _tick_harvest():
 	add_skill_experience(current_task.get("skill", ""), 1.0)
 
 func _tick_construct():
-	"""执行一次建造工作"""
+	"""执行一次建造工作——分两阶段：先搬运物资，物资齐了再建造"""
 	var game = get_node_or_null("/root/Game")
 	if game == null or game.building_system == null:
 		complete_task()
@@ -337,31 +337,91 @@ func _tick_construct():
 	if bld == null:
 		complete_task()
 		return
-	
 	if bld.is_completed:
 		complete_task()
 		return
 	
 	var data = bld.get_data()
+	if data == null:
+		complete_task()
+		return
+	
 	var gm = get_node("/root/GameManager")
 	
-	# 首次建造时消耗材料
-	if data and data.materials.size() > 0 and gm and not current_task.has("materials_consumed"):
-		var can_afford = true
-		for mat_id in data.materials:
-			var needed = data.materials[mat_id]
-			if not gm.has_resource(mat_id, needed):
-				can_afford = false
-				break
-		if can_afford:
-			for mat_id in data.materials:
-				var needed = data.materials[mat_id]
-				gm.remove_resource(mat_id, needed)
-			current_task["materials_consumed"] = true
-		else:
-			# 材料不足，稍后再试
-			return
+	# ========== 阶段1：搬运建筑材料 ==========
+	var construct_phase = current_task.get("construct_phase", "")
 	
+	if construct_phase == "fetch":
+		# 到达存储建筑，取材料到背包
+		var storage_pos: Vector2i = current_task.get("fetch_storage_pos", Vector2i.ZERO)
+		var fetch_item = current_task.get("fetch_item_id", "")
+		var fetch_amount = current_task.get("fetch_amount", 0)
+		
+		if fetch_item != "" and fetch_amount > 0:
+			var storage_bld = game.building_system.get_building_at(storage_pos)
+			if storage_bld != null and storage_bld.inventory != null:
+				var available = storage_bld.inventory.get_item_count(fetch_item)
+				var to_take = mini(fetch_amount, available)
+				if to_take > 0:
+					var removed = storage_bld.inventory.remove_item(fetch_item, to_take)
+					if removed > 0:
+						inventory.add_item(fetch_item, removed)
+						current_task["fetch_amount"] = fetch_amount - removed
+		
+		# 转向回建筑工地
+		current_task["construct_phase"] = "return_to_site"
+		var site_center = _bld_world_center(bld)
+		target_world_pos = site_center
+		state = SettlerState.MOVING
+		return
+	
+	if construct_phase == "return_to_site":
+		# 刚从存储建筑取了材料回来，存入建筑工地
+		var fetch_item = current_task.get("fetch_item_id", "")
+		var fetch_amount = current_task.get("fetch_amount", 0)
+		if fetch_item != "" and fetch_amount > 0:
+			var in_bp = inventory.get_item_count(fetch_item)
+			var to_deposit = mini(in_bp, fetch_amount)
+			if to_deposit > 0:
+				var removed = inventory.remove_item(fetch_item, to_deposit)
+				if removed > 0:
+					bld.deposit_material(fetch_item, removed)
+		# 清除搬运标记
+		current_task.erase("fetch_storage_pos")
+		current_task.erase("fetch_item_id")
+		current_task.erase("fetch_amount")
+		current_task.erase("construct_phase")
+		# 继续检查是否还需要搬运其他材料
+	
+	# 检查是否还缺材料
+	var missing = bld.get_missing_materials()
+	if not missing.is_empty():
+		# 先检查背包有没有可用的建筑材料，有的话直接存入
+		var deposited_any = false
+		for mat_id in missing.keys():
+			if inventory.has_item(mat_id, 1):
+				var in_bp = inventory.get_item_count(mat_id)
+				var to_deposit = mini(in_bp, missing[mat_id])
+				if to_deposit > 0:
+					var removed = inventory.remove_item(mat_id, to_deposit)
+					if removed > 0:
+						bld.deposit_material(mat_id, removed)
+						deposited_any = true
+		
+		if deposited_any:
+			# 重新检查材料是否齐了
+			missing = bld.get_missing_materials()
+		
+		if not missing.is_empty():
+			# 背包里的不够，去存储建筑取材料
+			if _construct_fetch_from_storage(bld, missing):
+				return  # 正在前往存储建筑取材料
+			else:
+				# 没有任何材料可用，无法建造
+				complete_task()
+				return
+	
+	# ========== 阶段2：建造（物资已齐） ==========
 	# 增加建造进度（技能越高建造越快）
 	var skill_level = get_skill("construction")
 	var work_amount = 1.0 + skill_level * 0.3
@@ -370,12 +430,72 @@ func _tick_construct():
 	# 检查是否刚完成
 	if game.building_system.get_building_at(grid_pos) and game.building_system.get_building_at(grid_pos).is_completed:
 		var name_str = data.name if data else "建筑"
-		var gm_notify = get_node("/root/GameManager")
-		if gm_notify:
-			gm_notify.show_notification("%s 建造完成！" % name_str, gm_notify.NotificationType.SUCCESS)
+		if gm:
+			gm.show_notification("%s 建造完成！" % name_str, gm.NotificationType.SUCCESS)
 		complete_task()
 	
 	add_skill_experience("construction", 1.0)
+
+func _construct_fetch_from_storage(bld, missing: Dictionary) -> bool:
+	"""查找最近的存储建筑取建筑材料，返回是否找到材料去向"""
+	var game = get_node_or_null("/root/Game")
+	if game == null:
+		return false
+	
+	var gm = get_node("/root/GameManager")
+	if gm == null:
+		return false
+	
+	var best_storage = null
+	var best_mat_id = ""
+	var best_dist = INF
+	
+	for mat_id in missing.keys():
+		var needed = missing[mat_id]
+		# 1. 检查全局资源池
+		if gm.has_resource(mat_id, 1):
+			# 从全局取，直接加入背包
+			var available = gm.get_resource(mat_id)
+			var to_take = mini(needed, available)
+			gm.remove_resource(mat_id, to_take)
+			inventory.add_item(mat_id, to_take)
+			# 标记回程，下一帧会存入建筑
+			current_task["construct_phase"] = "return_to_site"
+			current_task["fetch_item_id"] = mat_id
+			current_task["fetch_amount"] = to_take
+			# 重新走向建筑工地
+			var site_center = _bld_world_center(bld)
+			target_world_pos = site_center
+			state = SettlerState.MOVING
+			return true
+		
+		# 2. 检查存储建筑
+		var storage_blds = _find_nearby_storage(99999)
+		for sbld in storage_blds:
+			if sbld.inventory == null:
+				continue
+			if sbld.inventory.has_item(mat_id, 1):
+				var center = _bld_world_center(sbld)
+				var dist = position.distance_squared_to(center)
+				if dist < best_dist:
+					best_dist = dist
+					best_storage = sbld
+					best_mat_id = mat_id
+	
+	if best_storage != null and best_mat_id != "":
+		var needed = missing[best_mat_id]
+		var center = _bld_world_center(best_storage)
+		current_task["fetch_storage_pos"] = best_storage.grid_pos
+		current_task["fetch_item_id"] = best_mat_id
+		current_task["fetch_amount"] = needed
+		current_task["construct_phase"] = "fetch"
+		target_world_pos = center
+		state = SettlerState.MOVING
+		return true
+	
+	# 3. 检查建筑工地附近的地面资源（如木材/石头堆）
+	# 简化：无可用材料
+	return false
 
 func _tick_craft():
 	"""执行一次制作工作"""
@@ -622,6 +742,16 @@ func _tick_store():
 	var bld = game.building_system.get_building_at(target_bld_pos)
 	if bld == null or bld.inventory == null:
 		complete_task()
+		return
+	
+	# 检查是否在存储建筑附近（防止虚空转移）
+	var bld_center = _bld_world_center(bld)
+	var dist_to_bld = position.distance_to(bld_center)
+	var max_store_dist = _settler_setting("storage_search_radius", 300.0) * 0.3  # 默认为搜索半径的30%
+	if dist_to_bld > max_store_dist:
+		# 距离太远，重新走向建筑
+		target_world_pos = bld_center
+		state = SettlerState.MOVING
 		return
 	
 	if item_id != "" and amount > 0:

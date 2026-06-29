@@ -430,10 +430,30 @@ func _assign_ai_tasks():
 	# 收集所有可用任务
 	var tasks = []
 	
-	# 1. 建造任务
+	# 1. 建造任务——物资不足时不创建任务，让角色优先做其他工作
 	var uncompleted = building_system.get_uncompleted_buildings() if building_system else []
 	for bld in uncompleted:
 		var data = bld.get_data()
+		if data == null:
+			continue
+		
+		# 如果材料已备齐（已搬运到工地），直接创建建造任务
+		# 如果材料未备齐，检查全局是否有可用材料
+		if not bld.is_materials_ready():
+			var has_any_material = false
+			var missing = bld.get_missing_materials()
+			for mat_id in missing.keys():
+				# 检查全局资源池
+				if _gm.has_resource(mat_id, 1):
+					has_any_material = true
+					break
+				# 检查所有存储建筑
+				if _has_material_in_storage(mat_id):
+					has_any_material = true
+					break
+			if not has_any_material:
+				continue  # 没有任何材料可用，跳过此建筑，角色去做其他工作
+		
 		var center_pixel = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
 		tasks.append({
 			"id": "construct_%d_%d" % [bld.grid_pos.x, bld.grid_pos.y],
@@ -485,17 +505,20 @@ func _assign_ai_tasks():
 		var best_task = null
 		var best_score = INF
 		var best_idx = -1
+		var best_priority = 0  # 记录当前最高优先级
 		
 		for i in range(tasks.size()):
 			var t = tasks[i]
 			
 			# 检查该定居者是否允许做此工作类型
+			var pri = 0  # 不允许
 			if work_manager:
 				var wt = t.get("work_type", -1)
 				if wt >= 0:
-					var priority = work_manager.get_priority(sid, wt)
-					if priority <= 0:
-						continue  # 该定居者不做此类型工作
+					pri = work_manager.get_priority(sid, wt)
+			
+			if pri <= 0:
+				continue  # 该定居者不做此类型工作
 			
 			# 制作任务需要检查是否有其他定居者已经在做
 			if t.get("type") == "CRAFT":
@@ -506,17 +529,14 @@ func _assign_ai_tasks():
 			var task_pos = t.get("target_world_pos", Vector2.ZERO)
 			var dist = settler.position.distance_squared_to(task_pos) if task_pos != Vector2.ZERO else 0
 			
-			# 使用定居者的个人工作优先级计算评分（数字越大优先级越高）
-			var pri = 1  # 默认最低优先级
-			if work_manager:
-				var wt = t.get("work_type", -1)
-				if wt >= 0:
-					pri = work_manager.get_priority(sid, wt)
+			# 优先级优先：先比较优先级，同优先级内再比较距离
+			# 优先级1-4，4为最高；用优先级平方放大差距
+			var score = dist / (pri * pri * 2.0)
 			
-			# 评分 = 距离 / 优先级权重 (优先级4权重最高)
-			var weighted_dist = dist / max(0.5, float(pri))
-			if weighted_dist < best_score:
-				best_score = weighted_dist
+			# 如果此任务优先级更高，直接覆盖（无论距离）
+			if pri > best_priority or (pri == best_priority and score < best_score):
+				best_priority = pri
+				best_score = score
 				best_task = t
 				best_idx = i
 		
@@ -605,3 +625,16 @@ func _grid_to_world(grid_pos: Vector2i) -> Vector2:
 		grid_pos.x * world.tile_size + world.tile_size / 2.0,
 		grid_pos.y * world.tile_size + world.tile_size / 2.0
 	)
+func _has_material_in_storage(item_id: String) -> bool:
+	"""检查所有已完成的存储建筑中是否有指定材料"""
+	if building_system == null:
+		return false
+	for bld in building_system.get_all_buildings():
+		if not bld.is_completed:
+			continue
+		var bdata = bld.get_data()
+		if bdata == null or bdata.storage_capacity <= 0:
+			continue
+		if bld.inventory != null and bld.inventory.has_item(item_id, 1):
+			return true
+	return false
