@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="64" viewBox="0 0 256 64">
+  <!-- Sprite sheet with 16x16 icons for each item -->
+  <!-- Row: wood=0, stone=1, iron_ore=2, copper_ore=3, coal=4, berry=5, raw_meat=6, cloth=7 -->
+  <!-- Row: iron_ingot=8, copper_ingot=9, steel_ingot=10, plank=11, brick=12, cooked_meat=13, bread=14, vegetable_soup=15 -->
+
+  <!-- Wood -->
+  <rect x="0" y="0" width="16" height="16" fill="none"/>
+  <rect x="4" y="2" width="8" height="12" rx="1" fill="#8a6a3a"/>
+  <rect x="6" y="0" width="4" height="14" rx="0.5" fill="#6a4a2a"/>
+
+  <!-- Stone -->
+  <rect x="16" y="0" width="16" height="16" fill="none"/>
+  <ellipse cx="24" cy="8" rx="6" ry="5" fill="#8a8a8a"/>
+  <ellipse cx="24" cy="6" rx="4" ry="3" fill="#9a9a9a"/>
+
+  <!-- Iron Ore -->
+  <rect x="32" y="0" width="16" height="16" fill="none"/>
+  <ellipse cx="40" cy="8" rx="6" ry="5" fill="#b08040"/>
+  <circle cx="38" cy="6" r="2" fill="#c09050"/>
+  <circle cx="42" cy="7" r="1.5" fill="#c09050"/>
+
+  <!-- Copper Ore -->
+  <rect x="48" y="0" width="16" height="16" fill="none"/>
+  <ellipse cx="56" cy="8" rx="6" ry="5" fill="#c08040"/>
+  <circle cx="54" cy="6" r="2" fill="#d09050"/>
+  <circle cx="58" cy="7" r="1.5" fill="#d09050"/>
+
+  <!-- Coal -->
+  <rect x="64" y="0" width="16" height="16" fill="none"/>
+  <ellipse cx="72" cy="8" rx="5" ry="5" fill="#2a2a2a"/>
+  <ellipse cx="72" cy="7" rx="3" ry="3" fill="#3a3a3a"/>
+
+  <!-- Berry -->
+  <rect x="80" y="0" width="16" height="16" fill="none"/>
+  <circle cx="86" cy="6" r="3" fill="#cc2244"/>
+  <circle cx="90" cy="8" r="2.5" fill="#dd3355"/>
+  <circle cx="84" cy="10" r="2" fill="#bb1133"/>
+  <circle cx="88" cy="4" r="1.5" fill="#5a8a3a"/>
+
+  <!-- Raw Meat -->
+  <rect x="96" y="0" width="16" height="16" fill="none"/>
+  <ellipse cx="104" cy="8" rx="5" ry="4" fill="#cc4455"/>
+  <ellipse cx="104" cy="7" rx="3" ry="2.5" fill="#dd5566"/>
+
+  <!-- Cloth -->
+  <rect x="112" y="0" width="16" height="16" fill="none"/>
+  <rect x="114" y="3" width="12" height="10" rx="1" fill="#aa8855"/>
+  <line x1="114" y1="6" x2="126" y2="6" stroke="#997744" stroke-width="0.5"/>
+  <line x1="114" y1="9" x2="126" y2="9" stroke="#997744" stroke-width="0.5"/>
+
+  <!-- Iron Ingot -->
+  <rect x="128" y="0" width="16" height="16" fill="none"/>
+  <rect x="131" y="4" width="10" height="8" rx="1" fill="#a0a0a0"/>
+  <rect x="131" y="4" width="10" height="3" fill="#b0b0b0"/>
+
+  <!-- Copper Ingot -->
+  <rect x="144" y="0" width="16" height="16" fill="none"/>
+  <rect x="147" y="4" width="10" height="8" rx="1" fill="#c09050"/>
+  <rect x="147" y="4" width="10" height="3" fill="#d0a060"/>
+
+  <!-- Steel Ingot -->
+  <rect x="160" y="0" width="16" height="16" fill="none"/>
+  <rect x="163" y="4" width="10" height="8" rx="1" fill="#6a6a7a"/>
+  <rect x="163" y="4" width="10" height="3" fill="#7a7a8a"/>
+  <line x1="165" y1="7" x2="171" y2="7" stroke="#888" stroke-width="0.5"/>
+
+  <!-- Plank -->
+  <rect x="176" y="0" width="16" height="16" fill="none"/>
+  <rect x="178" y="5" width="12" height="6" rx="0.5" fill="#b08850"/>
+  <rect x="178" y="5" width="12" height="2" fill="#c09860"/>
+
+  <!-- Brick -->
+  <rect x="192" y="0" width="16" height="16" fill="none"/>
+  <rect x="194" y="4" width="12" height="8" rx="1" fill="#aa5533"/>
+  <rect x="194" y="4" width="12" height="3" fill="#bb6644"/>
+  <line x1="198" y1="7" x2="198" y2="12" stroke="#994422" stroke-width="0.5"/>
+
+  <!-- Cooked Meat -->
+  <rect x="208" y="0" width="16" height="16" fill="none"/>
+  <ellipse cx="216" cy="8" rx="5" ry="4" fill="#885533"/>
+  <ellipse cx="216" cy="7" rx="3" ry="2.5" fill="#996644"/>
+
+  <!-- Bread -->
+  <rect x="224" y="0" width="16" height="16" fill="none"/>
+  <ellipse cx="232" cy="8" rx="6" ry="4" fill="#c09850"/>
+  <ellipse cx="232" cy="7" rx="4" ry="3" fill="#d0a860"/>
+
+  <!-- Vegetable Soup -->
+  <rect x="240" y="0" width="16" height="16" fill="none"/>
+  <circle cx="248" cy="8" r="5" fill="#8a6a3a"/>
+  <circle cx="248" cy="8" r="4" fill="#aa6a3a"/>
+  <circle cx="248" cy="8" r="3" fill="#886a2a"/>
+</svg>

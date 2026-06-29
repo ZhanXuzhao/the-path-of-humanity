@@ -1,7 +1,8 @@
-[gd_scene load_steps=10 format=3 uid="uid://d0plvqi8nqtxg"]
+[gd_scene load_steps=11 format=3 uid="uid://d0plvqi8nqtxg"]
 
 [ext_resource type="Script" path="res://scripts/core/game.gd" id="1_b4xb6"]
 [ext_resource type="Script" path="res://scripts/core/world.gd" id="2_mhkh2"]
+[ext_resource type="Script" path="res://scripts/core/world_renderer.gd" id="2b_x4c7"]
 [ext_resource type="Script" path="res://scripts/systems/building_system.gd" id="3_ha1wi"]
 [ext_resource type="Script" path="res://scripts/systems/crafting_system.gd" id="4_e0m3h"]
 [ext_resource type="Script" path="res://scripts/systems/tech_system.gd" id="5_hb83g"]
@@ -15,6 +16,9 @@ script = ExtResource("1_b4xb6")
 
 [node name="World" type="Node2D" parent="."]
 script = ExtResource("2_mhkh2")
+
+[node name="WorldRenderer" type="Node2D" parent="World"]
+script = ExtResource("2b_x4c7")
 
 [node name="Camera" type="Camera2D" parent="."]
 position = Vector2(640, 360)

@@ -11,6 +11,9 @@ signal task_completed(task_id: String)
 var settler_name: String
 var settler_id: String
 
+# 视觉
+var settler_sprite: Sprite2D
+
 # 基础属性
 var stats = {
 	"strength": 5.0,     # 力量 - 影响近战、搬运
@@ -83,6 +86,14 @@ func _init():
 	inventory = Inventory.new(10, 30)
 	_randomize_name()
 	_randomize_stats()
+	_setup_sprite()
+
+func _setup_sprite():
+	settler_sprite = Sprite2D.new()
+	settler_sprite.texture = preload("res://scripts/core/texture_generator.gd")._generate_character().get("settler")
+	settler_sprite.scale = Vector2(1.5, 1.5)
+	settler_sprite.z_index = 3
+	add_child(settler_sprite)
 
 func _randomize_name():
 	var first_names = ["阿明", "小芳", "大壮", "阿珍", "铁柱", "翠花", "志强", "秀英", "建国", "丽华"]

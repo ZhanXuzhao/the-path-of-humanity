@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="16" viewBox="0 0 96 16">
+  <!-- HUD resource icons: wood, stone, food -->
+  <!-- Wood -->
+  <rect x="0" y="0" width="16" height="16" fill="none"/>
+  <rect x="4" y="2" width="8" height="12" rx="1" fill="#8a6a3a"/>
+  <rect x="6" y="0" width="4" height="14" rx="0.5" fill="#6a4a2a"/>
+
+  <!-- Stone -->
+  <rect x="32" y="0" width="16" height="16" fill="none"/>
+  <ellipse cx="40" cy="8" rx="6" ry="5" fill="#8a8a8a"/>
+  <ellipse cx="40" cy="6" rx="4" ry="3" fill="#9a9a9a"/>
+
+  <!-- Food (bread) -->
+  <rect x="64" y="0" width="16" height="16" fill="none"/>
+  <ellipse cx="72" cy="8" rx="6" ry="4" fill="#c09850"/>
+  <ellipse cx="72" cy="7" rx="4" ry="3" fill="#d0a860"/>
+</svg>
