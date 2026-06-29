@@ -422,14 +422,10 @@ func _update_settler_autonomy():
 		if s.state == Settler.SettlerState.SLEEPING or s.state == Settler.SettlerState.EATING:
 			continue
 		
-		# 如果正在工作中，不打断（除非需求极低）
+		# 正在工作中的角色不打断——让它们先完成当前任务
+		# （否则建造取料途中被打断会导致任务丢失，形成死循环）
 		if s.state == Settler.SettlerState.WORKING or s.state == Settler.SettlerState.MOVING:
-			# 检查是否有紧急需求
-			if s.needs.get("hunger", 100) < 15 or s.needs.get("rest", 100) < 10:
-				# 传入 true 跳过自动搬运，让角色先满足基本需求（进食/睡眠）
-				s.complete_task(true)
-			else:
-				continue
+			continue
 		
 		# 1. 饥饿处理（饱食度 < 25 且空闲）
 		if s.needs.get("hunger", 100) < 25 and s.state == Settler.SettlerState.IDLE:
