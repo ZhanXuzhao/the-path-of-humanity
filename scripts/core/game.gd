@@ -212,6 +212,20 @@ func exit_build_mode():
 	selected_building = ""
 	if build_preview:
 		build_preview.visible = false
+	
+	# 同时关闭建造菜单（右键退出建造模式时菜单也应关闭）
+	var build_menu = get_node_or_null("UI/BuildMenu")
+	if build_menu:
+		build_menu.visible = false
+		# 重置菜单状态
+		if build_menu.has_method("_populate_buildings"):
+			build_menu.shortcut_category_active = false
+			build_menu.current_category = -1
+			build_menu._populate_buildings()
+			build_menu.info_panel.visible = false
+			build_menu.selected_building = ""
+			for i in build_menu.category_tabs.get_child_count():
+				build_menu.category_tabs.get_child(i).button_pressed = false
 
 func _update_build_preview():
 	var mouse_pos = get_global_mouse_position()
