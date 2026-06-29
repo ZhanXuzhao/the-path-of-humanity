@@ -15,6 +15,7 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var pause_btn: Button = $BottomBar/PauseBtn
 @onready var build_menu_btn: Button = $BottomBar/BuildBtn
 @onready var tech_btn: Button = $BottomBar/TechBtn
+@onready var work_btn: Button = $BottomBar/WorkBtn
 @onready var menu_btn: Button = $BottomBar/MenuBtn
 
 # 定居者信息面板
@@ -66,6 +67,8 @@ func _ready():
 		build_menu_btn.text = "建造 [B]"
 	if tech_btn:
 		tech_btn.pressed.connect(_on_tech_pressed)
+	if work_btn:
+		work_btn.pressed.connect(_on_work_pressed)
 	if menu_btn:
 		menu_btn.pressed.connect(_on_menu_pressed)
 	
@@ -285,6 +288,13 @@ func _on_tech_pressed():
 	var tech_panel = get_node_or_null("/root/Game/UI/TechPanel")
 	if tech_panel:
 		tech_panel.visible = not tech_panel.visible
+
+func _on_work_pressed():
+	var work_panel = get_node_or_null("/root/Game/UI/WorkPanel")
+	if work_panel:
+		work_panel.visible = not work_panel.visible
+		if work_panel.visible:
+			work_panel._rebuild_grid()
 
 func _on_menu_pressed():
 	"""菜单按钮：打开游戏中暂停菜单"""

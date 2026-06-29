@@ -1,0 +1,75 @@
+[gd_scene format=3 uid="uid://dt1b7s52sjwyw"]
+
+[ext_resource type="Script" path="res://scripts/ui/work_panel.gd" id="1_x4c7"]
+
+[sub_resource type="StyleBoxFlat" id="1"]
+content_margin_left = 8.0
+content_margin_top = 8.0
+content_margin_right = 8.0
+content_margin_bottom = 8.0
+bg_color = Color(0.1, 0.1, 0.12, 0.95)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="2"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+bg_color = Color(0.15, 0.15, 0.17, 0.95)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="WorkPanel" type="Panel"]
+visible = false
+anchors_preset = 0
+offset_left = 40.0
+offset_top = 60.0
+offset_right = 940.0
+offset_bottom = 660.0
+theme_override_styles/panel = SubResource(1)
+script = ExtResource("1_x4c7")
+
+[node name="TitleBar" type="HBoxContainer" parent="."]
+offset_left = 12.0
+offset_top = 8.0
+offset_right = 888.0
+offset_bottom = 36.0
+
+[node name="Title" type="Label" parent="TitleBar"]
+size_flags_horizontal = 3
+theme_override_constants/minimum_font_size = 18
+theme_override_colors/font_color = Color(0.3, 0.8, 1.0, 1)
+text = "工作优先级"
+
+[node name="CloseBtn" type="Button" parent="TitleBar"]
+custom_minimum_size = Vector2(30, 30)
+text = "✕"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="."]
+offset_left = 12.0
+offset_top = 44.0
+offset_right = 888.0
+offset_bottom = 580.0
+
+[node name="WorkGrid" type="GridContainer" parent="ScrollContainer"]
+columns = 10
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 872.0
+offset_bottom = 400.0
+theme_override_constants/h_separation = 2
+theme_override_constants/v_separation = 2
+
+[node name="BottomBar" type="HBoxContainer" parent="."]
+offset_left = 12.0
+offset_top = 588.0
+offset_right = 888.0
+offset_bottom = 620.0
+
+[node name="ResetAllBtn" type="Button" parent="BottomBar"]
+text = "全部重置为默认"

@@ -98,11 +98,14 @@ func _generate_initial_area():
 
 func _spawn_initial_settlers():
 	# 创建3个初始定居者
+	var work_manager = get_node_or_null("/root/WorkManager")
 	for i in 3:
 		var settler = Settler.new()
 		settler.position = Vector2(randf_range(300, 500), randf_range(300, 500))
 		add_child(settler)
 		settlers.append(settler)
+		if work_manager:
+			work_manager.init_settler(settler.settler_id)
 		_gm.show_notification("新成员加入了聚居地: %s" % settler.settler_name, 
 			3)
 
@@ -323,6 +326,10 @@ func _input(event):
 		if tech_panel and tech_panel.visible:
 			tech_panel.visible = false
 			return
+		var work_panel = get_node_or_null("UI/WorkPanel")
+		if work_panel and work_panel.visible:
+			work_panel.visible = false
+			return
 		
 		# 无菜单打开时，Esc 打开暂停菜单
 		if main_menu:
@@ -375,6 +382,12 @@ func _restore_from_save(data: Dictionary):
 	if crafting_system and data.has("crafting"):
 		crafting_system.from_dict(data.crafting)
 	
+	# 恢复工作优先级
+	if data.has("work_priorities"):
+		var wm = get_node_or_null("/root/WorkManager")
+		if wm:
+			wm.from_dict(data.work_priorities)
+	
 	# 恢复定居者
 	if data.has("settlers"):
 		for s_data in data.settlers:
@@ -407,15 +420,17 @@ func _update_settlers(delta):
 			s.update_needs(delta_hours)
 
 func _assign_ai_tasks():
-	"""为所有空闲定居者分配任务（优先级：建造 > 制作 > 采集）"""
+	"""为所有空闲定居者分配任务（使用 WorkManager 的优先级配置）"""
 	var idle_settlers = get_idle_settlers()
 	if idle_settlers.is_empty():
 		return
 	
+	var work_manager = get_node_or_null("/root/WorkManager")
+	
 	# 收集所有可用任务
 	var tasks = []
 	
-	# 1. 建造任务（优先级最高）
+	# 1. 建造任务
 	var uncompleted = building_system.get_uncompleted_buildings() if building_system else []
 	for bld in uncompleted:
 		var data = bld.get_data()
@@ -427,17 +442,16 @@ func _assign_ai_tasks():
 			"target_world_pos": center_pixel,
 			"skill": "construction",
 			"work_required": data.work_cost - bld.construction_progress if data else 10.0,
-			"priority": 3,
+			"work_type": WorkManager.WorkType.CONSTRUCTION,
 		})
 	
-	# 2. 制作任务（中等优先级）
+	# 2. 制作任务
 	if crafting_system:
 		var pending_jobs = crafting_system.get_pending_crafting_jobs()
 		for job in pending_jobs:
 			var bld = building_system.get_building_at(job.building_pos) if building_system else null
 			if bld == null:
 				continue
-			var data = bld.get_data()
 			var center_pixel = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
 			var recipe = job.get_recipe()
 			tasks.append({
@@ -449,32 +463,40 @@ func _assign_ai_tasks():
 				"recipe_id": job.recipe_id,
 				"skill": "crafting",
 				"work_required": recipe.work_time if recipe else 5.0,
-				"priority": 2,
 				"crafting_job": job,
+				"work_type": WorkManager.WorkType.CRAFTING,
 			})
 	
-	# 3. 采集任务（低优先级）- 在地图已生成区块中找最近的资源
+	# 3. 采集任务 - 在地图已生成区块中找最近的资源
 	var harvest_tasks = _scan_nearby_resources(idle_settlers)
 	tasks.append_array(harvest_tasks)
 	
 	if tasks.is_empty():
 		return
 	
-	# 按优先级排序
-	tasks.sort_custom(func(a, b): return a.get("priority", 0) > b.get("priority", 0))
-	
-	# 为每个空闲定居者分配最近的最优任务
+	# 为每个空闲定居者分配任务（考虑个人工作优先级）
 	for settler in idle_settlers:
 		if tasks.is_empty():
 			break
 		
-		# 找到距离定居者最近的高优先级任务
+		var sid = settler.settler_id
+		
+		# 找到该定居者允许做的、距离最近的最高优先级任务
 		var best_task = null
-		var best_dist = INF
+		var best_score = INF
 		var best_idx = -1
 		
 		for i in range(tasks.size()):
 			var t = tasks[i]
+			
+			# 检查该定居者是否允许做此工作类型
+			if work_manager:
+				var wt = t.get("work_type", -1)
+				if wt >= 0:
+					var priority = work_manager.get_priority(sid, wt)
+					if priority <= 0:
+						continue  # 该定居者不做此类型工作
+			
 			# 制作任务需要检查是否有其他定居者已经在做
 			if t.get("type") == "CRAFT":
 				var job = t.get("crafting_job")
@@ -483,10 +505,18 @@ func _assign_ai_tasks():
 			
 			var task_pos = t.get("target_world_pos", Vector2.ZERO)
 			var dist = settler.position.distance_squared_to(task_pos) if task_pos != Vector2.ZERO else 0
-			# 优先级权重：同一优先级内选最近的
-			var weighted_dist = dist / max(1, t.get("priority", 1))
-			if weighted_dist < best_dist:
-				best_dist = weighted_dist
+			
+			# 使用定居者的个人工作优先级计算评分
+			var pri = 1  # 默认最低优先级
+			if work_manager:
+				var wt = t.get("work_type", -1)
+				if wt >= 0:
+					pri = work_manager.get_priority(sid, wt)
+			
+			# 评分 = 距离 / 优先级权重 (优先级1权重最高)
+			var weighted_dist = dist / max(0.5, float(5 - pri))
+			if weighted_dist < best_score:
+				best_score = weighted_dist
 				best_task = t
 				best_idx = i
 		
@@ -548,6 +578,13 @@ func _scan_nearby_resources(settlers: Array) -> Array:
 					world.ResourceNodeType.BERRY_BUSH: "woodcutting",
 				}
 				
+				var work_type = WorkManager.WorkType.WOODCUTTING
+				match dep.type:
+					world.ResourceNodeType.STONE_DEPOSIT, world.ResourceNodeType.IRON_DEPOSIT, world.ResourceNodeType.COPPER_DEPOSIT, world.ResourceNodeType.COAL_DEPOSIT:
+						work_type = WorkManager.WorkType.MINING
+					world.ResourceNodeType.BERRY_BUSH:
+						work_type = WorkManager.WorkType.FARMING
+				
 				result.append({
 					"id": "harvest_%d_%d" % [global_pos.x, global_pos.y],
 					"type": "HARVEST",
@@ -557,7 +594,7 @@ func _scan_nearby_resources(settlers: Array) -> Array:
 					"harvest_item": item_id,
 					"skill": skill_map.get(dep.type, "woodcutting"),
 					"work_required": dep.harvest_time,
-					"priority": 1,
+					"work_type": work_type,
 				})
 	
 	return result
