@@ -79,6 +79,12 @@ class BuildingInstance:
 			max_hp = data.hp
 			if data.storage_capacity > 0:
 				inventory = Inventory.new()
+				# 从 GameManager 配置读取容量，实现可配置
+				var gm = Engine.get_main_loop().root.get_node_or_null("/root/GameManager")
+				if gm and gm.settings.has("storage_rack_capacity") and id == "storage_rack":
+					inventory.capacity = gm.settings.storage_rack_capacity
+				else:
+					inventory.capacity = data.storage_capacity
 
 # 所有建筑实例
 var buildings: Dictionary = {}  # Vector2i -> BuildingInstance

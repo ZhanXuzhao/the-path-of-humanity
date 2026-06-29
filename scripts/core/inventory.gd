@@ -9,6 +9,9 @@ signal items_changed
 
 var items: Dictionary = {}  # item_id -> total_amount，每种物品只占一条
 
+# 容量上限（0 = 无限制）
+var capacity: int = 0
+
 func _init():
 	pass
 
@@ -22,7 +25,13 @@ func add_item(item_id: String, amount: int = 1) -> int:
 	if item_def == null or item_def.id == "":
 		return amount
 	
-	# 无容量和种类上限限制
+	# 容量检查
+	if capacity > 0:
+		var current = get_total_items()
+		var space = capacity - current
+		if space <= 0:
+			return amount  # 已满，全部退回
+		amount = mini(amount, space)
 	
 	items[item_id] = items.get(item_id, 0) + amount
 	emit_signal("items_changed")
@@ -59,7 +68,7 @@ func is_empty() -> bool:
 	return items.is_empty()
 
 func is_full() -> bool:
-	return false
+	return capacity > 0 and get_total_items() >= capacity
 
 func clear():
 	items.clear()

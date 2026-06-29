@@ -107,6 +107,9 @@ func _load_settings():
 	for v in cfg.get_value("speed", "levels", [0.5, 1.0, 2.0, 3.0, 5.0, 10.0]):
 		speed_levels.append(float(v))
 	
+	# 建筑设置
+	settings["storage_rack_capacity"] = cfg.get_value("building", "storage_rack_capacity", 1000)
+	
 	print("游戏设置已加载")
 
 func _setup_autosave():
