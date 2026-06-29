@@ -11,8 +11,10 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var fps_label: Label = $TopBar/FpsLabel
 @onready var resource_container: HBoxContainer = $TopBar/Resources
 @onready var notification_container: VBoxContainer = $Notifications
-@onready var speed_btn: Button = $BottomBar/SpeedBtn
-@onready var pause_btn: Button = $BottomBar/PauseBtn
+@onready var speed_down_btn: Button = $TopBar/SpeedBox/SpeedDownBtn
+@onready var speed_label: Label = $TopBar/SpeedBox/SpeedLabel
+@onready var speed_up_btn: Button = $TopBar/SpeedBox/SpeedUpBtn
+@onready var pause_btn: Button = $TopBar/PauseBtn
 @onready var build_menu_btn: Button = $BottomBar/BuildBtn
 @onready var tech_btn: Button = $BottomBar/TechBtn
 @onready var work_btn: Button = $BottomBar/WorkBtn
@@ -75,8 +77,10 @@ func _ready():
 		# 按钮连接
 	if pause_btn:
 		pause_btn.pressed.connect(_on_pause_pressed)
-	if speed_btn:
-		speed_btn.pressed.connect(_on_speed_pressed)
+	if speed_down_btn:
+		speed_down_btn.pressed.connect(_on_speed_down_pressed)
+	if speed_up_btn:
+		speed_up_btn.pressed.connect(_on_speed_up_pressed)
 	if build_menu_btn:
 		build_menu_btn.pressed.connect(_on_build_menu_pressed)
 		build_menu_btn.text = "建造 [B]"
@@ -503,19 +507,33 @@ func _on_pause_pressed():
 	if pause_btn:
 		pause_btn.text = "▶" if game_manager.state == 2 else "⏸"
 
-func _on_speed_pressed():
+func _update_speed_label():
+	"""更新速度显示标签"""
+	if not speed_label:
+		return
+	var speed = game_manager.time_speed
+	if speed == int(speed):
+		speed_label.text = "×%d" % speed
+	else:
+		speed_label.text = "×%.1f" % speed
+
+func _on_speed_up_pressed():
 	var speeds = game_manager.speed_levels
 	var current = game_manager.time_speed
 	var idx = speeds.find(current)
 	if idx >= 0 and idx < len(speeds) - 1:
 		idx += 1
 		game_manager.set_time_speed(speeds[idx])
-		if speed_btn:
-			var speed = speeds[idx]
-			if speed == int(speed):
-				speed_btn.text = "×%d" % speed
-			else:
-				speed_btn.text = "×%.1f" % speed
+		_update_speed_label()
+
+func _on_speed_down_pressed():
+	var speeds = game_manager.speed_levels
+	var current = game_manager.time_speed
+	var idx = speeds.find(current)
+	if idx > 0:
+		idx -= 1
+		game_manager.set_time_speed(speeds[idx])
+		_update_speed_label()
 
 func _on_build_menu_pressed():
 	# 发送打开建筑菜单的信号

@@ -565,14 +565,14 @@ func _input(event):
 			get_viewport().set_input_as_handled()
 
 func _update_speed_display():
-	"""更新 HUD 速度按钮显示"""
+	"""更新 HUD 速度显示"""
 	var hud = get_node_or_null("UI/HUD")
-	if hud and hud.speed_btn:
+	if hud and hud.speed_label:
 		var speed = _gm.time_speed
 		if speed == int(speed):
-			hud.speed_btn.text = "×%d" % speed
+			hud.speed_label.text = "×%d" % speed
 		else:
-			hud.speed_btn.text = "×%.1f" % speed
+			hud.speed_label.text = "×%.1f" % speed
 
 # ==================== 存档恢复 ====================
 
