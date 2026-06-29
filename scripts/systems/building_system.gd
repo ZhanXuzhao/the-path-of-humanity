@@ -194,6 +194,36 @@ func get_buildings_by_type(building_id: String) -> Array:
 			result.append(bld)
 	return result
 
+# -------- AI辅助查询 --------
+func get_uncompleted_buildings() -> Array:
+	"""获取所有未完成的建筑（施工工地）"""
+	var result: Array = []
+	var seen: Dictionary = {}
+	for pos in buildings:
+		var bld = buildings[pos]
+		if seen.has(bld.grid_pos):
+			continue
+		seen[bld.grid_pos] = true
+		if not bld.is_completed:
+			result.append(bld)
+	return result
+
+func get_completed_production_buildings() -> Array:
+	"""获取所有已完成且有生产能力的建筑"""
+	var result: Array = []
+	var seen: Dictionary = {}
+	for pos in buildings:
+		var bld = buildings[pos]
+		if seen.has(bld.grid_pos):
+			continue
+		seen[bld.grid_pos] = true
+		if not bld.is_completed:
+			continue
+		var data = bld.get_data()
+		if data and (data.production_time > 0 or data.storage_capacity > 0):
+			result.append(bld)
+	return result
+
 # -------- 拆除建筑 --------
 func remove_building(pos: Vector2i) -> bool:
 	var bld = get_building_at(pos)

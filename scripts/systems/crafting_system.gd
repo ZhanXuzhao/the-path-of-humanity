@@ -70,8 +70,8 @@ func _try_start_next_job(building_pos: Vector2i):
 	for job in queue:
 		if not job.is_active:
 			job.is_active = true
-			if job.assigned_settler_id != "":
-				crafting_started.emit(job.recipe_id, building_pos, job.assigned_settler_id)
+			active_jobs.append(job)
+			crafting_started.emit(job.recipe_id, building_pos, job.assigned_settler_id)
 			return
 
 # -------- 制作进度 --------
@@ -86,15 +86,25 @@ func process_crafting(delta: float):
 		
 		job.progress += delta
 		if job.progress >= recipe.work_time:
-			_complete_crafting(job, recipe)
+			complete_crafting(job, recipe)
 			active_jobs.remove_at(i)
 
-func _complete_crafting(job, _recipe):
-	"""完成制作"""
+func complete_crafting(job, _recipe):
+	"""完成制作（由定居者AI或系统调用）"""
 	# 输出物品 - 放入建筑库存或掉落
 	crafting_completed.emit(job.recipe_id, job.building_pos)
 
 # -------- 可用配方查询 --------
+func get_pending_crafting_jobs() -> Array:
+	"""获取所有尚未分配定居者的活跃制作任务"""
+	var jobs: Array = []
+	for pos in crafting_queues:
+		var queue = crafting_queues[pos]
+		for job in queue:
+			if job.is_active and job.assigned_settler_id == "":
+				jobs.append(job)
+	return jobs
+
 func get_available_recipes(building_id: String, researched_techs: Array) -> Array:
 	"""获取建筑可用的已解锁配方"""
 	var all_recipes = ItemDefinitions.get_recipes_for_building(building_id)

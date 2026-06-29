@@ -7,6 +7,8 @@ signal needs_changed(need_id: String, value: float)
 signal task_assigned(task_id: String)
 signal task_completed(task_id: String)
 
+const ItemDefinitions = preload("res://resources/item_definitions.gd")
+
 # 角色属性
 var settler_name: String
 var settler_id: String
@@ -77,6 +79,12 @@ var current_task = null  # 当前任务数据
 var target_position: Vector2i
 var inventory
 
+# 移动和工作的中间变量
+var target_world_pos: Vector2 = Vector2.ZERO   # 移动目标（像素坐标）
+var work_accumulator: float = 0.0               # 工作累积计时器
+var work_tick_interval: float = 0.5             # 每次工作刻的间隔（秒）
+var is_working_on_construction: bool = false    # 是否正在建造建筑
+
 # 年龄和寿命
 var age: float = 20.0
 var lifespan: float = 80.0
@@ -94,6 +102,196 @@ func _setup_sprite():
 	settler_sprite.scale = Vector2(1.5, 1.5)
 	settler_sprite.z_index = 3
 	add_child(settler_sprite)
+
+func _process(delta):
+	# 暂停时停止移动和工作
+	var gm = get_node("/root/GameManager")
+	if gm and gm.state != gm.GameState.PLAYING:
+		return
+	
+	match state:
+		SettlerState.IDLE:
+			# Game 主循环会分配任务，空闲时什么都不做
+			pass
+		SettlerState.MOVING:
+			_move_towards(delta)
+		SettlerState.WORKING:
+			_execute_work(delta)
+
+# -------- 移动系统 --------
+func move_to(target: Vector2):
+	"""移动到目标像素位置"""
+	target_world_pos = target
+	state = SettlerState.MOVING
+
+func _move_towards(delta):
+	if target_world_pos == Vector2.ZERO:
+		state = SettlerState.IDLE
+		return
+	var offset = target_world_pos - position
+	var dist = offset.length()
+	if dist > 2.0:
+		position += offset.normalized() * move_speed * delta
+	else:
+		position = target_world_pos
+		# 到达目标，如果是工作类任务则开始工作
+		if current_task != null:
+			state = SettlerState.WORKING
+			work_accumulator = 0.0
+		else:
+			state = SettlerState.IDLE
+
+# -------- 工作系统 --------
+func _execute_work(delta):
+	if current_task == null:
+		state = SettlerState.IDLE
+		return
+	
+	var task_type = current_task.get("type", "")
+	if task_type == "":
+		complete_task()
+		return
+	
+	# 根据技能计算工作速度
+	var skill_id = current_task.get("skill", "")
+	var skill_level = get_skill(skill_id)
+	var work_speed = max(0.1, skill_level * 0.4)  # 技能越高干得越快
+	
+	work_accumulator += delta * work_speed
+	
+	if work_accumulator >= work_tick_interval:
+		work_accumulator -= work_tick_interval
+		_do_work_tick(task_type)
+
+func _do_work_tick(task_type: String):
+	match task_type:
+		"HARVEST":
+			_tick_harvest()
+		"CONSTRUCT":
+			_tick_construct()
+		"CRAFT":
+			_tick_craft()
+
+func _tick_harvest():
+	"""执行一次采集工作"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.world == null:
+		complete_task()
+		return
+	
+	var grid_pos: Vector2i = current_task.get("target_pos", Vector2i.ZERO)
+	var result = game.world.harvest_resource(grid_pos, 1.0)
+	if result.is_empty() or result.amount <= 0:
+		# 资源已耗尽
+		complete_task()
+		return
+	
+	# 采集到的物品直接上交到聚居地资源库
+	var item_id = result.item_id
+	var amount = result.amount
+	var gm = get_node("/root/GameManager")
+	if gm:
+		gm.resources[item_id] = gm.resources.get(item_id, 0) + amount
+	
+	# 增加经验
+	add_skill_experience(current_task.get("skill", ""), 1.0)
+
+func _tick_construct():
+	"""执行一次建造工作"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		complete_task()
+		return
+	
+	var grid_pos: Vector2i = current_task.get("target_pos", Vector2i.ZERO)
+	var bld = game.building_system.get_building_at(grid_pos)
+	if bld == null:
+		complete_task()
+		return
+	
+	if bld.is_completed:
+		complete_task()
+		return
+	
+	var data = bld.get_data()
+	var gm = get_node("/root/GameManager")
+	
+	# 首次建造时消耗材料
+	if data and data.materials.size() > 0 and gm and not current_task.has("materials_consumed"):
+		var can_afford = true
+		for mat_id in data.materials:
+			var needed = data.materials[mat_id]
+			if gm.resources.get(mat_id, 0) < needed:
+				can_afford = false
+				break
+		if can_afford:
+			for mat_id in data.materials:
+				var needed = data.materials[mat_id]
+				gm.resources[mat_id] = gm.resources.get(mat_id, 0) - needed
+			current_task["materials_consumed"] = true
+		else:
+			# 材料不足，稍后再试
+			return
+	
+	# 增加建造进度（技能越高建造越快）
+	var skill_level = get_skill("construction")
+	var work_amount = 1.0 + skill_level * 0.3
+	game.building_system.add_construction_progress(grid_pos, work_amount)
+	
+	# 检查是否刚完成
+	if game.building_system.get_building_at(grid_pos) and game.building_system.get_building_at(grid_pos).is_completed:
+		var name_str = data.name if data else "建筑"
+		var gm_notify = get_node("/root/GameManager")
+		if gm_notify:
+			gm_notify.show_notification("%s 建造完成！" % name_str, gm_notify.NotificationType.SUCCESS)
+		complete_task()
+	
+	add_skill_experience("construction", 1.0)
+
+func _tick_craft():
+	"""执行一次制作工作"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.crafting_system == null:
+		complete_task()
+		return
+	
+	var building_pos: Vector2i = current_task.get("building_pos", Vector2i.ZERO)
+	var recipe_id: String = current_task.get("recipe_id", "")
+	
+	if recipe_id == "":
+		complete_task()
+		return
+	
+	# 查找对应制作任务并推进进度
+	var queue = game.crafting_system.get_or_create_queue(building_pos)
+	var recipe = ItemDefinitions.get_recipe(recipe_id)
+	if recipe == null:
+		complete_task()
+		return
+	
+	for job in queue:
+		if job.recipe_id == recipe_id and job.is_active:
+			# 推进制作进度
+			var work_speed = get_skill(current_task.get("skill", "")) * 0.5
+			job.progress += work_speed
+			add_skill_experience(current_task.get("skill", ""), 1.0)
+			
+			# 检查是否完成
+			if job.progress >= recipe.work_time:
+				game.crafting_system.complete_crafting(job, recipe)
+				queue.erase(job)
+				game.crafting_system.active_jobs.erase(job)
+				# 如果是重复任务，重新加入队列
+				if job.repeat:
+					var new_job = game.crafting_system.CraftingJob.new(recipe_id, building_pos, settler_id)
+					new_job.repeat = true
+					queue.append(new_job)
+					game.crafting_system._try_start_next_job(building_pos)
+				complete_task()
+			return
+	
+	# 没有找到对应的活跃任务
+	complete_task()
 
 func _randomize_name():
 	var first_names = ["阿明", "小芳", "大壮", "阿珍", "铁柱", "翠花", "志强", "秀英", "建国", "丽华"]
@@ -146,7 +344,17 @@ func add_skill_experience(skill_id: String, amount: float):
 func assign_task(task_data: Dictionary) -> bool:
 	"""分配任务，返回是否可以接受"""
 	current_task = task_data
-	state = SettlerState.WORKING
+	
+	# 设置移动目标（像素坐标）
+	var target_pixel = task_data.get("target_world_pos", Vector2.ZERO)
+	if target_pixel != Vector2.ZERO:
+		target_world_pos = target_pixel
+		state = SettlerState.MOVING
+	else:
+		# 没有目标位置则直接开始工作
+		state = SettlerState.WORKING
+		work_accumulator = 0.0
+	
 	task_assigned.emit(task_data.get("id", ""))
 	return true
 
