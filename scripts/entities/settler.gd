@@ -68,7 +68,14 @@ enum SettlerState {
 	COMBAT,         # 战斗
 }
 
+# 性别
+enum Gender {
+	MALE,
+	FEMALE,
+}
+
 var state: SettlerState = SettlerState.IDLE
+var gender: Gender
 var hp: float = 100.0
 var max_hp: float = 100.0
 var move_speed: float = 60.0  # 像素/秒
@@ -86,7 +93,7 @@ var work_tick_interval: float = 0.5             # 每次工作刻的间隔（秒
 var is_working_on_construction: bool = false    # 是否正在建造建筑
 
 # 年龄和寿命
-var age: float = 20.0
+var age: float
 var lifespan: float = 80.0
 
 func _init():
@@ -94,14 +101,47 @@ func _init():
 	inventory = Inventory.new(10, 30)
 	_randomize_name()
 	_randomize_stats()
+	_randomize_age()
 	_setup_sprite()
+
+const TILE_SIZE: float = 32.0
 
 func _setup_sprite():
 	settler_sprite = Sprite2D.new()
-	settler_sprite.texture = preload("res://assets/art/characters/settler.svg")
-	settler_sprite.scale = Vector2(1.5, 1.5)
+	settler_sprite.texture = _pick_character_texture()
+	# 自动缩放到一个格子大小
+	var tex_size = settler_sprite.texture.get_size()
+	var scale_factor = TILE_SIZE / max(tex_size.x, tex_size.y)
+	settler_sprite.scale = Vector2(scale_factor, scale_factor)
 	settler_sprite.z_index = 3
 	add_child(settler_sprite)
+
+# 根据性别和年龄随机选择一个合适的角色贴图
+func _pick_character_texture() -> Texture2D:
+	var base_path = "res://assets/art/characters/"
+	match gender:
+		Gender.MALE:
+			if age < 8.0:
+				return load(base_path + "player_little_boy.png")
+			elif age < 14.0:
+				return load(base_path + "player_boy.png")
+			elif age < 40.0:
+				var choices = ["player_young_man.png", "player_young_man2.png", "player_young_man3.png"]
+				return load(base_path + choices[randi() % choices.size()])
+			else:
+				return load(base_path + "player_man2.png")
+		Gender.FEMALE:
+			if age < 8.0:
+				return load(base_path + "player_little_girl.png")
+			elif age < 14.0:
+				var choices = ["player_girl.png", "player_girl2.png"]
+				return load(base_path + choices[randi() % choices.size()])
+			elif age < 40.0:
+				return load(base_path + "player_woman.png")
+			else:
+				return load(base_path + "player_woman.png")
+		_:
+			return load(base_path + "player_young_man.png")
 
 func _process(delta):
 	# 暂停时停止移动和工作
@@ -294,9 +334,19 @@ func _tick_craft():
 	complete_task()
 
 func _randomize_name():
-	var first_names = ["阿明", "小芳", "大壮", "阿珍", "铁柱", "翠花", "志强", "秀英", "建国", "丽华"]
+	var first_names_male = ["阿明", "大壮", "铁柱", "志强", "建国"]
+	var first_names_female = ["小芳", "阿珍", "翠花", "秀英", "丽华"]
 	var last_names = ["李", "王", "张", "刘", "陈", "杨", "赵", "黄", "周", "吴"]
-	settler_name = last_names[randi() % last_names.size()] + first_names[randi() % first_names.size()]
+	var is_male = randi() % 2 == 0
+	if is_male:
+		gender = Gender.MALE
+		settler_name = last_names[randi() % last_names.size()] + first_names_male[randi() % first_names_male.size()]
+	else:
+		gender = Gender.FEMALE
+		settler_name = last_names[randi() % last_names.size()] + first_names_female[randi() % first_names_female.size()]
+
+func _randomize_age():
+	age = 10.0 + randi() % 51  # 10~60 岁
 
 func _randomize_stats():
 	var rng = RandomNumberGenerator.new()
@@ -381,6 +431,7 @@ func to_dict() -> Dictionary:
 	return {
 		"id": settler_id,
 		"name": settler_name,
+		"gender": gender,
 		"stats": stats.duplicate(),
 		"skills": skills.duplicate(),
 		"needs": needs.duplicate(),
@@ -394,7 +445,7 @@ func to_dict() -> Dictionary:
 
 func from_dict(data: Dictionary):
 	settler_id = data.id
-	settler_name = data.name
+	gender = data.get("gender", Gender.MALE)
 	stats = data.stats
 	skills = data.skills
 	needs = data.needs
@@ -404,3 +455,9 @@ func from_dict(data: Dictionary):
 	position = Vector2(data.get("position", {}).get("x", 0.0), data.get("position", {}).get("y", 0.0))
 	state = data.get("state", SettlerState.IDLE)
 	inventory.from_dict(data.inventory)
+	# 反序列化后更新角色贴图和缩放
+	if settler_sprite:
+		settler_sprite.texture = _pick_character_texture()
+		var tex_size = settler_sprite.texture.get_size()
+		var scale_factor = TILE_SIZE / max(tex_size.x, tex_size.y)
+		settler_sprite.scale = Vector2(scale_factor, scale_factor)

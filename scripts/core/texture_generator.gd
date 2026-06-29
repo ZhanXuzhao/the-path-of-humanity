@@ -73,15 +73,25 @@ static func _load_buildings() -> Dictionary:
 	
 	return bld
 
-# -------- 角色 (从 SVG 加载) --------
+# -------- 角色 (从 PNG 加载) --------
 static func _load_character() -> Dictionary:
 	var chars = {}
-	chars["settler"] = _load_svg(CHARACTERS_PATH + "settler.svg")
+	chars["player_boy"]        = _load_svg(CHARACTERS_PATH + "player_boy.png")
+	chars["player_girl"]       = _load_svg(CHARACTERS_PATH + "player_girl.png")
+	chars["player_girl2"]      = _load_svg(CHARACTERS_PATH + "player_girl2.png")
+	chars["player_kid"]        = _load_svg(CHARACTERS_PATH + "player_kid.png")
+	chars["player_little_boy"] = _load_svg(CHARACTERS_PATH + "player_little_boy.png")
+	chars["player_little_girl"]= _load_svg(CHARACTERS_PATH + "player_little_girl.png")
+	chars["player_man2"]       = _load_svg(CHARACTERS_PATH + "player_man2.png")
+	chars["player_woman"]      = _load_svg(CHARACTERS_PATH + "player_woman.png")
+	chars["player_young_man"]  = _load_svg(CHARACTERS_PATH + "player_young_man.png")
+	chars["player_young_man2"] = _load_svg(CHARACTERS_PATH + "player_young_man2.png")
+	chars["player_young_man3"] = _load_svg(CHARACTERS_PATH + "player_young_man3.png")
 	return chars
 
 # ==================== SVG 加载工具 ====================
 
-# 加载 SVG 文件为 Texture2D
+# 加载图片文件（SVG/PNG等）为 Texture2D
 static func _load_svg(path: String) -> Texture2D:
 	var tex = ResourceLoader.load(path, "Texture2D")
 	if tex == null:

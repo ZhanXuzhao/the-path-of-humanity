@@ -32,7 +32,7 @@ func _ready():
 	tile_textures = all_textures["tiles"]
 	resource_textures = all_textures["resources"]
 	building_textures = all_textures["buildings"]
-	settler_texture = all_textures["character"]["settler"]
+	settler_texture = all_textures["character"]["player_young_man"]
 	
 	# 连接信号
 	world.tile_changed.connect(_on_tile_changed)
