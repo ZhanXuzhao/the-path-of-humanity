@@ -187,11 +187,8 @@ func _try_place_building():
 			1)
 
 # -------- 定居者选择 --------
-func _try_select_settler() -> bool:
-	"""尝试在鼠标位置选择定居者，返回是否选中"""
-	var global_pos = get_global_mouse_position()
-	
-	# 查找鼠标位置附近的定居者
+func _find_settler_at_pos(global_pos: Vector2):
+	"""查找指定位置附近的定居者，返回定居者或 null"""
 	var closest = null
 	var closest_dist = world.tile_size * 0.6  # 约19像素，匹配角色视觉大小
 	
@@ -203,8 +200,13 @@ func _try_select_settler() -> bool:
 			closest_dist = dist
 			closest = s
 	
-	if closest != null:
-		_select_settler(closest)
+	return closest
+
+func _try_select_settler() -> bool:
+	"""尝试在鼠标位置选择定居者，返回是否选中"""
+	var s = _find_settler_at_pos(get_global_mouse_position())
+	if s != null:
+		_select_settler(s)
 		return true
 	
 	_deselect_settler()
@@ -231,16 +233,19 @@ func _deselect_settler():
 
 # -------- 建筑点击选择 --------
 func _try_select_building():
-	"""尝试在鼠标位置选择建筑
-	- 已完成且有存储功能 → 存储面板
-	- 未完成（施工中）→ 建筑进度面板
-	"""
+	"""尝试在鼠标位置选择建筑"""
 	var global_pos = get_global_mouse_position()
 	var grid_pos = Vector2i(
 		floori(global_pos.x / world.tile_size),
 		floori(global_pos.y / world.tile_size)
 	)
-	
+	_try_select_building_at(grid_pos)
+
+func _try_select_building_at(grid_pos: Vector2i):
+	"""在指定网格位置选择建筑
+	- 已完成且有存储功能 → 存储面板
+	- 未完成（施工中）→ 建筑进度面板
+	"""
 	var bld = building_system.get_building_at(grid_pos) if building_system else null
 	if bld == null:
 		_deselect_construction()
@@ -383,19 +388,60 @@ func _input(event):
 			main_menu.visible = true
 			_gm.pause_game()
 	
+	# 右键退出建造模式
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and build_mode:
+		exit_build_mode()
+		return
+	
 	if event.is_action_pressed("left_click") and build_mode:
 		_try_place_building()
 		return
 	
 	# 定居者点击选择（非建造模式下的左键单击）
 	if event.is_action_pressed("left_click") and not build_mode:
-		# 先尝试选定居者，若没选到则尝试选中建筑
-		var had_settler = _try_select_settler()
-		if not had_settler:
-			_try_select_building()
-		else:
-			# 选中定居者时取消在建建筑选中
+		var global_pos = get_global_mouse_position()
+		var grid_pos = Vector2i(
+			floori(global_pos.x / world.tile_size),
+			floori(global_pos.y / world.tile_size)
+		)
+		
+		# 查找当前位置的所有可选目标
+		var clicked_settler = _find_settler_at_pos(global_pos)
+		var clicked_bld = building_system.get_building_at(grid_pos) if building_system else null
+		
+		# 判断建筑是否可选择（存储建筑或施工中建筑）
+		var bld_selectable = false
+		if clicked_bld != null:
+			if clicked_bld.is_completed:
+				var data = clicked_bld.get_data()
+				if data != null and data.storage_capacity > 0 and clicked_bld.inventory != null:
+					bld_selectable = true
+			else:
+				bld_selectable = true
+		
+		if clicked_settler != null and bld_selectable:
+			# 同时有定居者和建筑 → 轮流选择
+			if selected_settler != null and is_instance_valid(selected_settler):
+				# 当前选中定居者 → 切到建筑
+				_deselect_settler()
+				_try_select_building_at(grid_pos)
+			else:
+				# 当前选中建筑或未选中 → 切到定居者
+				_deselect_construction()
+				_deselect_building()
+				_select_settler(clicked_settler)
+		elif clicked_settler != null:
+			# 只有定居者
+			_select_settler(clicked_settler)
 			_deselect_construction()
+		elif clicked_bld != null:
+			# 只有建筑
+			_try_select_building_at(grid_pos)
+		else:
+			# 什么都没选中
+			_deselect_construction()
+			_deselect_building()
+			_deselect_settler()
 	
 	# 快捷键 B：打开/关闭建造菜单
 	if event is InputEventKey and event.pressed and not event.echo:
