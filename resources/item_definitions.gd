@@ -145,7 +145,7 @@ static func _register_buildings():
 	_add_building("kiln", "窑炉", "烧制砖块", BuildingCategory.PRODUCTION, Vector2i(2, 1), 130, 30.0, {"stone": 30, "wood": 10}, {}, {}, 0.0, 0, 7)
 
 	# 存储类
-	_add_building("storage_rack", "储物架", "存储物品", BuildingCategory.STORAGE, Vector2i(1, 1), 50, 10.0, {"wood": 10}, {}, {}, 0.0, 100, 8)
+	_add_building("storage_rack", "储物架", "存储物品", BuildingCategory.STORAGE, Vector2i(1, 1), 50, 10.0, {"wood": 10}, {}, {}, 0.0, 1000, 8)
 	_add_building("warehouse", "仓库", "大型存储设施", BuildingCategory.STORAGE, Vector2i(3, 3), 300, 60.0, {"wood": 50, "stone": 30}, {}, {}, 0.0, 500, 9)
 
 	# 居住类

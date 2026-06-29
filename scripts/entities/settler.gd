@@ -429,7 +429,7 @@ func _tick_construct():
 	
 	# 检查是否刚完成
 	if game.building_system.get_building_at(grid_pos) and game.building_system.get_building_at(grid_pos).is_completed:
-		var name_str = data.name if data else "建筑"
+		var name_str = bld.display_name if bld.display_name != "" else (data.name if data else "建筑")
 		if gm:
 			gm.show_notification("%s 建造完成！" % name_str, gm.NotificationType.SUCCESS)
 		complete_task()

@@ -24,6 +24,7 @@ class BuildingInstance:
 	var inventory = null
 	var assigned_settlers: Array[String] = []  # settler IDs
 	var deposited_materials: Dictionary = {}  # 已搬运到工地的建筑材料 {item_id: amount}
+	var display_name: String = ""  # 显示名称（带编号，如"储物架 1"）
 	
 	func get_data():
 		return ItemDefinitions.get_building(building_id)
@@ -83,6 +84,9 @@ class BuildingInstance:
 var buildings: Dictionary = {}  # Vector2i -> BuildingInstance
 var world = null
 
+# 存储建筑编号计数器
+var _storage_rack_counter: int = 0
+
 func _ready():
 	# 尝试获取世界引用
 	world = get_node_or_null("/root/Game/World")
@@ -128,6 +132,12 @@ func place_building(building_id: String, pos: Vector2i) -> bool:
 		return false
 	
 	var instance := BuildingInstance.new(building_id, pos)
+	
+	# 存储建筑自动编号
+	if building_id == "storage_rack":
+		_storage_rack_counter += 1
+		instance.display_name = "%s %d" % [data.name, _storage_rack_counter]
+	
 	var size = data.size
 	
 	# 注册所有占用格子

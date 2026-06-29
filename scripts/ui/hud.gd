@@ -174,7 +174,8 @@ func _update_storage_panel(bld):
 		return
 	
 	var data = bld.get_data()
-	storage_name_label.text = data.name if data else "存储"
+	var display_name = bld.display_name if bld.display_name != "" else (data.name if data else "存储")
+	storage_name_label.text = display_name
 	
 	# 容量信息
 	var used = bld.inventory.get_total_items() if bld.inventory else 0
