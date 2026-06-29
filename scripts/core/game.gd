@@ -516,7 +516,6 @@ func _input(event):
 					build_menu._populate_buildings()
 					build_menu.info_panel.visible = false
 					build_menu.selected_building = ""
-					build_menu.build_btn.disabled = true
 					# 取消所有分类按钮的选中状态
 					for i in build_menu.category_tabs.get_child_count():
 						build_menu.category_tabs.get_child(i).button_pressed = false
