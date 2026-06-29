@@ -11,6 +11,7 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var tech_system = $Systems/TechSystem
 @onready var camera: Camera2D = $Camera
 @onready var ui: CanvasLayer = $UI
+@onready var world_renderer = $World/WorldRenderer
 @onready var _gm = get_node("/root/GameManager")
 
 # 建造模式
@@ -66,11 +67,24 @@ func enter_build_mode(building_id: String):
 	# 创建预览精灵
 	if build_preview == null:
 		build_preview = Sprite2D.new()
+		build_preview.z_index = 100  # 确保预览始终在最上层
 		add_child(build_preview)
 	
+	# 设置建筑预览纹理
+	if world_renderer and world_renderer.building_textures.has(building_id):
+		build_preview.texture = world_renderer.building_textures[building_id]
+	else:
+		build_preview.texture = null
+	
 	build_preview.visible = true
-	build_preview.modulate = Color(1, 1, 1, 0.5)
-	# TODO: 设置预览纹理
+	
+	# 根据建筑大小设置缩放
+	var data = ItemDefinitions.get_building(building_id)
+	if data:
+		build_preview.scale = Vector2(world.tile_size / 32.0, world.tile_size / 32.0)
+	
+	# 默认绿色（可建造）
+	build_preview.modulate = Color(0, 1, 0, 0.5)
 
 func exit_build_mode():
 	build_mode = false
@@ -79,15 +93,29 @@ func exit_build_mode():
 		build_preview.visible = false
 
 func _update_build_preview():
-	# 更新预览位置
 	var mouse_pos = get_global_mouse_position()
 	mouse_grid_pos = Vector2i(
 		floori(mouse_pos.x / world.tile_size),
 		floori(mouse_pos.y / world.tile_size)
 	)
 	
-	if build_preview:
-		build_preview.position = mouse_grid_pos * world.tile_size
+	if build_preview and build_mode:
+		var data = ItemDefinitions.get_building(selected_building)
+		if data:
+			var size = data.size
+			# 将预览精灵居中于建筑占用的区域
+			var center = Vector2(
+				mouse_grid_pos.x * world.tile_size + size.x * world.tile_size / 2.0,
+				mouse_grid_pos.y * world.tile_size + size.y * world.tile_size / 2.0
+			)
+			build_preview.position = center
+		
+		# 检查建造合法性并设置颜色
+		var check = building_system.can_place_building(selected_building, mouse_grid_pos)
+		if check.can_place:
+			build_preview.modulate = Color(0, 1, 0, 0.5)  # 绿色-可建造
+		else:
+			build_preview.modulate = Color(1, 0, 0, 0.5)  # 红色-不可建造
 
 func _try_place_building():
 	if not build_mode or selected_building == "":
