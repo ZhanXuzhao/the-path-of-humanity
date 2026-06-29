@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- Ground item indicator: a small bundle/sack on the ground -->
+  <!-- Shadow -->
+  <ellipse cx="16" cy="28" rx="12" ry="3" fill="#00000020"/>
+  
+  <!-- Sack body -->
+  <path d="M6 20 Q6 10 10 8 L12 6 L20 6 L22 8 Q26 10 26 20 L24 26 Q22 28 16 28 Q10 28 8 26 Z" fill="#b09060"/>
+  <path d="M6 20 Q6 10 10 8 L12 6 L20 6 L22 8 Q26 10 26 20" fill="#c0a070"/>
+  
+  <!-- Sack fold/tie at top -->
+  <rect x="12" y="5" width="8" height="4" rx="1" fill="#d0b080"/>
+  <rect x="14" y="4" width="4" height="2" rx="1" fill="#8a6a3a"/>
+  
+  <!-- Item: wood stick poking out left -->
+  <rect x="3" y="12" width="3" height="10" rx="0.5" fill="#8a6a3a" transform="rotate(-20, 5, 17)"/>
+  <rect x="3" y="12" width="3" height="10" rx="0.5" fill="#9a7a4a" transform="rotate(-20, 5, 17)"/>
+  
+  <!-- Item: stone peeking out right -->
+  <ellipse cx="25" cy="18" rx="4" ry="3" fill="#8a8a8a"/>
+  <ellipse cx="25" cy="17" rx="3" ry="2" fill="#9a9a9a"/>
+  
+  <!-- Highlight on sack -->
+  <path d="M10 12 Q12 10 14 12" stroke="#d0b880" stroke-width="0.8" fill="none"/>
+  <ellipse cx="14" cy="16" rx="3" ry="5" fill="#c8a870" opacity="0.3"/>
+  
+  <!-- Small dots for texture -->
+  <circle cx="12" cy="18" r="0.8" fill="#a08050"/>
+  <circle cx="18" cy="20" r="0.6" fill="#a08050"/>
+  <circle cx="15" cy="22" r="0.7" fill="#a08050"/>
+</svg>

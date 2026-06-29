@@ -8,6 +8,7 @@ const TILES_PATH := "res://assets/art/tiles/"
 const BUILDINGS_PATH := "res://assets/art/buildings/"
 const RESOURCES_PATH := "res://assets/art/resources/"
 const CHARACTERS_PATH := "res://assets/art/characters/"
+const ICONS_PATH := "res://assets/art/icons/"
 
 # 生成所有纹理并返回字典
 static func generate_all() -> Dictionary:
@@ -16,6 +17,7 @@ static func generate_all() -> Dictionary:
 	textures["resources"] = _load_resources()
 	textures["buildings"] = _load_buildings()
 	textures["character"] = _load_character()
+	textures["ground_item"] = _load_ground_item()
 	return textures
 
 # -------- 地形瓦片 (从 SVG 加载) --------
@@ -72,6 +74,10 @@ static func _load_buildings() -> Dictionary:
 	bld["road"]             = _load_svg(BUILDINGS_PATH + "road.svg")
 	
 	return bld
+
+# -------- 地面物品图标 --------
+static func _load_ground_item() -> Texture2D:
+	return _load_svg(ICONS_PATH + "ground_item.svg")
 
 # -------- 角色 (从 PNG 加载) --------
 static func _load_character() -> Dictionary:

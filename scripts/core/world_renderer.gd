@@ -21,10 +21,14 @@ var building_textures: Dictionary = {}
 # 角色纹理
 var settler_texture: Texture2D
 
+# 地面物品纹理
+var ground_item_texture: Texture2D
+
 # 当前可见的精灵节点
 var tile_sprites: Dictionary = {}  # Vector2i -> Sprite2D
 var resource_sprites: Dictionary = {}  # Vector2i -> Sprite2D
 var building_sprites: Dictionary = {}  # Vector2i -> Sprite2D
+var ground_item_sprites: Dictionary = {}  # Vector2i -> Sprite2D
 
 # 建造进度条
 var construction_overlays: Dictionary = {}  # Vector2i(建筑主格) -> Node2D(进度条容器)
@@ -48,9 +52,11 @@ func _ready():
 	resource_textures = all_textures["resources"]
 	building_textures = all_textures["buildings"]
 	settler_texture = all_textures["character"]["player_young_man"]
+	ground_item_texture = all_textures.get("ground_item", null)
 	
 	# 连接信号
 	world.tile_changed.connect(_on_tile_changed)
+	world.ground_items_changed.connect(_on_ground_items_changed)
 	world.resource_depleted.connect(_on_resource_depleted)
 	
 	# 连接建筑系统信号
@@ -84,6 +90,9 @@ func _ready():
 	_resource_selection_overlay.z_index = 50
 	_resource_selection_overlay.name = "ResourceSelectionOverlay"
 	add_child(_resource_selection_overlay)
+	
+	# 渲染已有的地面物品（加载存档时可能已有数据）
+	call_deferred("_render_existing_ground_items")
 	
 	# 强制触发 _draw()
 	queue_redraw()
@@ -496,6 +505,56 @@ func _update_resource_label_text(deposit):
 	
 	var res_name = res_names.get(deposit.type, "资源")
 	_resource_info_label.text = "%s: %.0f" % [res_name, deposit.amount]
+
+# ==================== 地面物品渲染 ====================
+
+func _render_existing_ground_items():
+	"""渲染所有已有的地面物品（加载存档时使用）"""
+	if ground_item_texture == null:
+		return
+	for pos in world.ground_items:
+		var stacks = world.ground_items[pos]
+		if stacks.is_empty():
+			continue
+		_render_ground_item(pos)
+
+func _render_ground_item(pos: Vector2i):
+	"""在指定网格位置创建地面物品精灵"""
+	var key = pos
+	if ground_item_sprites.has(key):
+		return
+	if ground_item_texture == null:
+		return
+	
+	var sprite = Sprite2D.new()
+	sprite.texture = ground_item_texture
+	var pixel_pos = Vector2(pos.x * world.tile_size, pos.y * world.tile_size) + Vector2(world.tile_size / 2.0, world.tile_size / 2.0 + 2.0)
+	sprite.position = pixel_pos
+	sprite.scale = Vector2(0.6, 0.6)
+	sprite.z_index = 1.5  # 在资源(1)和建筑(2)之间，高于地形(0)
+	add_child(sprite)
+	ground_item_sprites[key] = sprite
+
+func _remove_ground_item(pos: Vector2i):
+	"""移除指定位置的地面物品精灵"""
+	var key = pos
+	if ground_item_sprites.has(key):
+		ground_item_sprites[key].queue_free()
+		ground_item_sprites.erase(key)
+
+func _clear_all_ground_items():
+	"""清除所有地面物品精灵"""
+	for key in ground_item_sprites.keys():
+		ground_item_sprites[key].queue_free()
+	ground_item_sprites.clear()
+
+func _on_ground_items_changed(grid_pos: Vector2i):
+	"""地面物品变化时更新精灵"""
+	var stacks = world.get_ground_items_at(grid_pos)
+	if stacks.is_empty():
+		_remove_ground_item(grid_pos)
+	else:
+		_render_ground_item(grid_pos)
 
 # -------- 信号处理 --------
 func _on_building_completed(pos: Vector2i):
