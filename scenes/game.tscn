@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://scripts/ui/build_menu.gd" id="8_17ot"]
 [ext_resource type="Script" path="res://scripts/ui/tech_panel.gd" id="9_3h2wo"]
 [ext_resource type="PackedScene" path="res://scenes/main_menu.tscn" id="10_kae2"]
+[ext_resource type="Script" path="res://scripts/ui/minimap.gd" id="11_x8m9"]
 
 [sub_resource type="StyleBoxFlat" id="1"]
 content_margin_left = 8.0
@@ -352,6 +353,10 @@ offset_right = 432.0
 offset_bottom = 530.0
 
 [node name="TechList" type="VBoxContainer" parent="UI/TechPanel/ScrollContainer"]
+
+[node name="Minimap" type="Control" parent="UI"]
+mouse_filter = 0
+script = ExtResource("11_x8m9")
 
 [node name="MainMenu" parent="UI" instance=ExtResource("10_kae2")]
 visible = false
