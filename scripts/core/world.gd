@@ -96,21 +96,12 @@ class GroundItemStack:
 		item_id = id
 		amount = amt
 	
-	func get_data():
-		return ItemDefinitions.get_item(item_id)
-	
 	func can_merge(other_id: String) -> bool:
 		return item_id == other_id
 	
 	func add(amt: int) -> int:
-		var data = get_data()
-		if data == null:
-			return amt
-		var max_stack = data.max_stack
-		var can_add = max_stack - amount
-		var to_add = mini(can_add, amt)
-		amount += to_add
-		return amt - to_add  # 剩余未添加
+		amount += amt
+		return 0
 
 # 地面物品：Vector2i(网格坐标) -> Array[GroundItemStack]
 var ground_items: Dictionary = {}
@@ -480,7 +471,7 @@ func _reconstruct_path(came_from: Dictionary, current: Vector2i) -> Array[Vector
 # ==================== 地面物品管理 ====================
 
 func drop_item_on_ground(grid_pos: Vector2i, item_id: String, amount: int) -> int:
-	"""在地面指定格子掉落物品，返回未掉落的剩余数量（超出堆叠上限的部分）"""
+	"""在地面指定格子掉落物品"""
 	if amount <= 0 or item_id == "":
 		return amount
 	
@@ -488,24 +479,18 @@ func drop_item_on_ground(grid_pos: Vector2i, item_id: String, amount: int) -> in
 		ground_items[grid_pos] = []
 	
 	var stacks = ground_items[grid_pos]
-	var remaining = amount
 	
-	# 先尝试合并到现有堆叠
+	# 合并到现有堆叠
 	for stack in stacks:
 		if stack.can_merge(item_id):
-			remaining = stack.add(remaining)
-			if remaining <= 0:
-				ground_items_changed.emit(grid_pos)
-				return 0
+			stack.add(amount)
+			ground_items_changed.emit(grid_pos)
+			return 0
 	
-	# 还有剩余则创建新堆叠
-	while remaining > 0:
-		var new_stack := GroundItemStack.new(item_id)
-		remaining = new_stack.add(remaining)
-		stacks.append(new_stack)
-	
+	# 没有现有堆叠则创建新堆叠
+	stacks.append(GroundItemStack.new(item_id, amount))
 	ground_items_changed.emit(grid_pos)
-	return remaining
+	return 0
 
 func pickup_from_ground(grid_pos: Vector2i, item_id: String, amount: int) -> int:
 	"""从地面拾取物品，返回实际拾取数量"""
