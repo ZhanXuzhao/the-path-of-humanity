@@ -33,6 +33,7 @@ var PROGRESS_BAR_HEIGHT: float = 6.0
 # 选中框
 var _selected_building_pos: Vector2i = Vector2i(-1, -1)
 var _selected_building_size: Vector2i = Vector2i.ONE
+var _selection_overlay: Node2D  # 单独的高层级选中框叠加层
 
 func _ready():
 	# 使用 TextureGenerator 生成所有纹理
@@ -63,6 +64,12 @@ func _ready():
 	
 	# 延迟一帧渲染，确保 Game._ready() 已完成区块生成
 	call_deferred("_render_existing_chunks")
+	
+	# 创建选中框叠加层（在建筑之上显示）
+	_selection_overlay = Node2D.new()
+	_selection_overlay.z_index = 100
+	_selection_overlay.name = "SelectionOverlay"
+	add_child(_selection_overlay)
 	
 	# 强制触发 _draw()
 	queue_redraw()
@@ -276,29 +283,36 @@ func _get_progress_color(ratio: float) -> Color:
 
 # -------- 选中框 --------
 func _on_building_selected(bld):
-	"""建筑被选中时记录位置"""
+	"""建筑被选中时记录位置并绘制选中框"""
 	_selected_building_pos = bld.grid_pos
 	_selected_building_size = bld.get_size()
-	queue_redraw()
+	_update_selection_overlay()
 
 func _on_building_deselected():
 	"""建筑取消选中时清除"""
 	_selected_building_pos = Vector2i(-1, -1)
-	queue_redraw()
+	_clear_selection_overlay()
 
 func _on_construction_selected(bld):
-	"""在建建筑被选中时记录位置"""
+	"""在建建筑被选中时记录位置并绘制选中框"""
 	_selected_building_pos = bld.grid_pos
 	_selected_building_size = bld.get_size()
-	queue_redraw()
+	_update_selection_overlay()
 
 func _on_construction_deselected():
 	"""在建建筑取消选中时清除"""
 	_selected_building_pos = Vector2i(-1, -1)
-	queue_redraw()
+	_clear_selection_overlay()
 
-func _draw():
-	"""绘制选中框"""
+func _clear_selection_overlay():
+	"""清除选中框叠加层"""
+	for child in _selection_overlay.get_children():
+		child.queue_free()
+
+func _update_selection_overlay():
+	"""在叠加层上绘制选中框（确保显示在建筑之上）"""
+	_clear_selection_overlay()
+	
 	if _selected_building_pos.x < 0:
 		return
 	
@@ -310,11 +324,45 @@ func _draw():
 		_selected_building_size.x * world.tile_size,
 		_selected_building_size.y * world.tile_size
 	)
-	var rect = Rect2(pixel_pos, pixel_size)
+	
 	# 淡蓝色半透明填充
-	draw_rect(rect, Color(0.3, 0.8, 1.0, 0.12), true)
-	# 蓝色边框
-	draw_rect(rect, Color(0.3, 0.8, 1.0, 0.9), false, 2.0)
+	var fill = ColorRect.new()
+	fill.color = Color(0.3, 0.8, 1.0, 0.12)
+	fill.position = pixel_pos
+	fill.size = pixel_size
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_overlay.add_child(fill)
+	
+	# 蓝色边框（使用4条边）
+	var bw = 2.0  # 边框宽度
+	# 上边框
+	var top = ColorRect.new()
+	top.color = Color(0.3, 0.8, 1.0, 0.9)
+	top.position = pixel_pos
+	top.size = Vector2(pixel_size.x, bw)
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_overlay.add_child(top)
+	# 下边框
+	var bottom = ColorRect.new()
+	bottom.color = Color(0.3, 0.8, 1.0, 0.9)
+	bottom.position = pixel_pos + Vector2(0, pixel_size.y - bw)
+	bottom.size = Vector2(pixel_size.x, bw)
+	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_overlay.add_child(bottom)
+	# 左边框
+	var left = ColorRect.new()
+	left.color = Color(0.3, 0.8, 1.0, 0.9)
+	left.position = pixel_pos
+	left.size = Vector2(bw, pixel_size.y)
+	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_overlay.add_child(left)
+	# 右边框
+	var right = ColorRect.new()
+	right.color = Color(0.3, 0.8, 1.0, 0.9)
+	right.position = pixel_pos + Vector2(pixel_size.x - bw, 0)
+	right.size = Vector2(bw, pixel_size.y)
+	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_overlay.add_child(right)
 
 # -------- 信号处理 --------
 func _on_building_completed(pos: Vector2i):
@@ -355,4 +403,4 @@ func clear_all():
 	
 	# 清除选中框
 	_selected_building_pos = Vector2i(-1, -1)
-	queue_redraw()
+	_clear_selection_overlay()
