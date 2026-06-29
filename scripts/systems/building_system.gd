@@ -78,7 +78,7 @@ class BuildingInstance:
 			hp = data.hp
 			max_hp = data.hp
 			if data.storage_capacity > 0:
-				inventory = Inventory.new(20, data.storage_capacity)
+				inventory = Inventory.new()
 
 # 所有建筑实例
 var buildings: Dictionary = {}  # Vector2i -> BuildingInstance

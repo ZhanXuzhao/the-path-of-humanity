@@ -98,7 +98,7 @@ var target_world_pos: Vector2 = Vector2.ZERO   # 移动目标（像素坐标）
 var _path: Array[Vector2i] = []                # A*寻路路径（网格坐标，不含起点）
 var _path_target_grid: Vector2i = Vector2i(-1, -1)  # 上次计算路径的目标网格
 var work_accumulator: float = 0.0               # 工作累积计时器
-var work_tick_interval: float = 0.5             # 每次工作刻的间隔（秒）
+var work_tick_interval: float = 3.0             # 每次工作刻的间隔（秒）
 var is_working_on_construction: bool = false    # 是否正在建造建筑
 
 # 状态切换冷却（至少间隔1秒）
@@ -118,7 +118,7 @@ var lifespan: float = 80.0
 
 func _init():
 	settler_id = str(Time.get_ticks_usec())
-	inventory = Inventory.new(10, 30)
+	inventory = Inventory.new()
 	_randomize_name()
 	_randomize_stats()
 	_randomize_age()
@@ -383,6 +383,12 @@ func _move_towards(delta):
 		
 		if current_task != null:
 			var task_type = current_task.get("type", "")
+			if task_type == "HARVEST":
+				print("[伐木] %s 🚶 到达目标位置，进入WORKING状态 | 位置=(%d,%d) | work_accumulator=%.2f" % [
+					settler_name,
+					current_task.get("target_pos", Vector2i.ZERO).x,
+					current_task.get("target_pos", Vector2i.ZERO).y,
+					work_accumulator])
 			match task_type:
 				"SLEEP":
 					_tick_go_sleep()
@@ -423,9 +429,18 @@ func _execute_work(delta):
 	var speed_mult = gm.time_speed if gm else 1.0
 	work_accumulator += delta * work_speed * speed_mult
 	
+	var ticked = false
 	if work_accumulator >= work_tick_interval:
 		work_accumulator -= work_tick_interval
+		ticked = true
+		if task_type == "HARVEST":
+			print("[伐木] %s 🔨 工作刻触发 | 累积=%.3f | skill=%s lv=%.1f | speed_mult=%.1f" % [
+				settler_name, work_accumulator + work_tick_interval, skill_id, skill_level, speed_mult])
 		_do_work_tick(task_type)
+	elif task_type == "HARVEST" and Engine.get_physics_frames() % 60 == 0:
+		# 每秒打印一次累积进度，方便观察是否在正常累积
+		print("[伐木] %s ⏳ 累积中 work_accumulator=%.3f / %.3f | delta=%.4f | speed=%.2f | mult=%.1f" % [
+			settler_name, work_accumulator, work_tick_interval, delta, work_speed, speed_mult])
 
 func _do_work_tick(task_type: String):
 	match task_type:
@@ -448,10 +463,19 @@ func _tick_harvest():
 	"""执行一次采集工作"""
 	var game = get_node_or_null("/root/Game")
 	if game == null or game.world == null:
+		print("[伐木] %s ❌ game/world 为空，结束任务" % settler_name)
 		complete_task()
 		return
 	
 	var grid_pos: Vector2i = current_task.get("target_pos", Vector2i.ZERO)
+	
+	# 查看采集前资源状态
+	var before_deposit = game.world.get_resource_at(grid_pos)
+	var before_amt = before_deposit.amount if before_deposit else 0.0
+	print("[伐木] %s 开始采集 tick | 位置=(%d,%d) | 资源剩余=%.1f | 背包木材=%d | 负重=%.1f/%.1f" % [
+		settler_name, grid_pos.x, grid_pos.y, before_amt,
+		inventory.get_item_count("wood"),
+		get_inventory_weight(), carry_capacity])
 	
 	# 释放该资源的占用标记（无论是否采完都先释放，确保资源耗尽时标记被清理）
 	if game.has_method("release_harvest_resource"):
@@ -459,7 +483,7 @@ func _tick_harvest():
 	
 	var result = game.world.harvest_resource(grid_pos)
 	if result.is_empty() or result.amount <= 0:
-		# 资源已耗尽
+		print("[伐木] %s ❌ 资源已耗尽 (result空或amount<=0)，结束任务" % settler_name)
 		complete_task()
 		return
 	
@@ -467,17 +491,31 @@ func _tick_harvest():
 	var amount = result.amount
 	var _gm = get_node("/root/GameManager")
 	
+	print("[伐木] %s harvest_resource 返回: item_id=%s amount=%s (类型=%s)" % [
+		settler_name, item_id, amount, typeof(amount)])
+	
 	# 采集到背包（优先放入个人背包）
-	inventory.add_item(item_id, amount)
+	var remaining = inventory.add_item(item_id, amount)
+	print("[伐木] %s inventory.add_item(%s, %s) → 剩余(未加入)=%d | 加入后背包木材=%d" % [
+		settler_name, item_id, amount, remaining, inventory.get_item_count("wood")])
 	
 	# 检查是否超重——超重时去存放，但每次存放更多物品以减少往返次数
 	if is_overweight():
+		print("[伐木] %s ⚠️ 超重! 负重=%.1f/%.1f，结束任务去存放" % [settler_name, get_inventory_weight(), carry_capacity])
 		complete_task()
 		return
 	
 	# 资源还在，重新占用标记（防止其他定居者中途抢走该资源）
 	if game.has_method("claim_harvest_resource"):
 		game.claim_harvest_resource(grid_pos, settler_id)
+	
+	# 查看采集后资源状态
+	var after_deposit = game.world.get_resource_at(grid_pos)
+	var after_amt = after_deposit.amount if after_deposit else 0.0
+	print("[伐木] %s ✅ 采集成功 | 采集量=%s | 资源剩余=%.1f | 背包木材=%d | 负重=%.1f/%.1f" % [
+		settler_name, amount, after_amt,
+		inventory.get_item_count("wood"),
+		get_inventory_weight(), carry_capacity])
 	
 	# 增加经验
 	add_skill_experience(current_task.get("skill", ""), 1.0)
@@ -1512,6 +1550,15 @@ func add_skill_experience(skill_id: String, amount: float):
 # -------- 任务系统 --------
 func assign_task(task_data: Dictionary) -> bool:
 	"""分配任务，返回是否可以接受"""
+	var task_type = task_data.get("type", "")
+	if task_type == "HARVEST":
+		print("[伐木] %s 📋 收到采集任务 | 位置=(%d,%d) | 资源类型=%s | skill=%s" % [
+			settler_name,
+			task_data.get("target_pos", Vector2i.ZERO).x,
+			task_data.get("target_pos", Vector2i.ZERO).y,
+			task_data.get("resource_type", "?"),
+			task_data.get("skill", "?")])
+	
 	# 检查目标位置是否可通行（防止将任务分配到水面上）
 	var target_pixel = task_data.get("target_world_pos", Vector2.ZERO)
 	if target_pixel != Vector2.ZERO:
@@ -1522,6 +1569,8 @@ func assign_task(task_data: Dictionary) -> bool:
 				int(target_pixel.y / game.world.tile_size)
 			)
 			if not game.world.is_walkable(target_grid):
+				if task_type == "HARVEST":
+					print("[伐木] %s ❌ 目标位置不可行走，拒绝任务" % settler_name)
 				return false  # 目标不可达，拒绝接受任务
 	
 	current_task = task_data
@@ -1542,7 +1591,15 @@ func assign_task(task_data: Dictionary) -> bool:
 
 func complete_task(skip_auto_store: bool = false):
 	if current_task:
-		task_completed.emit(current_task.get("id", ""))
+		var task_type = current_task.get("type", "")
+		var task_id = current_task.get("id", "")
+		if task_type == "HARVEST":
+			var gpos = current_task.get("target_pos", Vector2i.ZERO)
+			print("[伐木] %s 🏁 complete_task | id=%s | 位置=(%d,%d) | 背包木材=%d | 负重=%.1f/%.1f | skip_auto_store=%s" % [
+				settler_name, task_id, gpos.x, gpos.y,
+				inventory.get_item_count("wood") if inventory else 0,
+				get_inventory_weight(), carry_capacity, skip_auto_store])
+		task_completed.emit(task_id)
 		# 成功完成任务，减少重试计数
 		_construction_retry_count = max(0, _construction_retry_count - 1)
 	current_task = null
@@ -1556,6 +1613,7 @@ func complete_task(skip_auto_store: bool = false):
 	# 如果超重，自动寻找置物架去存放物品
 	# 但跳过紧急需求打断时的自动搬运，让角色先满足基本需求
 	if not skip_auto_store and is_overweight():
+		print("[伐木] %s 📦 超重，自动寻找置物架存放" % settler_name)
 		_auto_store_overweight()
 
 # -------- 伤害系统 --------

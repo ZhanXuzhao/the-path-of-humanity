@@ -8,12 +8,9 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 signal items_changed
 
 var items: Dictionary = {}  # item_id -> total_amount，每种物品只占一条
-var max_slots: int = 30     # 最大物品种类数
-var capacity: int = 0       # 最大总物品数 (0=不限)
 
-func _init(slots: int = 30, cap: int = 0):
-	max_slots = slots
-	capacity = cap
+func _init():
+	pass
 
 # -------- 添加物品 --------
 func add_item(item_id: String, amount: int = 1) -> int:
@@ -25,17 +22,7 @@ func add_item(item_id: String, amount: int = 1) -> int:
 	if item_def == null or item_def.id == "":
 		return amount
 	
-	# 容量上限检查
-	if capacity > 0:
-		var current_total = get_total_items()
-		var can_add = capacity - current_total
-		if can_add <= 0:
-			return amount
-		amount = mini(amount, can_add)
-	
-	# 种类上限检查（仅新增物品种类时）
-	if not items.has(item_id) and items.size() >= max_slots:
-		return amount
+	# 无容量和种类上限限制
 	
 	items[item_id] = items.get(item_id, 0) + amount
 	emit_signal("items_changed")
@@ -72,9 +59,7 @@ func is_empty() -> bool:
 	return items.is_empty()
 
 func is_full() -> bool:
-	if capacity > 0 and get_total_items() >= capacity:
-		return true
-	return items.size() >= max_slots
+	return false
 
 func clear():
 	items.clear()
@@ -83,14 +68,10 @@ func clear():
 # -------- 序列化 --------
 func to_dict() -> Dictionary:
 	return {
-		"max_slots": max_slots,
-		"capacity": capacity,
 		"items": items.duplicate(),
 	}
 
 func from_dict(data: Dictionary):
-	max_slots = data.get("max_slots", 30)
-	capacity = data.get("capacity", 0)
 	items.clear()
 	var raw_items = data.get("items", {})
 	if raw_items is Array:
