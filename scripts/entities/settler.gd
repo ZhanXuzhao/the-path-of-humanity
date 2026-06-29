@@ -191,7 +191,7 @@ func _tick_harvest():
 	var amount = result.amount
 	var gm = get_node("/root/GameManager")
 	if gm:
-		gm.resources[item_id] = gm.resources.get(item_id, 0) + amount
+		gm.add_resource(item_id, amount)
 	
 	# 增加经验
 	add_skill_experience(current_task.get("skill", ""), 1.0)
@@ -221,13 +221,13 @@ func _tick_construct():
 		var can_afford = true
 		for mat_id in data.materials:
 			var needed = data.materials[mat_id]
-			if gm.resources.get(mat_id, 0) < needed:
+			if not gm.has_resource(mat_id, needed):
 				can_afford = false
 				break
 		if can_afford:
 			for mat_id in data.materials:
 				var needed = data.materials[mat_id]
-				gm.resources[mat_id] = gm.resources.get(mat_id, 0) - needed
+				gm.remove_resource(mat_id, needed)
 			current_task["materials_consumed"] = true
 		else:
 			# 材料不足，稍后再试

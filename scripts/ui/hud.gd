@@ -22,6 +22,16 @@ var notification_scene = load("res://scenes/ui/notification.tscn")
 # 要显示的资源列表
 var tracked_resources = ["wood", "stone", "food", "iron_ore", "copper_ore", "coal"]
 
+# 资源对应的 Emoji 图标
+const RESOURCE_EMOJI = {
+	"wood": "🪵",
+	"stone": "🪨",
+	"food": "🍖",
+	"iron_ore": "⛏️",
+	"copper_ore": "🪙",
+	"coal": "⬛",
+}
+
 func _ready():
 	game_manager = get_node("/root/GameManager")
 	
@@ -29,6 +39,7 @@ func _ready():
 	game_manager.time_changed.connect(_on_time_changed)
 	game_manager.day_changed.connect(_on_day_changed)
 	game_manager.notification.connect(_on_notification)
+	game_manager.resources_changed.connect(_on_resources_changed)
 	
 	# 按钮连接
 	if pause_btn:
@@ -40,7 +51,8 @@ func _ready():
 	if tech_btn:
 		tech_btn.pressed.connect(_on_tech_pressed)
 	
-	_update_resource_display()
+	# 延迟一帧初始化资源显示（等待 GameManager 完全就绪）
+	call_deferred("_update_resource_display")
 
 func _on_time_changed(_hour: float):
 	if time_label:
@@ -84,20 +96,46 @@ func _on_notification(msg: String, type: int):
 	if is_instance_valid(notif):
 		notif.queue_free()
 
-func _update_resource_display():
-	# 这个方法会被外部调用来更新资源显示
-	pass
-
-func update_resource(resource_id: String, amount: int):
-	"""更新单个资源显示"""
+func _on_resources_changed(resource_id: String, _old_amount: int, new_amount: int):
+	"""单个资源变化时更新对应标签"""
+	var emoji = RESOURCE_EMOJI.get(resource_id, "")
 	for child in resource_container.get_children():
 		if child.name == resource_id:
-			child.text = "%s: %d" % [ItemDefinitions.get_item(resource_id).name, amount]
+			var item_def = ItemDefinitions.get_item(resource_id)
+			var name_str = item_def.name if item_def else resource_id
+			child.text = "%s %s: %d" % [emoji, name_str, new_amount]
 			return
+
+func _update_resource_display():
+	"""初始化或刷新所有资源标签"""
+	if not game_manager or resource_container == null:
+		return
 	
-	# 如果没有找到，创建一个
-	var label = Label.new()
-	label.name = resource_id
-	label.add_theme_color_override("font_color", Color.WHITE)
-	label.text = "%s: %d" % [ItemDefinitions.get_item(resource_id).name, amount]
-	resource_container.add_child(label)
+	for res_id in tracked_resources:
+		var amount = game_manager.resources.get(res_id, 0)
+		var emoji = RESOURCE_EMOJI.get(res_id, "")
+		
+		# 查找是否已有对应标签
+		var existing = null
+		for child in resource_container.get_children():
+			if child.name == res_id:
+				existing = child
+				break
+		
+		if existing:
+			var item_def = ItemDefinitions.get_item(res_id)
+			var name_str = item_def.name if item_def else res_id
+			existing.text = "%s %s: %d" % [emoji, name_str, amount]
+		else:
+			var label = Label.new()
+			label.name = res_id
+			label.add_theme_color_override("font_color", Color.WHITE)
+			label.add_theme_constant_override("minimum_font_size", 14)
+			var item_def = ItemDefinitions.get_item(res_id)
+			var name_str = item_def.name if item_def else res_id
+			label.text = "%s %s: %d" % [emoji, name_str, amount]
+			resource_container.add_child(label)
+
+func update_resource(resource_id: String, amount: int):
+	"""更新单个资源显示（外部调用，兼容旧接口）"""
+	_on_resources_changed(resource_id, 0, amount)

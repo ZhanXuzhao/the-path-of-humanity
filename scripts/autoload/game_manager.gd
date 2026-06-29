@@ -6,6 +6,7 @@ signal day_changed(day: int)
 signal time_changed(hour: float)
 signal game_paused(is_paused: bool)
 signal notification(msg: String, type: int)
+signal resources_changed(resource_id: String, old_amount: int, new_amount: int)
 
 # 游戏状态枚举
 enum GameState {
@@ -47,6 +48,17 @@ var resources = {
 	"wood": 0,
 	"stone": 0,
 	"food": 0,
+	"iron_ore": 0,
+	"copper_ore": 0,
+	"coal": 0,
+	"iron_ingot": 0,
+	"copper_ingot": 0,
+	"plank": 0,
+	"brick": 0,
+	"berry": 0,
+	"raw_meat": 0,
+	"cooked_meat": 0,
+	"cloth": 0,
 }
 
 func _ready():
@@ -75,6 +87,23 @@ func start_game():
 	current_day = 1
 	time_speed = 1.0
 	stats.survival_days = 0
+	# 重置资源
+	resources = {
+		"wood": 0,
+		"stone": 0,
+		"food": 0,
+		"iron_ore": 0,
+		"copper_ore": 0,
+		"coal": 0,
+		"iron_ingot": 0,
+		"copper_ingot": 0,
+		"plank": 0,
+		"brick": 0,
+		"berry": 0,
+		"raw_meat": 0,
+		"cooked_meat": 0,
+		"cloth": 0,
+	}
 	notification.emit("人类之路开启了！", NotificationType.SUCCESS)
 
 func pause_game():
@@ -112,6 +141,32 @@ func get_daylight_factor() -> float:
 		return 1.0 - (game_time - 17.0) / 2.0  # 日落
 	else:
 		return 0.0  # 夜晚
+
+# -------- 资源管理 --------
+func add_resource(resource_id: String, amount: int) -> int:
+	"""添加资源，返回实际添加数量"""
+	if amount <= 0:
+		return 0
+	var old = resources.get(resource_id, 0)
+	resources[resource_id] = old + amount
+	resources_changed.emit(resource_id, old, resources[resource_id])
+	return amount
+
+func remove_resource(resource_id: String, amount: int) -> int:
+	"""移除资源，返回实际移除数量"""
+	if amount <= 0:
+		return 0
+	var old = resources.get(resource_id, 0)
+	var actual = min(old, amount)
+	resources[resource_id] = old - actual
+	resources_changed.emit(resource_id, old, resources[resource_id])
+	return actual
+
+func has_resource(resource_id: String, amount: int = 1) -> bool:
+	return resources.get(resource_id, 0) >= amount
+
+func get_resource(resource_id: String) -> int:
+	return resources.get(resource_id, 0)
 
 func show_notification(msg: String, type: NotificationType = NotificationType.INFO):
 	notification.emit(msg, type)
