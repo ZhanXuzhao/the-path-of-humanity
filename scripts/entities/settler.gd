@@ -1077,14 +1077,15 @@ func assign_task(task_data: Dictionary) -> bool:
 	task_assigned.emit(task_data.get("id", ""))
 	return true
 
-func complete_task():
+func complete_task(skip_auto_store: bool = false):
 	if current_task:
 		task_completed.emit(current_task.get("id", ""))
 	current_task = null
 	state = SettlerState.IDLE
 	
 	# 如果超重，自动寻找置物架去存放物品
-	if is_overweight():
+	# 但跳过紧急需求打断时的自动搬运，让角色先满足基本需求
+	if not skip_auto_store and is_overweight():
 		_auto_store_overweight()
 
 # -------- 伤害系统 --------

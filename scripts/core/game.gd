@@ -322,7 +322,8 @@ func _update_settler_autonomy():
 		if s.state == Settler.SettlerState.WORKING or s.state == Settler.SettlerState.MOVING:
 			# 检查是否有紧急需求
 			if s.needs.get("hunger", 100) < 15 or s.needs.get("rest", 100) < 10:
-				s.complete_task()
+				# 传入 true 跳过自动搬运，让角色先满足基本需求（进食/睡眠）
+				s.complete_task(true)
 			else:
 				continue
 		
@@ -514,6 +515,11 @@ func _update_settlers(delta):
 	for s in settlers:
 		if is_instance_valid(s):
 			s.update_needs(delta_hours)
+	
+	# 超重空闲定居者自动搬运
+	for s in settlers:
+		if is_instance_valid(s) and s.state == Settler.SettlerState.IDLE and s.is_overweight():
+			s._auto_store_overweight()
 
 func _assign_ai_tasks():
 	"""为所有空闲定居者分配任务（使用 WorkManager 的优先级配置）"""
