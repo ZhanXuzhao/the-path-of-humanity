@@ -48,9 +48,9 @@ var needs = {
 	"safety": 80.0,      # 安全感 - 受防御影响
 }
 
-# 需求衰减速度（每小时）
-const NEED_DECAY = {
-	"hunger": 5.0,
+# 需求衰减速度（每小时）——从 GameManager.settings 加载
+var NEED_DECAY = {
+	"hunger": 4.17,
 	"rest": 3.0,
 	"comfort": 1.0,
 	"social": 2.0,
@@ -81,6 +81,13 @@ var max_hp: float = 100.0
 var move_speed: float = 60.0  # 像素/秒
 var carry_capacity: float = 50.0  # 负重上限
 
+# 读取 GameManager 配置的快捷方式
+static func _settler_setting(key: String, default_value):
+	var gm = Engine.get_main_loop().root.get_node_or_null("/root/GameManager")
+	if gm and gm.settings.has(key):
+		return gm.settings[key]
+	return default_value
+
 # 当前行为
 var current_task = null  # 当前任务数据
 var target_position: Vector2i
@@ -106,6 +113,8 @@ func _init():
 	_randomize_stats()
 	_randomize_age()
 	_setup_sprite()
+	# 从GameManager配置加载参数
+	_apply_config_settings()
 
 const TILE_SIZE: float = 32.0
 
@@ -461,8 +470,10 @@ func _dump_inventory_to_global():
 			gm.add_resource(stack.item_id, stack.amount)
 	inventory.clear()
 
-func _find_nearby_storage(max_dist: float = 300.0) -> Array:
+func _find_nearby_storage(max_dist: float = -1.0) -> Array:
 	"""查找附近有空间的存储建筑，按距离排序"""
+	if max_dist < 0:
+		max_dist = _settler_setting("storage_search_radius", 300.0)
 	var game = get_node_or_null("/root/Game")
 	if game == null or game.building_system == null:
 		return []
@@ -555,7 +566,8 @@ func _tick_sleep(delta):
 		delta_hours = gm.time_speed * delta * (24.0 / gm.day_length)
 	
 	# 快速恢复精力
-	modify_need("rest", delta_hours * 15.0)
+	var sleep_restore = _settler_setting("sleep_restore_per_hour", 15.0)
+	modify_need("rest", delta_hours * sleep_restore)
 	
 	# 检查是否天亮了或精力已满
 	if needs["rest"] >= 95.0:
@@ -600,14 +612,13 @@ func try_eat():
 		return
 	
 	# 1. 先吃背包里的食物
+	var food_restore = _settler_setting("food_restore_amount", 100.0)
 	var food_ids = ["berry", "cooked_meat", "raw_meat", "bread", "vegetable_soup"]
 	for food_id in food_ids:
 		if inventory.has_item(food_id, 1):
 			var removed = inventory.remove_item(food_id, 1)
 			if removed > 0:
-				var data = ItemDefinitions.get_item(food_id)
-				var nutrition = data.nutrition if data else 10.0
-				modify_need("hunger", nutrition)
+				modify_need("hunger", food_restore)
 				state = SettlerState.EATING
 				# 将进食动画计时器设为2秒
 				_eat_timer = 2.0
@@ -615,7 +626,7 @@ func try_eat():
 	
 	# 2. 背包没食物，找置物架
 	var food_source = _find_food_in_storage()
-	if food_source != null:
+	if not food_source.is_empty():
 		var center = _bld_world_center(food_source.bld)
 		current_task = {
 			"type": "EAT_FROM_RACK",
@@ -659,11 +670,10 @@ func _tick_eat_from_rack():
 		return
 	
 	# 从置物架取一份食物
+	var food_restore = _settler_setting("food_restore_amount", 100.0)
 	var removed = bld.inventory.remove_item(food_id, 1)
 	if removed > 0:
-		var data = ItemDefinitions.get_item(food_id)
-		var nutrition = data.nutrition if data else 10.0
-		modify_need("hunger", nutrition)
+		modify_need("hunger", food_restore)
 		_eat_timer = 2.0
 		state = SettlerState.EATING
 	else:
@@ -677,7 +687,8 @@ func _find_food_in_storage() -> Dictionary:
 		return {}
 	
 	var food_ids = ["berry", "cooked_meat", "raw_meat", "bread", "vegetable_soup"]
-	var storage_buildings = _find_nearby_storage(400.0)
+	var search_dist = _settler_setting("food_search_radius", 400.0)
+	var storage_buildings = _find_nearby_storage(search_dist)
 	
 	for bld in storage_buildings:
 		if bld.inventory == null:
@@ -753,15 +764,32 @@ func _randomize_name():
 func _randomize_age():
 	age = 10.0 + randi() % 51  # 10~60 岁
 
+func _apply_config_settings():
+	"""从GameManager.config加载可配置参数"""
+	var base_hp = _settler_setting("base_hp", 80.0)
+	var con_bonus = _settler_setting("constitution_hp_bonus", 4.0)
+	var base_speed = _settler_setting("base_move_speed", 60.0)
+	var dex_bonus = _settler_setting("dexterity_move_bonus", 3.0)
+	carry_capacity = _settler_setting("carry_capacity", 50.0)
+	
+	hp = base_hp + stats.constitution * con_bonus
+	max_hp = hp
+	move_speed = base_speed + stats.dexterity * dex_bonus
+	
+	# 加载需求衰减配置
+	NEED_DECAY["hunger"] = _settler_setting("hunger_decay_per_hour", 4.17)
+	NEED_DECAY["rest"] = _settler_setting("rest_decay_per_hour", 3.0)
+	NEED_DECAY["comfort"] = _settler_setting("comfort_decay_per_hour", 1.0)
+	NEED_DECAY["social"] = _settler_setting("social_decay_per_hour", 2.0)
+	NEED_DECAY["safety"] = _settler_setting("safety_decay_per_hour", 0.5)
+
 func _randomize_stats():
 	var rng = RandomNumberGenerator.new()
 	for stat in stats:
 		stats[stat] = rng.randf_range(3.0, 8.0)
 	for skill in skills:
 		skills[skill] = rng.randf_range(1.0, 5.0)
-	hp = 80.0 + stats.constitution * 4.0
-	max_hp = hp
-	move_speed = 50.0 + stats.dexterity * 3.0
+	_apply_config_settings()
 
 # -------- 需求更新 --------
 func update_needs(delta_hours: float):

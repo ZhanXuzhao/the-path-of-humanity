@@ -276,8 +276,8 @@ func _update_settler_autonomy():
 			else:
 				continue
 		
-		# 1. 饥饿处理（饱食度 < 30 且空闲）
-		if s.needs.get("hunger", 100) < 30 and s.state == Settler.SettlerState.IDLE:
+		# 1. 饥饿处理（饱食度 < 25 且空闲）
+		if s.needs.get("hunger", 100) < 25 and s.state == Settler.SettlerState.IDLE:
 			s.try_eat()
 			continue
 		

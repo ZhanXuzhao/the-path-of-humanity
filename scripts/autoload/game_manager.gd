@@ -83,6 +83,22 @@ func _load_settings():
 	settings["scroll_speed"] = cfg.get_value("camera", "scroll_speed", 300.0)
 	settings["edge_scroll_margin"] = cfg.get_value("camera", "edge_scroll_margin", 20)
 	
+	# 定居者设置
+	settings["carry_capacity"] = cfg.get_value("settler", "carry_capacity", 50.0)
+	settings["base_move_speed"] = cfg.get_value("settler", "base_move_speed", 60.0)
+	settings["dexterity_move_bonus"] = cfg.get_value("settler", "dexterity_move_bonus", 3.0)
+	settings["base_hp"] = cfg.get_value("settler", "base_hp", 80.0)
+	settings["constitution_hp_bonus"] = cfg.get_value("settler", "constitution_hp_bonus", 4.0)
+	settings["hunger_decay_per_hour"] = cfg.get_value("settler", "hunger_decay_per_hour", 4.17)
+	settings["rest_decay_per_hour"] = cfg.get_value("settler", "rest_decay_per_hour", 3.0)
+	settings["comfort_decay_per_hour"] = cfg.get_value("settler", "comfort_decay_per_hour", 1.0)
+	settings["social_decay_per_hour"] = cfg.get_value("settler", "social_decay_per_hour", 2.0)
+	settings["safety_decay_per_hour"] = cfg.get_value("settler", "safety_decay_per_hour", 0.5)
+	settings["food_restore_amount"] = cfg.get_value("settler", "food_restore_amount", 100.0)
+	settings["sleep_restore_per_hour"] = cfg.get_value("settler", "sleep_restore_per_hour", 15.0)
+	settings["storage_search_radius"] = cfg.get_value("settler", "storage_search_radius", 300.0)
+	settings["food_search_radius"] = cfg.get_value("settler", "food_search_radius", 400.0)
+	
 	print("游戏设置已加载")
 
 func _on_close_requested():
