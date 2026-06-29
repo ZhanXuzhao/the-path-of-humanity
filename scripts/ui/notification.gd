@@ -4,13 +4,14 @@ extends Control
 @onready var label: Label = $Label
 @onready var animation: AnimationPlayer = $AnimationPlayer
 
+# NotificationType enum values: INFO=0, WARNING=1, ERROR=2, SUCCESS=3, RESEARCH=4, COMBAT=5
 var type_colors = {
-	GameManager.NotificationType.INFO: Color(0.5, 0.8, 1.0),      # 蓝色
-	GameManager.NotificationType.WARNING: Color(1.0, 0.8, 0.2),   # 黄色
-	GameManager.NotificationType.ERROR: Color(1.0, 0.3, 0.3),     # 红色
-	GameManager.NotificationType.SUCCESS: Color(0.3, 1.0, 0.3),   # 绿色
-	GameManager.NotificationType.RESEARCH: Color(0.8, 0.5, 1.0),  # 紫色
-	GameManager.NotificationType.COMBAT: Color(1.0, 0.3, 0.3),    # 红色
+	0: Color(0.5, 0.8, 1.0),      # INFO - 蓝色
+	1: Color(1.0, 0.8, 0.2),      # WARNING - 黄色
+	2: Color(1.0, 0.3, 0.3),      # ERROR - 红色
+	3: Color(0.3, 1.0, 0.3),      # SUCCESS - 绿色
+	4: Color(0.8, 0.5, 1.0),      # RESEARCH - 紫色
+	5: Color(1.0, 0.3, 0.3),      # COMBAT - 红色
 }
 
 func show_notification(msg: String, type: int):

@@ -3,6 +3,8 @@
 extends Panel
 class_name BuildMenu
 
+const ItemDefinitions = preload("res://resources/item_definitions.gd")
+
 @onready var building_list: VBoxContainer = $ScrollContainer/BuildingList
 @onready var category_tabs: HBoxContainer = $CategoryTabs
 @onready var info_panel: Panel = $InfoPanel

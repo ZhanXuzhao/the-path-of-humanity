@@ -3,8 +3,7 @@
 class_name Inventory
 extends RefCounted
 
-# 库存变化信号（需要连接节点手动转发）
-signal items_changed
+const ItemDefinitions = preload("res://resources/item_definitions.gd")
 
 var items: Array[ItemStack] = []  # 库存中的物品堆
 var max_slots: int = 30           # 最大格子数

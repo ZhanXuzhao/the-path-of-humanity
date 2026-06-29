@@ -3,6 +3,8 @@
 extends CanvasLayer
 class_name HUD
 
+const ItemDefinitions = preload("res://resources/item_definitions.gd")
+
 @onready var time_label: Label = $TopBar/TimeLabel
 @onready var day_label: Label = $TopBar/DayLabel
 @onready var population_label: Label = $TopBar/PopulationLabel
@@ -51,7 +53,7 @@ func _on_day_changed(day: int):
 func _on_pause_pressed():
 	game_manager.toggle_pause()
 	if pause_btn:
-		pause_btn.text = "▶" if game_manager.state == GameManager.GameState.PAUSED else "⏸"
+		pause_btn.text = "▶" if game_manager.state == 2 else "⏸"
 
 func _on_speed_pressed():
 	var speeds = [1.0, 2.0, 3.0, 5.0]

@@ -3,6 +3,8 @@
 extends Node
 class_name CraftingSystem
 
+const ItemDefinitions = preload("res://resources/item_definitions.gd")
+
 signal crafting_started(recipe_id: String, building_pos: Vector2i, settler_id: String)
 signal crafting_completed(recipe_id: String, building_pos: Vector2i)
 signal crafting_queue_changed(building_pos: Vector2i)

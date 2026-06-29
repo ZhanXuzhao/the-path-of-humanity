@@ -6,7 +6,6 @@ class_name Settler
 signal needs_changed(need_id: String, value: float)
 signal task_assigned(task_id: String)
 signal task_completed(task_id: String)
-signal inventory_changed
 
 # 角色属性
 var settler_name: String

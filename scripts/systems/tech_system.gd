@@ -3,6 +3,8 @@
 extends Node
 class_name TechSystem
 
+const ItemDefinitions = preload("res://resources/item_definitions.gd")
+
 signal research_started(tech_id: String)
 signal research_completed(tech_id: String)
 signal tech_unlocked(tech_id: String)

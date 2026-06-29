@@ -3,6 +3,8 @@
 extends Node
 class_name BuildingSystem
 
+const ItemDefinitions = preload("res://resources/item_definitions.gd")
+
 signal building_placed(building_id: String, pos: Vector2i)
 signal building_removed(building_id: String, pos: Vector2i)
 signal building_completed(pos: Vector2i)

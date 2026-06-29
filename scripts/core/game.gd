@@ -3,12 +3,15 @@
 extends Node2D
 class_name Game
 
+const ItemDefinitions = preload("res://resources/item_definitions.gd")
+
 @onready var world = $World
 @onready var building_system = $Systems/BuildingSystem
 @onready var crafting_system = $Systems/CraftingSystem
 @onready var tech_system = $Systems/TechSystem
 @onready var camera: Camera2D = $Camera
 @onready var ui: CanvasLayer = $UI
+@onready var _gm = get_node("/root/GameManager")
 
 # 建造模式
 var build_mode: bool = false
@@ -30,7 +33,7 @@ func _ready():
 	if building_system:
 		building_system.world = world
 
-func _process(delta):
+func _process(_delta):
 	if build_mode:
 		_update_build_preview()
 
@@ -48,8 +51,8 @@ func _spawn_initial_settlers():
 		settler.position = Vector2(randf_range(300, 500), randf_range(300, 500))
 		add_child(settler)
 		settlers.append(settler)
-		GameManager.show_notification("新成员加入了聚居地: %s" % settler.settler_name, 
-			GameManager.NotificationType.SUCCESS)
+		_gm.show_notification("新成员加入了聚居地: %s" % settler.settler_name, 
+			3)
 
 # -------- 建造模式 --------
 func enter_build_mode(building_id: String):
@@ -93,11 +96,11 @@ func _try_place_building():
 	var check = building_system.can_place_building(selected_building, mouse_grid_pos)
 	if check.can_place:
 		building_system.place_building(selected_building, mouse_grid_pos)
-		GameManager.show_notification("开始建造: " + ItemDefinitions.get_building(selected_building).name,
-			GameManager.NotificationType.SUCCESS)
+		_gm.show_notification("开始建造: " + ItemDefinitions.get_building(selected_building).name,
+			3)
 	else:
-		GameManager.show_notification("无法建造: " + check.reason,
-			GameManager.NotificationType.WARNING)
+		_gm.show_notification("无法建造: " + check.reason,
+			1)
 
 func _input(event):
 	if event.is_action_pressed("ui_cancel"):

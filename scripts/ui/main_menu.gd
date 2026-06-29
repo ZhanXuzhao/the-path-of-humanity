@@ -11,12 +11,12 @@ func _ready():
 	quit_btn.pressed.connect(_on_quit_pressed)
 
 func _on_start_pressed():
-	GameManager.start_game()
+	get_node("/root/GameManager").start_game()
 	get_tree().change_scene_to_file("res://scenes/game.tscn")
 
 func _on_load_pressed():
 	# TODO: 实现加载存档
-	GameManager.show_notification("存档功能开发中", GameManager.NotificationType.WARNING)
+	get_node("/root/GameManager").show_notification("存档功能开发中", 1)
 
 func _on_quit_pressed():
 	get_tree().quit()

@@ -1,6 +1,5 @@
 # 游戏全局管理器 - Game Manager (Autoload)
 # 管理游戏状态、时间、资源等全局数据
-class_name GameManager
 extends Node
 
 signal day_changed(day: int)

@@ -3,12 +3,14 @@
 extends Panel
 class_name TechPanel
 
+const ItemDefinitions = preload("res://resources/item_definitions.gd")
+
 @onready var tech_list: VBoxContainer = $ScrollContainer/TechList
 @onready var current_label: Label = $CurrentResearch/CurrentLabel
 @onready var progress_bar: ProgressBar = $CurrentResearch/ProgressBar
 @onready var close_btn: Button = $CloseBtn
 
-var tech_system: TechSystem
+var tech_system
 
 func _ready():
 	tech_system = get_node("/root/Game/Systems/TechSystem")
@@ -83,8 +85,8 @@ func _on_research_btn(tech_id: String):
 		_populate_techs()
 
 func _on_research_started(tech_id: String):
-	GameManager.show_notification("开始研究: " + ItemDefinitions.get_tech(tech_id).name,
-		GameManager.NotificationType.RESEARCH)
+	get_node("/root/GameManager").show_notification("开始研究: " + ItemDefinitions.get_tech(tech_id).name,
+		4)
 	_populate_techs()
 
 func _on_research_completed(tech_id: String):
@@ -96,6 +98,6 @@ func _on_research_completed(tech_id: String):
 		elif ItemDefinitions.recipes.has(unlock):
 			unlocks_text += ItemDefinitions.recipes[unlock].name + " "
 	
-	GameManager.show_notification("科技完成: %s! 解锁: %s" % [data.name, unlocks_text],
-		GameManager.NotificationType.RESEARCH)
+	get_node("/root/GameManager").show_notification("科技完成: %s! 解锁: %s" % [data.name, unlocks_text],
+		4)
 	_populate_techs()
