@@ -506,15 +506,15 @@ func _assign_ai_tasks():
 			var task_pos = t.get("target_world_pos", Vector2.ZERO)
 			var dist = settler.position.distance_squared_to(task_pos) if task_pos != Vector2.ZERO else 0
 			
-			# 使用定居者的个人工作优先级计算评分
+			# 使用定居者的个人工作优先级计算评分（数字越大优先级越高）
 			var pri = 1  # 默认最低优先级
 			if work_manager:
 				var wt = t.get("work_type", -1)
 				if wt >= 0:
 					pri = work_manager.get_priority(sid, wt)
 			
-			# 评分 = 距离 / 优先级权重 (优先级1权重最高)
-			var weighted_dist = dist / max(0.5, float(5 - pri))
+			# 评分 = 距离 / 优先级权重 (优先级4权重最高)
+			var weighted_dist = dist / max(0.5, float(pri))
 			if weighted_dist < best_score:
 				best_score = weighted_dist
 				best_task = t

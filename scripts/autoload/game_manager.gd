@@ -99,6 +99,17 @@ func _load_settings():
 	settings["storage_search_radius"] = cfg.get_value("settler", "storage_search_radius", 300.0)
 	settings["food_search_radius"] = cfg.get_value("settler", "food_search_radius", 400.0)
 	
+	# 工作优先级设置
+	settings["mining_priority"] = cfg.get_value("work", "mining_priority", 2)
+	settings["woodcutting_priority"] = cfg.get_value("work", "woodcutting_priority", 3)
+	settings["construction_priority"] = cfg.get_value("work", "construction_priority", 4)
+	settings["crafting_priority"] = cfg.get_value("work", "crafting_priority", 3)
+	settings["cooking_priority"] = cfg.get_value("work", "cooking_priority", 2)
+	settings["farming_priority"] = cfg.get_value("work", "farming_priority", 2)
+	settings["hauling_priority"] = cfg.get_value("work", "hauling_priority", 1)
+	settings["research_priority"] = cfg.get_value("work", "research_priority", 3)
+	settings["combat_priority"] = cfg.get_value("work", "combat_priority", 1)
+	
 	print("游戏设置已加载")
 
 func _on_close_requested():

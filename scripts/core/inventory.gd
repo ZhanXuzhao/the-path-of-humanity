@@ -5,6 +5,8 @@ extends RefCounted
 
 const ItemDefinitions = preload("res://resources/item_definitions.gd")
 
+signal items_changed
+
 var items: Array[ItemStack] = []  # 库存中的物品堆
 var max_slots: int = 30           # 最大格子数
 var capacity: int = 0             # 最大容量 (0=不限)

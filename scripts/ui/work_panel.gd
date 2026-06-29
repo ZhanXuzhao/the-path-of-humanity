@@ -13,13 +13,13 @@ var _work_manager
 var _settler_priority_btns: Dictionary = {}  # settler_id -> { work_type -> Button }
 var _header_labels: Array = []
 
-# 优先级颜色
+# 优先级颜色（数字越大优先级越高）
 const PRIORITY_COLORS = {
 	0: Color(0.35, 0.35, 0.35),  # 禁用 - 灰色
-	1: Color(0.2, 0.8, 1.0),     # 最高 - 青色
-	2: Color(0.3, 1.0, 0.3),     # 高 - 绿色
-	3: Color(1.0, 1.0, 0.2),     # 中 - 黄色
-	4: Color(1.0, 0.5, 0.2),     # 低 - 橙色
+	1: Color(1.0, 0.5, 0.2),     # 最低 - 橙色
+	2: Color(1.0, 1.0, 0.2),     # 低 - 黄色
+	3: Color(0.3, 1.0, 0.3),     # 中 - 绿色
+	4: Color(0.2, 0.8, 1.0),     # 最高 - 青色
 }
 
 const PRIORITY_LABELS = {
@@ -122,20 +122,30 @@ func _rebuild_grid():
 			btn.add_theme_constant_override("minimum_font_size", 13)
 			btn.tooltip_text = WorkManager.WORK_TYPE_NAMES.get(wt, "?")
 			
-			# 点击循环切换优先级 0->1->2->3->4->0
-			var settler_ref = s
+			# 左键增加优先级，右键减少优先级
 			var work_type = wt
-			btn.pressed.connect(_on_priority_btn_pressed.bind(sid, work_type, btn))
+			var settler_id = sid
+			btn.pressed.connect(_on_left_click.bind(sid, work_type, btn))
+			btn.gui_input.connect(_on_priority_btn_gui_input.bind(sid, work_type, btn))
 			
 			work_grid.add_child(btn)
 			_settler_priority_btns[sid][wt] = btn
 
-func _on_priority_btn_pressed(settler_id: String, work_type: int, btn: Button):
-	"""点击优先级按钮：循环切换 0->1->2->3->4->0"""
+func _on_left_click(settler_id: String, work_type: int, btn: Button):
+	"""左键增加优先级 (0->1->2->3->4->4)"""
 	var current = _work_manager.get_priority(settler_id, work_type)
-	var next_pri = (current + 1) % 5  # 0->1->2->3->4->0
+	var next_pri = mini(current + 1, 4)
 	_work_manager.set_priority(settler_id, work_type, next_pri)
 	_update_btn_visual(btn, next_pri)
+
+func _on_priority_btn_gui_input(event: InputEvent, settler_id: String, work_type: int, btn: Button):
+	"""右键减少优先级 (4->3->2->1->0->0)"""
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		var current = _work_manager.get_priority(settler_id, work_type)
+		var next_pri = maxi(current - 1, 0)
+		_work_manager.set_priority(settler_id, work_type, next_pri)
+		_update_btn_visual(btn, next_pri)
+		get_viewport().set_input_as_handled()
 
 func _update_btn_visual(btn: Button, priority: int):
 	"""更新按钮的显示和颜色"""

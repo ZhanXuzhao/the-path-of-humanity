@@ -79,7 +79,7 @@ const ALL_WORK_TYPES = [
 	WorkType.COMBAT,
 ]
 
-# 优先级：0=不做, 1=最高, 2=高, 3=中, 4=低
+# 优先级：0=不做, 1=最低, 2=低, 3=中, 4=最高
 # 每个定居者的工作优先级: settler_id -> { WorkType: priority }
 var _priorities: Dictionary = {}
 
@@ -90,17 +90,42 @@ func _ready():
 	_init_default_priorities()
 
 func _init_default_priorities():
-	default_priorities = {
-		WorkType.MINING: 3,
-		WorkType.WOODCUTTING: 2,
-		WorkType.CONSTRUCTION: 1,
-		WorkType.CRAFTING: 2,
-		WorkType.COOKING: 3,
-		WorkType.FARMING: 3,
-		WorkType.HAULING: 4,
-		WorkType.RESEARCH: 2,
-		WorkType.COMBAT: 4,
+	default_priorities = _load_defaults_from_config()
+
+# 配置文件键名到工作类型的映射
+const CONFIG_KEY_MAP = {
+	"mining_priority": WorkType.MINING,
+	"woodcutting_priority": WorkType.WOODCUTTING,
+	"construction_priority": WorkType.CONSTRUCTION,
+	"crafting_priority": WorkType.CRAFTING,
+	"cooking_priority": WorkType.COOKING,
+	"farming_priority": WorkType.FARMING,
+	"hauling_priority": WorkType.HAULING,
+	"research_priority": WorkType.RESEARCH,
+	"combat_priority": WorkType.COMBAT,
+}
+
+static func _load_defaults_from_config() -> Dictionary:
+	"""从 GameManager.settings 读取默认工作优先级"""
+	var result = {
+		WorkType.MINING: 2,
+		WorkType.WOODCUTTING: 3,
+		WorkType.CONSTRUCTION: 4,
+		WorkType.CRAFTING: 3,
+		WorkType.COOKING: 2,
+		WorkType.FARMING: 2,
+		WorkType.HAULING: 1,
+		WorkType.RESEARCH: 3,
+		WorkType.COMBAT: 1,
 	}
+	
+	var gm = Engine.get_main_loop().root.get_node_or_null("/root/GameManager")
+	if gm and gm.settings.size() > 0:
+		for key in CONFIG_KEY_MAP:
+			if gm.settings.has(key):
+				result[CONFIG_KEY_MAP[key]] = clampi(gm.settings[key], 0, 4)
+	
+	return result
 
 # -------- 优先级管理 --------
 
@@ -161,7 +186,7 @@ func get_sorted_work_types(settler_id: String) -> Array:
 		if pri > 0:
 			sorted.append({"work_type": wt, "priority": pri})
 	
-	sorted.sort_custom(func(a, b): return a.priority < b.priority)
+	sorted.sort_custom(func(a, b): return a.priority > b.priority)
 	return sorted
 
 func get_priority_for_task(settler_id: String, task_type: String, resource_type: String = "") -> int:
