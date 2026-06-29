@@ -493,16 +493,25 @@ func _tick_construct():
 	var construct_phase = current_task.get("construct_phase", "")
 	
 	if construct_phase == "fetch":
-		# 到达来源地，取材料到背包
+		# 到达来源地，取材料到背包（受负重限制）
 		var fetch_source = current_task.get("fetch_source_type", "storage")
 		var fetch_item = current_task.get("fetch_item_id", "")
 		var fetch_amount = current_task.get("fetch_amount", 0)
 		
 		if fetch_item != "" and fetch_amount > 0:
+			# 根据剩余负重计算实际能取多少
+			var max_carry = _get_max_carryable(fetch_item, fetch_amount)
+			if max_carry <= 0:
+				# 背包已满，直接回去工地先存入
+				current_task["construct_phase"] = "return_to_site"
+				var site_center = _bld_world_center(bld)
+				target_world_pos = site_center
+				set_state(SettlerState.MOVING)
+				return
 			if fetch_source == "ground":
 				# 从地面捡取
 				var ground_pos: Vector2i = current_task.get("fetch_storage_pos", Vector2i.ZERO)
-				var picked = game.world.pickup_from_ground(ground_pos, fetch_item, fetch_amount)
+				var picked = game.world.pickup_from_ground(ground_pos, fetch_item, max_carry)
 				if picked > 0:
 					inventory.add_item(fetch_item, picked)
 					current_task["fetch_amount"] = fetch_amount - picked
@@ -512,7 +521,7 @@ func _tick_construct():
 				var storage_bld = game.building_system.get_building_at(storage_pos)
 				if storage_bld != null and storage_bld.inventory != null:
 					var available = storage_bld.inventory.get_item_count(fetch_item)
-					var to_take = mini(fetch_amount, available)
+					var to_take = mini(max_carry, mini(fetch_amount, available))
 					if to_take > 0:
 						var removed = storage_bld.inventory.remove_item(fetch_item, to_take)
 						if removed > 0:
@@ -686,10 +695,15 @@ func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 	# 优先去存储建筑取材料
 	if best_storage != null and best_mat_id != "":
 		var needed = missing[best_mat_id]
+		# 限制取料量不超过负重上限
+		var carry_limit = _get_max_carryable(best_mat_id, needed)
+		if carry_limit <= 0:
+			# 背包已满无法再取，跳过此材料（等回工地存入后再来）
+			return false
 		var center = _bld_world_center(best_storage)
 		current_task["fetch_storage_pos"] = best_storage.grid_pos
 		current_task["fetch_item_id"] = best_mat_id
-		current_task["fetch_amount"] = needed
+		current_task["fetch_amount"] = carry_limit
 		current_task["construct_phase"] = "fetch"
 		target_world_pos = center
 		set_state(SettlerState.MOVING)
@@ -698,13 +712,17 @@ func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 	# 其次从地面捡取
 	if best_ground_pos != null and best_mat_id != "":
 		var needed = missing[best_mat_id]
+		# 限制取料量不超过负重上限
+		var carry_limit = _get_max_carryable(best_mat_id, needed)
+		if carry_limit <= 0:
+			return false
 		var world_pos = Vector2(
 			best_ground_pos.x * game.world.tile_size + game.world.tile_size / 2.0,
 			best_ground_pos.y * game.world.tile_size + game.world.tile_size / 2.0
 		)
 		current_task["fetch_storage_pos"] = best_ground_pos
 		current_task["fetch_item_id"] = best_mat_id
-		current_task["fetch_amount"] = needed
+		current_task["fetch_amount"] = carry_limit
 		current_task["construct_phase"] = "fetch"
 		current_task["fetch_source_type"] = "ground"  # 标记为地面来源
 		target_world_pos = world_pos
@@ -736,11 +754,18 @@ func _tick_haul_construct_fetch():
 	
 	var taken = 0
 	
+	# 根据剩余负重计算实际能取多少
+	var max_carry = _get_max_carryable(item_id, amount)
+	if max_carry <= 0:
+		# 背包已满，任务失败
+		complete_task()
+		return
+	
 	if source_type == "ground":
 		# 从地面捡取
 		var source_pos: Vector2i = current_task.get("source_bld_pos", Vector2i.ZERO)
 		if game.world:
-			taken = game.world.pickup_from_ground(source_pos, item_id, amount)
+			taken = game.world.pickup_from_ground(source_pos, item_id, max_carry)
 			if taken > 0:
 				inventory.add_item(item_id, taken)
 	elif source_type == "storage":
@@ -749,7 +774,7 @@ func _tick_haul_construct_fetch():
 		var source_bld = game.building_system.get_building_at(source_pos)
 		if source_bld != null and source_bld.inventory != null:
 			var available = source_bld.inventory.get_item_count(item_id)
-			var to_take = mini(amount, available)
+			var to_take = mini(max_carry, mini(amount, available))
 			if to_take > 0:
 				taken = source_bld.inventory.remove_item(item_id, to_take)
 				if taken > 0:
@@ -872,6 +897,19 @@ func get_inventory_weight() -> float:
 func is_overweight() -> bool:
 	"""是否超过负重上限"""
 	return get_inventory_weight() > carry_capacity
+
+func _get_max_carryable(item_id: String, desired_amount: int) -> int:
+	"""计算在不超过负重上限的前提下，最多还能携带多少个指定物品"""
+	var current_weight = get_inventory_weight()
+	var remaining_capacity = carry_capacity - current_weight
+	if remaining_capacity <= 0:
+		return 0
+	# 查物品重量
+	var data = ItemDefinitions.get_item(item_id)
+	if data == null or data.weight <= 0:
+		return desired_amount
+	var max_by_weight = int(floor(remaining_capacity / data.weight))
+	return mini(desired_amount, max_by_weight)
 
 func _store_excess_to_storage():
 	"""将背包中超重的部分存入附近置物架，若无可用的则掉落地面"""
