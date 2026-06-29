@@ -34,6 +34,9 @@ var current_day: int = 1           # 当前天数
 # 游戏设置（从配置文件加载）
 var settings: Dictionary = {}
 
+# 速度档位列表（从配置文件加载）
+var speed_levels: Array[float] = []
+
 # 游戏状态
 var state: GameState = GameState.MENU
 var colony_name: String = "人类聚居地"
@@ -98,6 +101,11 @@ func _load_settings():
 	settings["hauling_priority"] = cfg.get_value("work", "hauling_priority", 1)
 	settings["research_priority"] = cfg.get_value("work", "research_priority", 3)
 	settings["combat_priority"] = cfg.get_value("work", "combat_priority", 1)
+	
+	# 速度档位
+	speed_levels = []
+	for v in cfg.get_value("speed", "levels", [0.5, 1.0, 2.0, 3.0, 5.0, 10.0]):
+		speed_levels.append(float(v))
 	
 	print("游戏设置已加载")
 

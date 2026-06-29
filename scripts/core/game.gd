@@ -544,18 +544,18 @@ func _input(event):
 		
 		# 快捷键 =：加速游戏
 		if event.keycode == KEY_EQUAL:
-			var speeds = [0.5, 1.0, 2.0, 3.0, 5.0, 10.0]
+			var speeds = _gm.speed_levels
 			var current = _gm.time_speed
 			var idx = speeds.find(current)
-			if idx < len(speeds) - 1:
+			if idx >= 0 and idx < len(speeds) - 1:
 				idx += 1
 				_gm.set_time_speed(speeds[idx])
 				_update_speed_display()
 			get_viewport().set_input_as_handled()
 		
-		# 快捷键 -：减速游戏（最低 0.5）
+		# 快捷键 -：减速游戏
 		if event.keycode == KEY_MINUS:
-			var speeds = [0.1, 0.2, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0]
+			var speeds = _gm.speed_levels
 			var current = _gm.time_speed
 			var idx = speeds.find(current)
 			if idx > 0:

@@ -504,17 +504,18 @@ func _on_pause_pressed():
 		pause_btn.text = "▶" if game_manager.state == 2 else "⏸"
 
 func _on_speed_pressed():
-	var speeds = [0.5, 1.0, 2.0, 3.0, 5.0, 10.0]
+	var speeds = game_manager.speed_levels
 	var current = game_manager.time_speed
 	var idx = speeds.find(current)
-	idx = (idx + 1) % speeds.size()
-	game_manager.set_time_speed(speeds[idx])
-	if speed_btn:
-		var speed = speeds[idx]
-		if speed == int(speed):
-			speed_btn.text = "×%d" % speed
-		else:
-			speed_btn.text = "×%.1f" % speed
+	if idx >= 0 and idx < len(speeds) - 1:
+		idx += 1
+		game_manager.set_time_speed(speeds[idx])
+		if speed_btn:
+			var speed = speeds[idx]
+			if speed == int(speed):
+				speed_btn.text = "×%d" % speed
+			else:
+				speed_btn.text = "×%.1f" % speed
 
 func _on_build_menu_pressed():
 	# 发送打开建筑菜单的信号
