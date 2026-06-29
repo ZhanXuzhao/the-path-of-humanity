@@ -444,7 +444,11 @@ func _tick_harvest():
 		return
 	
 	var grid_pos: Vector2i = current_task.get("target_pos", Vector2i.ZERO)
-	# 使用资源点配置的每次采集量（由 GameManager 设置）
+	
+	# 释放该资源的占用标记（无论是否采完都先释放，确保资源耗尽时标记被清理）
+	if game.has_method("release_harvest_resource"):
+		game.release_harvest_resource(grid_pos)
+	
 	var result = game.world.harvest_resource(grid_pos)
 	if result.is_empty() or result.amount <= 0:
 		# 资源已耗尽
@@ -462,6 +466,10 @@ func _tick_harvest():
 	if is_overweight():
 		complete_task()
 		return
+	
+	# 资源还在，重新占用标记（防止其他定居者中途抢走该资源）
+	if game.has_method("claim_harvest_resource"):
+		game.claim_harvest_resource(grid_pos, settler_id)
 	
 	# 增加经验
 	add_skill_experience(current_task.get("skill", ""), 1.0)
@@ -1349,6 +1357,10 @@ func _find_and_harvest_berries():
 				if dep.type != game.world.ResourceNodeType.BERRY_BUSH:
 					continue
 				var global_pos = chunk_pos * game.world.CHUNK_SIZE + local_pos
+				var res_key = "%d,%d" % [global_pos.x, global_pos.y]
+				# 跳过已被其他定居者占用的浆果丛
+				if game._claimed_harvest_resources and game._claimed_harvest_resources.has(res_key):
+					continue
 				var world_pos = Vector2(
 					global_pos.x * game.world.tile_size + game.world.tile_size / 2.0,
 					global_pos.y * game.world.tile_size + game.world.tile_size / 2.0
@@ -1366,6 +1378,9 @@ func _find_and_harvest_berries():
 			"skill": "woodcutting",
 			"priority": 4,
 		}
+		# 标记该资源已被占用
+		if game.has_method("claim_harvest_resource"):
+			game.claim_harvest_resource(best_pos.global_pos, settler_id)
 		target_world_pos = best_pos.world_pos
 		set_state(SettlerState.MOVING)
 

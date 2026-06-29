@@ -50,6 +50,11 @@ var _construction_retry_cooldown: Dictionary = {}  # "x,y" -> frame_number
 # 自主行为计时器（每2秒执行一次）
 var _autonomy_timer: float = 0.0
 
+# 资源采集占用标记——防止多个定居者被分配到同一资源
+# key: "x,y" -> settler_id，表示该资源正被哪个定居者采集
+var _claimed_harvest_resources: Dictionary = {}
+
+# 清理过期采集占用的定时器（每30帧清理一次）
 func _ready():
 	# 自动加载存档（静默读取，不弹通知）
 	if _gm.state != 1 and _gm._loaded_save_data.is_empty() and _gm.has_save_file():
@@ -633,6 +638,9 @@ func _update_settlers(delta):
 	for s in settlers:
 		if is_instance_valid(s) and s.state == Settler.SettlerState.IDLE and s.is_overweight():
 			s._auto_store_overweight()
+	
+	# 清理已失效的资源采集占用标记
+	_cleanup_harvest_claims()
 
 func _assign_ai_tasks():
 	"""为所有空闲定居者分配任务（使用 WorkManager 的优先级配置）"""
@@ -797,6 +805,12 @@ func _assign_ai_tasks():
 			if job:
 				job.assigned_settler_id = settler.settler_id
 		
+		# 如果是采集任务，标记该资源已被占用，防止第二个定居者也被分配过来
+		if best_task.get("type") == "HARVEST":
+			var target_pos: Vector2i = best_task.get("target_pos", Vector2i.ZERO)
+			var res_key = "%d,%d" % [target_pos.x, target_pos.y]
+			_claimed_harvest_resources[res_key] = settler.settler_id
+		
 		tasks.remove_at(best_idx)
 		settler.assign_task(best_task)
 
@@ -833,6 +847,12 @@ func _scan_nearby_resources(idle_settlers: Array) -> Array:
 					continue
 				
 				var global_pos = chunk_pos * world.CHUNK_SIZE + local_pos
+				var res_key = "%d,%d" % [global_pos.x, global_pos.y]
+				
+				# 跳过已被其他定居者占用的资源，防止两人砍同一棵树
+				if _claimed_harvest_resources.has(res_key):
+					continue
+				
 				var world_pos = _grid_to_world(global_pos)
 				var item_id = dep.get_item_drop()
 				
@@ -1077,3 +1097,43 @@ func _has_material_in_storage(item_id: String) -> bool:
 	if building_system == null:
 		return false
 	return not building_system.get_storage_buildings_with_item(item_id, 1).is_empty()
+
+func claim_harvest_resource(grid_pos: Vector2i, settler_id: String):
+	"""标记一个资源为已被指定定居者占用采集"""
+	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
+	_claimed_harvest_resources[key] = settler_id
+
+func release_harvest_resource(grid_pos: Vector2i):
+	"""释放一个资源的采集占用标记"""
+	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
+	_claimed_harvest_resources.erase(key)
+
+func _cleanup_harvest_claims():
+	"""清理已失效的资源采集占用标记"""
+	var expired_keys: Array = []
+	for res_key in _claimed_harvest_resources:
+		var claim_settler_id = _claimed_harvest_resources[res_key]
+		# 检查该定居者是否仍然存在且仍在采集该资源
+		var settler = get_settler_by_id(claim_settler_id)
+		if settler == null or not is_instance_valid(settler):
+			expired_keys.append(res_key)
+			continue
+		if settler.current_task == null or settler.current_task.get("type", "") != "HARVEST":
+			expired_keys.append(res_key)
+			continue
+		var task_target = settler.current_task.get("target_pos", Vector2i.ZERO)
+		var task_key = "%d,%d" % [task_target.x, task_target.y]
+		if task_key != res_key:
+			expired_keys.append(res_key)
+			continue
+		# 检查资源是否还存在
+		if world:
+			var parts = res_key.split(",")
+			var grid_pos = Vector2i(int(parts[0]), int(parts[1]))
+			var dep = world.get_resource_at(grid_pos)
+			if dep == null or dep.amount <= 0:
+				expired_keys.append(res_key)
+				continue
+	
+	for key in expired_keys:
+		_claimed_harvest_resources.erase(key)
