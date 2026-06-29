@@ -214,7 +214,7 @@ func _on_construction_deselected():
 	construction_panel.visible = false
 
 # -------- 资源节点信息面板 --------
-func _on_resource_selected(pos: Vector2i, deposit):
+func _on_resource_selected(_pos: Vector2i, deposit):
 	"""选中资源节点时显示信息面板"""
 	# 隐藏其他面板
 	storage_panel.visible = false

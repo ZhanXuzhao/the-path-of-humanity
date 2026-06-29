@@ -219,14 +219,14 @@ func _draw_target_line():
 	draw_circle(local_target, 3.0, line_color)
 
 # 根据任务数据获取工作类别显示文字
-static func get_work_type_from_task(current_task: Dictionary) -> String:
+static func get_work_type_from_task(task_data: Dictionary) -> String:
 	"""从任务数据中提取工作类别名称"""
-	if current_task.is_empty():
+	if task_data.is_empty():
 		return ""
-	var task_type = current_task.get("type", "")
+	var task_type = task_data.get("type", "")
 	match task_type:
 		"HARVEST":
-			var skill = current_task.get("skill", "")
+			var skill = task_data.get("skill", "")
 			match skill:
 				"mining": return "采矿"
 				"woodcutting": return "伐木"
@@ -241,17 +241,17 @@ static func get_work_type_from_task(current_task: Dictionary) -> String:
 		"SLEEP": return "睡眠"
 		_: return ""
 
-static func get_state_display(state_val: int, current_task: Dictionary = {}) -> String:
+static func get_state_display(state_val: int, task_data: Dictionary = {}) -> String:
 	"""将状态枚举转换为中文显示文字"""
 	match state_val:
 		SettlerState.IDLE: return "无工作"
 		SettlerState.MOVING:
-			var work_name = get_work_type_from_task(current_task)
+			var work_name = get_work_type_from_task(task_data)
 			if work_name != "":
 				return work_name + "中"
 			return "移动中"
 		SettlerState.WORKING:
-			var work_name = get_work_type_from_task(current_task)
+			var work_name = get_work_type_from_task(task_data)
 			if work_name != "":
 				return work_name + "中"
 			return "工作中"
@@ -367,7 +367,7 @@ func _tick_harvest():
 	
 	var item_id = result.item_id
 	var amount = result.amount
-	var gm = get_node("/root/GameManager")
+	var _gm = get_node("/root/GameManager")
 	
 	# 采集到背包（优先放入个人背包）
 	inventory.add_item(item_id, amount)
@@ -561,7 +561,7 @@ func _immediate_deposit_materials():
 	current_task.erase("fetch_amount")
 	current_task.erase("construct_phase")
 
-func _construct_fetch_from_storage(bld, missing: Dictionary) -> bool:
+func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 	"""查找最近的存储建筑或地面取建筑材料，返回是否找到材料去向"""
 	var game = get_node_or_null("/root/Game")
 	if game == null or game.world == null:
@@ -573,7 +573,7 @@ func _construct_fetch_from_storage(bld, missing: Dictionary) -> bool:
 	var best_ground_pos = null
 	
 	for mat_id in missing.keys():
-		var needed = missing[mat_id]
+		var _needed = missing[mat_id]
 		# 1. 检查存储建筑（使用专门用来取料的查询，不过滤已满的仓库）
 		var storage_blds = _find_storage_with_item(mat_id, 99999)
 		for sbld in storage_blds:

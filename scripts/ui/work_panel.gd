@@ -124,7 +124,6 @@ func _rebuild_grid():
 			
 			# 左键增加优先级，右键减少优先级
 			var work_type = wt
-			var settler_id = sid
 			btn.pressed.connect(_on_left_click.bind(sid, work_type, btn))
 			btn.gui_input.connect(_on_priority_btn_gui_input.bind(sid, work_type, btn))
 			
@@ -192,6 +191,6 @@ func _check_settler_changes():
 			grid_count += 1
 	
 	# 每行有 1(名字) + 9(工作类型) = 10 个控件，减去标题行
-	var expected_rows = (grid_count - 10) / 10 + 1 if grid_count >= 10 else 0
+	var expected_rows = int(float(grid_count - 10) / 10) + 1 if grid_count >= 10 else 0
 	if expected_rows != current_count:
 		_rebuild_grid()

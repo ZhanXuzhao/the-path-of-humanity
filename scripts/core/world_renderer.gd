@@ -88,7 +88,7 @@ func _ready():
 	# 强制触发 _draw()
 	queue_redraw()
 
-func _process(delta):
+func _process(_delta):
 	# 更新选中的资源节点信息标签（资源量可能因采集而变化）
 	if _selected_resource_pos.x >= 0:
 		var deposit = world.get_resource_at(_selected_resource_pos)
