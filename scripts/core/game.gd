@@ -28,11 +28,17 @@ func _ready():
 	if _gm.state != 1:  # GameState.PLAYING
 		_gm.start_game()
 	
-	# 初始化世界
-	_generate_initial_area()
+	# 检查是否有读档数据
+	var is_loading = not _gm._loaded_save_data.is_empty()
 	
-	# 创建初始定居者
-	_spawn_initial_settlers()
+	if is_loading:
+		# 从存档恢复 - 不生成初始区域和定居者
+		_restore_from_save(_gm._loaded_save_data)
+		_gm._loaded_save_data.clear()
+	else:
+		# 新游戏 - 初始化世界和定居者
+		_generate_initial_area()
+		_spawn_initial_settlers()
 	
 	# 初始化系统引用
 	if building_system:
@@ -191,6 +197,30 @@ func _input(event):
 					for i in build_menu.category_tabs.get_child_count():
 						build_menu.category_tabs.get_child(i).button_pressed = false
 				get_viewport().set_input_as_handled()
+
+# ==================== 存档恢复 ====================
+
+func _restore_from_save(data: Dictionary):
+	"""从存档数据恢复所有系统状态"""
+	# 先恢复世界（区块/地形/资源）
+	if world and data.has("world"):
+		world.from_dict(data.world)
+	
+	# 恢复系统
+	if building_system and data.has("buildings"):
+		building_system.from_dict(data.buildings)
+	if tech_system and data.has("tech"):
+		tech_system.from_dict(data.tech)
+	if crafting_system and data.has("crafting"):
+		crafting_system.from_dict(data.crafting)
+	
+	# 恢复定居者
+	if data.has("settlers"):
+		for s_data in data.settlers:
+			var settler = load("res://scripts/entities/settler.gd").new()
+			settler.from_dict(s_data)
+			add_child(settler)
+			settlers.append(settler)
 
 # -------- 定居者管理 --------
 func get_idle_settlers() -> Array:

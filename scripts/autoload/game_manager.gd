@@ -170,3 +170,71 @@ func get_resource(resource_id: String) -> int:
 
 func show_notification(msg: String, type: NotificationType = NotificationType.INFO):
 	notification.emit(msg, type)
+
+# ==================== 存档系统 ====================
+
+# 加载存档时暂存的数据，供 Game 场景恢复
+var _loaded_save_data: Dictionary = {}
+
+func save_game() -> bool:
+	"""保存游戏（收集所有系统数据）"""
+	var game = get_node_or_null("/root/Game")
+	if not game:
+		show_notification("无法保存：未在游戏中", NotificationType.ERROR)
+		return false
+	
+	var save_data = {
+		"version": 1,
+		"game_time": game_time,
+		"current_day": current_day,
+		"time_speed": time_speed,
+		"resources": resources.duplicate(),
+		"stats": stats.duplicate(),
+		"world": game.world.to_dict() if game.world else {},
+		"buildings": game.building_system.to_dict() if game.building_system else {},
+		"tech": game.tech_system.to_dict() if game.tech_system else {},
+		"crafting": game.crafting_system.to_dict() if game.crafting_system else {},
+		"settlers": _serialize_settlers(game.settlers),
+	}
+	
+	var file = FileAccess.open("user://savegame.dat", FileAccess.WRITE)
+	if file:
+		file.store_var(save_data)
+		show_notification("游戏已保存", NotificationType.SUCCESS)
+		return true
+	else:
+		show_notification("保存失败！", NotificationType.ERROR)
+		return false
+
+func load_game() -> bool:
+	"""读取存档（恢复 GameManager 状态，暂存系统数据）"""
+	var file = FileAccess.open("user://savegame.dat", FileAccess.READ)
+	if not file:
+		show_notification("未找到存档", NotificationType.ERROR)
+		return false
+	
+	var data = file.get_var()
+	if typeof(data) != TYPE_DICTIONARY:
+		show_notification("存档数据损坏", NotificationType.ERROR)
+		return false
+	
+	# 恢复 GameManager 状态
+	game_time = data.get("game_time", 6.0)
+	current_day = data.get("current_day", 1)
+	time_speed = data.get("time_speed", 1.0)
+	resources = data.get("resources", {})
+	stats = data.get("stats", {})
+	state = GameState.PLAYING
+	
+	# 暂存系统数据供 Game 场景恢复
+	_loaded_save_data = data
+	
+	show_notification("存档已读取", NotificationType.SUCCESS)
+	return true
+
+static func _serialize_settlers(settler_list: Array) -> Array:
+	var result = []
+	for s in settler_list:
+		if is_instance_valid(s):
+			result.append(s.to_dict())
+	return result

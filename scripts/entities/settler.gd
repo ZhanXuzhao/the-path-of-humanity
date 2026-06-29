@@ -387,6 +387,8 @@ func to_dict() -> Dictionary:
 		"hp": hp,
 		"max_hp": max_hp,
 		"age": age,
+		"position": {"x": position.x, "y": position.y},
+		"state": state,
 		"inventory": inventory.to_dict(),
 	}
 
@@ -399,4 +401,6 @@ func from_dict(data: Dictionary):
 	hp = data.hp
 	max_hp = data.max_hp
 	age = data.age
+	position = Vector2(data.get("position", {}).get("x", 0.0), data.get("position", {}).get("y", 0.0))
+	state = data.get("state", SettlerState.IDLE)
 	inventory.from_dict(data.inventory)

@@ -71,37 +71,10 @@ func _on_quit_pressed():
 # ==================== 存档管理 ====================
 
 func _save_game():
-	var save_data = {
-		"version": 1,
-		"game_time": _gm.game_time,
-		"current_day": _gm.current_day,
-		"time_speed": _gm.time_speed,
-		"resources": _gm.resources.duplicate(),
-		"stats": _gm.stats.duplicate(),
-	}
-	var file = FileAccess.open("user://savegame.dat", FileAccess.WRITE)
-	if file:
-		file.store_var(save_data)
-		_gm.show_notification("游戏已保存", _gm.NotificationType.SUCCESS)
-	else:
-		_gm.show_notification("保存失败！", _gm.NotificationType.ERROR)
+	_gm.save_game()
 
 func _load_game():
-	var file = FileAccess.open("user://savegame.dat", FileAccess.READ)
-	if file:
-		var data = file.get_var()
-		if typeof(data) != TYPE_DICTIONARY:
-			_gm.show_notification("存档数据损坏", _gm.NotificationType.ERROR)
-			return
-		_gm.game_time = data.get("game_time", 6.0)
-		_gm.current_day = data.get("current_day", 1)
-		_gm.time_speed = data.get("time_speed", 1.0)
-		_gm.resources = data.get("resources", {})
-		_gm.stats = data.get("stats", {})
-		_gm.state = _gm.GameState.PLAYING
-		_gm.show_notification("存档已读取", _gm.NotificationType.SUCCESS)
+	if _gm.load_game():
 		# 如果当前不在游戏中，跳转到游戏场景
 		if get_tree().current_scene.scene_file_path != "res://scenes/game.tscn":
 			get_tree().change_scene_to_file("res://scenes/game.tscn")
-	else:
-		_gm.show_notification("未找到存档", _gm.NotificationType.ERROR)
