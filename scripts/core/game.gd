@@ -153,9 +153,36 @@ func _input(event):
 	if event.is_action_pressed("ui_cancel"):
 		if build_mode:
 			exit_build_mode()
+		else:
+			# 关闭打开的菜单
+			var build_menu = get_node_or_null("UI/BuildMenu")
+			if build_menu and build_menu.visible:
+				build_menu.visible = false
+			var tech_panel = get_node_or_null("UI/TechPanel")
+			if tech_panel and tech_panel.visible:
+				tech_panel.visible = false
 	
 	if event.is_action_pressed("left_click") and build_mode:
 		_try_place_building()
+	
+	# 快捷键 B：打开/关闭建造菜单
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_B:
+			var build_menu = get_node_or_null("UI/BuildMenu")
+			if build_menu:
+				build_menu.visible = not build_menu.visible
+				if build_menu.visible:
+					# 重置菜单到初始状态
+					build_menu.shortcut_category_active = false
+					build_menu.current_category = -1
+					build_menu._populate_buildings()
+					build_menu.info_panel.visible = false
+					build_menu.selected_building = ""
+					build_menu.build_btn.disabled = true
+					# 取消所有分类按钮的选中状态
+					for i in build_menu.category_tabs.get_child_count():
+						build_menu.category_tabs.get_child(i).button_pressed = false
+				get_viewport().set_input_as_handled()
 
 # -------- 定居者管理 --------
 func get_idle_settlers() -> Array:

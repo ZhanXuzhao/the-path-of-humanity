@@ -41,13 +41,14 @@ func _ready():
 	game_manager.notification.connect(_on_notification)
 	game_manager.resources_changed.connect(_on_resources_changed)
 	
-	# 按钮连接
+		# 按钮连接
 	if pause_btn:
 		pause_btn.pressed.connect(_on_pause_pressed)
 	if speed_btn:
 		speed_btn.pressed.connect(_on_speed_pressed)
 	if build_menu_btn:
 		build_menu_btn.pressed.connect(_on_build_menu_pressed)
+		build_menu_btn.text = "建造 [B]"
 	if tech_btn:
 		tech_btn.pressed.connect(_on_tech_pressed)
 	
@@ -81,6 +82,17 @@ func _on_build_menu_pressed():
 	var build_menu = get_node_or_null("/root/Game/UI/BuildMenu")
 	if build_menu:
 		build_menu.visible = not build_menu.visible
+		if build_menu.visible:
+			# 重置菜单到初始状态
+			build_menu.shortcut_category_active = false
+			build_menu.current_category = -1
+			build_menu._populate_buildings()
+			build_menu.info_panel.visible = false
+			build_menu.selected_building = ""
+			build_menu.build_btn.disabled = true
+			# 取消所有分类按钮的选中状态
+			for i in build_menu.category_tabs.get_child_count():
+				build_menu.category_tabs.get_child(i).button_pressed = false
 
 func _on_tech_pressed():
 	var tech_panel = get_node_or_null("/root/Game/UI/TechPanel")
