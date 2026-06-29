@@ -8,6 +8,7 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 signal building_placed(building_id: String, pos: Vector2i)
 signal building_removed(building_id: String, pos: Vector2i)
 signal building_completed(pos: Vector2i)
+signal construction_progress_updated(pos: Vector2i, progress: float, work_cost: float)
 signal production_output(pos: Vector2i, item_id: String, amount: int)
 
 # 建筑实例数据
@@ -118,6 +119,11 @@ func add_construction_progress(pos: Vector2i, amount: float) -> bool:
 	
 	bld.construction_progress += amount
 	var data = bld.get_data()
+	
+	# 发射进度更新信号（供渲染器更新进度条）
+	if data != null:
+		construction_progress_updated.emit(bld.grid_pos, bld.construction_progress, data.work_cost)
+	
 	if data != null and bld.construction_progress >= data.work_cost:
 		bld.is_completed = true
 		bld.hp = data.hp
