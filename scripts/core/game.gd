@@ -40,12 +40,12 @@ signal construction_deselected()
 
 # 选中资源节点
 var selected_resource_pos: Vector2i = Vector2i(-1, -1)
-var selected_resource_deposit = null # World.ResourceDeposit
+var selected_resource_deposit = null  # World.ResourceDeposit
 signal resource_selected(pos: Vector2i, deposit)
 signal resource_deselected()
 
 # 建筑建造重试冷却（防止反复给同一缺物资建筑分配任务）
-var _construction_retry_cooldown: Dictionary = {} # "x,y" -> frame_number
+var _construction_retry_cooldown: Dictionary = {}  # "x,y" -> frame_number
 
 # 自主行为计时器（每2秒执行一次）
 var _autonomy_timer: float = 0.0
@@ -56,7 +56,7 @@ func _ready():
 		_gm.load_game(true)
 	
 	# 启动游戏状态
-	if _gm.state != 1: # GameState.PLAYING
+	if _gm.state != 1:  # GameState.PLAYING
 		_gm.start_game()
 	
 	# 检查是否有读档数据
@@ -70,12 +70,6 @@ func _ready():
 		# 新游戏 - 初始化世界和定居者
 		_generate_initial_area()
 		_spawn_initial_settlers()
-	
-	# 应用世界可配置参数（采集量、资源倍率）
-	world.apply_settings(
-		_gm.settings.get("resource_amount_multiplier", 5.0),
-		_gm.settings.get("harvest_amount", 5.0)
-	)
 	
 	# 初始化系统引用
 	if building_system:
@@ -138,7 +132,7 @@ func _spawn_initial_settlers():
 		settlers.append(settler)
 		if work_manager:
 			work_manager.init_settler(settler.settler_id)
-		_gm.show_notification("新成员加入了聚居地: %s" % settler.settler_name,
+		_gm.show_notification("新成员加入了聚居地: %s" % settler.settler_name, 
 			3)
 
 # -------- 建造模式 --------
@@ -149,7 +143,7 @@ func enter_build_mode(building_id: String):
 	# 创建预览精灵
 	if build_preview == null:
 		build_preview = Sprite2D.new()
-		build_preview.z_index = 100 # 确保预览始终在最上层
+		build_preview.z_index = 100  # 确保预览始终在最上层
 		add_child(build_preview)
 	
 	# 设置建筑预览纹理
@@ -195,9 +189,9 @@ func _update_build_preview():
 		# 检查建造合法性并设置颜色
 		var check = building_system.can_place_building(selected_building, mouse_grid_pos)
 		if check.can_place:
-			build_preview.modulate = Color(0, 1, 0, 0.5) # 绿色-可建造
+			build_preview.modulate = Color(0, 1, 0, 0.5)  # 绿色-可建造
 		else:
-			build_preview.modulate = Color(1, 0, 0, 0.5) # 红色-不可建造
+			build_preview.modulate = Color(1, 0, 0, 0.5)  # 红色-不可建造
 
 func _try_place_building():
 	if not build_mode or selected_building == "":
@@ -216,7 +210,7 @@ func _try_place_building():
 func _find_settler_at_pos(global_pos: Vector2):
 	"""查找指定位置附近的定居者，返回定居者或 null"""
 	var closest = null
-	var closest_dist = world.tile_size * 0.6 # 约19像素，匹配角色视觉大小
+	var closest_dist = world.tile_size * 0.6  # 约19像素，匹配角色视觉大小
 	
 	for s in settlers:
 		if not is_instance_valid(s):
@@ -541,38 +535,6 @@ func _input(event):
 			if hud and hud.pause_btn:
 				hud.pause_btn.text = "▶" if _gm.state == 2 else "⏸"
 			get_viewport().set_input_as_handled()
-		
-		# 快捷键 =：加速游戏
-		if event.keycode == KEY_EQUAL:
-			var speeds = _gm.speed_levels
-			var current = _gm.time_speed
-			var idx = speeds.find(current)
-			if idx >= 0 and idx < len(speeds) - 1:
-				idx += 1
-				_gm.set_time_speed(speeds[idx])
-				_update_speed_display()
-			get_viewport().set_input_as_handled()
-		
-		# 快捷键 -：减速游戏
-		if event.keycode == KEY_MINUS:
-			var speeds = _gm.speed_levels
-			var current = _gm.time_speed
-			var idx = speeds.find(current)
-			if idx > 0:
-				idx -= 1
-				_gm.set_time_speed(speeds[idx])
-				_update_speed_display()
-			get_viewport().set_input_as_handled()
-
-func _update_speed_display():
-	"""更新 HUD 速度显示"""
-	var hud = get_node_or_null("UI/HUD")
-	if hud and hud.speed_label:
-		var speed = _gm.time_speed
-		if speed == int(speed):
-			hud.speed_label.text = "×%d" % speed
-		else:
-			hud.speed_label.text = "×%.1f" % speed
 
 # ==================== 存档恢复 ====================
 
@@ -682,7 +644,7 @@ func _assign_ai_tasks():
 			if not has_any_material:
 				# 没有任何材料可用，加入冷却防止反复尝试
 				_construction_retry_cooldown[bld_key] = current_frame
-				continue # 跳过此建筑，角色去做其他工作
+				continue  # 跳过此建筑，角色去做其他工作
 		
 		var center_pixel = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
 		tasks.append({
@@ -743,20 +705,20 @@ func _assign_ai_tasks():
 		var best_task = null
 		var best_score = INF
 		var best_idx = -1
-		var best_priority = 0 # 记录当前最高优先级
+		var best_priority = 0  # 记录当前最高优先级
 		
 		for i in range(tasks.size()):
 			var t = tasks[i]
 			
 			# 检查该定居者是否允许做此工作类型
-			var pri = 0 # 不允许
+			var pri = 0  # 不允许
 			if work_manager:
 				var wt = t.get("work_type", -1)
 				if wt >= 0:
 					pri = work_manager.get_priority(sid, wt)
 			
 			if pri <= 0:
-				continue # 该定居者不做此类型工作
+				continue  # 该定居者不做此类型工作
 			
 			# 制作任务需要检查是否有其他定居者已经在做
 			if t.get("type") == "CRAFT":
@@ -794,19 +756,19 @@ func _assign_ai_tasks():
 		tasks.remove_at(best_idx)
 		settler.assign_task(best_task)
 
-func _scan_nearby_resources(settler_list: Array) -> Array:
+func _scan_nearby_resources(settlers: Array) -> Array:
 	"""扫描定居者周围的可采集资源"""
 	var result: Array = []
 	var scanned_chunks: Dictionary = {}
 	
 	# 决定搜索范围：以所有空闲定居者位置为中心
-	var search_radius = 5 # 区块半径
-	if settler_list.is_empty():
+	var search_radius = 5  # 区块半径
+	if settlers.is_empty():
 		return result
 	
 	var center_chunk = world.global_to_chunk(Vector2i(
-		int(settler_list[0].position.x / world.tile_size),
-		int(settler_list[0].position.y / world.tile_size)
+		int(settlers[0].position.x / world.tile_size),
+		int(settlers[0].position.y / world.tile_size)
 	))
 	
 	for cx in range(center_chunk.x - search_radius, center_chunk.x + search_radius + 1):
@@ -861,20 +823,20 @@ func _scan_nearby_resources(settler_list: Array) -> Array:
 	
 	return result
 
-func _scan_material_hauling_tasks(_settlers: Array) -> Array:
+func _scan_material_hauling_tasks(settlers: Array) -> Array:
 	"""扫描需要搬运物资的建筑（施工工地/生产建筑），生成搬运任务"""
 	var result: Array = []
 	if building_system == null:
 		return result
 	
-	var haul_tasks_added: Dictionary = {} # 防止重复添加
+	var haul_tasks_added: Dictionary = {}  # 防止重复添加
 	
 	# 1. 施工工地——检查缺哪些材料
 	for bld in building_system.get_uncompleted_buildings():
 		if bld.is_materials_ready():
 			continue
 		var missing = bld.get_missing_materials()
-		var _bld_center = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
+		var bld_center = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
 		
 		for mat_id in missing.keys():
 			var needed = missing[mat_id]
@@ -885,7 +847,7 @@ func _scan_material_hauling_tasks(_settlers: Array) -> Array:
 			# 检查是否有来源可取材料
 			var source_pos = _find_material_source(mat_id)
 			if source_pos == null:
-				continue # 没有任何来源
+				continue  # 没有任何来源
 			
 			haul_tasks_added[task_key] = true
 			var source_world_pos = source_pos.world_pos if source_pos.has("world_pos") else Vector2.ZERO
@@ -893,13 +855,13 @@ func _scan_material_hauling_tasks(_settlers: Array) -> Array:
 				"id": task_key,
 				"type": "HAUL_CONSTRUCT",
 				"target_pos": bld.grid_pos,
-				"target_world_pos": source_world_pos, # 先去来源地
+				"target_world_pos": source_world_pos,  # 先去来源地
 				"target_bld_pos": bld.grid_pos,
 				"source_type": source_pos.type,
 				"source_bld_pos": source_pos.get("bld_pos", Vector2i.ZERO),
 				"item_id": mat_id,
 				"amount": needed,
-				"haul_phase": "fetch", # 初始阶段：取货
+				"haul_phase": "fetch",  # 初始阶段：取货
 				"skill": "",
 				"work_type": WorkManager.WorkType.HAULING,
 			})
@@ -914,7 +876,7 @@ func _scan_material_hauling_tasks(_settlers: Array) -> Array:
 			var needed = data.consumes[mat_id]
 			# 检查库存是否缺少
 			if bld.inventory != null and bld.inventory.has_item(mat_id, needed):
-				continue # 材料充足
+				continue  # 材料充足
 			
 			var task_key = "haul_prod_%d_%d_%s" % [bld.grid_pos.x, bld.grid_pos.y, mat_id]
 			if haul_tasks_added.has(task_key):
@@ -930,13 +892,13 @@ func _scan_material_hauling_tasks(_settlers: Array) -> Array:
 				"id": task_key,
 				"type": "HAUL_CONSTRUCT",
 				"target_pos": bld.grid_pos,
-				"target_world_pos": source_world_pos, # 先去来源地
+				"target_world_pos": source_world_pos,  # 先去来源地
 				"target_bld_pos": bld.grid_pos,
 				"source_type": source_pos.type,
 				"source_bld_pos": source_pos.get("bld_pos", Vector2i.ZERO),
 				"item_id": mat_id,
 				"amount": needed,
-				"haul_phase": "fetch", # 初始阶段：取货
+				"haul_phase": "fetch",  # 初始阶段：取货
 				"skill": "",
 				"work_type": WorkManager.WorkType.HAULING,
 			})

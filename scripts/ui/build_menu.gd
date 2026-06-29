@@ -11,7 +11,6 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var info_name: Label = $InfoPanel/Name
 @onready var info_desc: Label = $InfoPanel/Description
 @onready var info_materials: VBoxContainer = $InfoPanel/Materials
-@onready var build_btn: Button = $InfoPanel/BuildBtn
 
 var tech_system
 var building_system
@@ -52,10 +51,7 @@ func _ready():
 	visible = false
 	_populate_categories()
 	_populate_buildings()
-	
-	# 连接建造按钮信号
-	if build_btn:
-		build_btn.pressed.connect(_on_build_btn_pressed)
+
 
 func _input(event):
 	if not visible:
@@ -89,7 +85,6 @@ func _input(event):
 				_populate_buildings()
 				info_panel.visible = false
 				selected_building = ""
-				build_btn.disabled = true
 				get_viewport().set_input_as_handled()
 
 func _populate_categories():
@@ -153,10 +148,6 @@ func _select_building_by_shortcut(index: int):
 	var bld_id = building_shortcut_map[index]
 	_on_building_selected(bld_id)
 	
-	# 自动建造（仅当建筑信息已显示且材料足够时）
-	if build_btn and not build_btn.disabled:
-		_on_build_btn_pressed()
-	
 	shortcut_category_active = false
 
 func _on_category_selected(category: int):
@@ -169,7 +160,6 @@ func _on_category_selected(category: int):
 	# 清空之前选中的建筑信息
 	info_panel.visible = false
 	selected_building = ""
-	build_btn.disabled = true
 
 func _on_building_selected(building_id: String):
 	selected_building = building_id
@@ -190,13 +180,9 @@ func _on_building_selected(building_id: String):
 		info_materials.add_child(label)
 	
 	info_panel.visible = true
-	build_btn.disabled = false
-
-func _on_build_btn_pressed():
-	if selected_building == "":
-		return
-	# 进入建造模式
+	
+	# 直接进入建造模式，无需额外点击建造按钮
 	var game = get_node("/root/Game")
 	if game.has_method("enter_build_mode"):
 		game.enter_build_mode(selected_building)
-	visible = false
+
