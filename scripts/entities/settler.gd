@@ -169,6 +169,10 @@ func _process(delta):
 	if gm and gm.state != gm.GameState.PLAYING:
 		return
 	
+	# 选中时每帧重绘，确保指示线跟随角色位置实时更新
+	if is_selected:
+		queue_redraw()
+	
 	match state:
 		SettlerState.IDLE:
 			# Game 主循环会分配任务，空闲时什么都不做
@@ -189,7 +193,7 @@ func set_selected(selected: bool):
 	queue_redraw()
 
 func _draw():
-	"""绘制选择指示框"""
+	"""绘制选择指示框和连接线"""
 	if is_selected:
 		var half_size = TILE_SIZE * 0.5
 		var rect = Rect2(-half_size, -half_size, TILE_SIZE, TILE_SIZE)
@@ -197,6 +201,22 @@ func _draw():
 		draw_rect(rect, Color(0.3, 0.8, 1.0, 0.15), true)
 		# 蓝色边框
 		draw_rect(rect, Color(0.3, 0.8, 1.0, 0.9), false, 2.0)
+		
+		# 绘制目标指示线
+		_draw_target_line()
+
+func _draw_target_line():
+	"""绘制连接到目标位置的指示虚线（选中时显示）"""
+	if target_world_pos == Vector2.ZERO or position.distance_squared_to(target_world_pos) < 16.0:
+		return
+	
+	var local_target = target_world_pos - position
+	var line_color = Color(0.3, 0.8, 1.0, 0.6)
+	
+	# 虚线
+	draw_dashed_line(Vector2.ZERO, local_target, line_color, 1.5, 4.0, true)
+	# 目标位置标记圆圈
+	draw_circle(local_target, 3.0, line_color)
 
 # 根据任务数据获取工作类别显示文字
 static func get_work_type_from_task(current_task: Dictionary) -> String:
@@ -246,6 +266,8 @@ func move_to(target: Vector2):
 	"""移动到目标像素位置"""
 	target_world_pos = target
 	set_state(SettlerState.MOVING)
+	if is_selected:
+		queue_redraw()
 
 func _move_towards(delta):
 	if target_world_pos == Vector2.ZERO:
@@ -1288,6 +1310,8 @@ func assign_task(task_data: Dictionary) -> bool:
 	if target_pixel != Vector2.ZERO:
 		target_world_pos = target_pixel
 		set_state(SettlerState.MOVING, true)  # 强制切换，防止冷却导致任务卡住
+		if is_selected:
+			queue_redraw()
 	else:
 		# 没有目标位置则直接开始工作
 		set_state(SettlerState.WORKING, true)  # 强制切换，防止冷却导致任务卡住
@@ -1302,7 +1326,10 @@ func complete_task(skip_auto_store: bool = false):
 		# 成功完成任务，减少重试计数
 		_construction_retry_count = max(0, _construction_retry_count - 1)
 	current_task = null
+	target_world_pos = Vector2.ZERO
 	set_state(SettlerState.IDLE, true)  # 强制切换，防止冷却导致卡死
+	if is_selected:
+		queue_redraw()
 	
 	# 如果超重，自动寻找置物架去存放物品
 	# 但跳过紧急需求打断时的自动搬运，让角色先满足基本需求
