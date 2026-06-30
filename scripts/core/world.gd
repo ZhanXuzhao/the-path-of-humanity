@@ -138,6 +138,9 @@ func get_chunk(chunk_pos: Vector2i) -> ChunkData:
 	return chunks[chunk_pos]
 
 func ensure_chunk_generated(chunk_pos: Vector2i):
+	# 防止在世界边界外生成区块
+	if chunk_pos.x < 0 or chunk_pos.x >= WORLD_CHUNKS_X or chunk_pos.y < 0 or chunk_pos.y >= WORLD_CHUNKS_Y:
+		return
 	var chunk = get_chunk(chunk_pos)
 	if chunk.is_generated:
 		return
@@ -614,12 +617,21 @@ func to_dict() -> Dictionary:
 			})
 		ground_data["%d,%d" % [pos.x, pos.y]] = stacks_data
 	
-	return {"chunks": chunk_list, "ground_items": ground_data, "world_seed": world_seed}
+	return {
+		"chunks": chunk_list,
+		"ground_items": ground_data,
+		"world_seed": world_seed,
+		"world_chunks_x": WORLD_CHUNKS_X,
+		"world_chunks_y": WORLD_CHUNKS_Y,
+	}
 
 func from_dict(data: Dictionary):
 	chunks.clear()
 	ground_items.clear()
 	world_seed = data.get("world_seed", 0)
+	# 恢复世界尺寸（确保读档后世界大小与存档一致）
+	WORLD_CHUNKS_X = data.get("world_chunks_x", WORLD_CHUNKS_X)
+	WORLD_CHUNKS_Y = data.get("world_chunks_y", WORLD_CHUNKS_Y)
 	
 	# 恢复地面物品
 	if data.has("ground_items"):
@@ -634,6 +646,9 @@ func from_dict(data: Dictionary):
 			ground_items[pos] = stacks
 	for c_data in data.get("chunks", []):
 		var cpos := Vector2i(c_data.pos_x, c_data.pos_y)
+		# 跳过世界边界外的区块（旧存档可能有多余区块）
+		if cpos.x < 0 or cpos.x >= WORLD_CHUNKS_X or cpos.y < 0 or cpos.y >= WORLD_CHUNKS_Y:
+			continue
 		var chunk := ChunkData.new(cpos)
 		chunk.tiles = c_data.tiles
 		
