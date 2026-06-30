@@ -15,80 +15,101 @@ var commands: Array[Dictionary] = [
 ]
 
 @onready var button_container: VBoxContainer = $MarginContainer/VBox/ButtonContainer
-@onready var clear_btn: Button = $MarginContainer/VBox/ClearBtn
 @onready var title_label: Label = $MarginContainer/VBox/TitleLabel
-@onready var hint_label: Label = $MarginContainer/VBox/HintLabel
 
 var _buttons: Dictionary = {}  # work_type -> Button
+var _clear_btn: Button = null
 var _game = null
+
+const CLEAR_WORK_TYPE := -1
 
 func _ready():
 	_game = get_node("/root/Game")
 	title_label.text = "指令面板"
-	hint_label.text = "点击按钮后，在地图上\n点击或拖拽框选资源"
 	
 	# 创建指令按钮
 	for cmd in commands:
-		var btn = Button.new()
-		btn.text = "%s %s" % [cmd.icon, cmd.name]
-		btn.tooltip_text = cmd.desc
-		btn.toggle_mode = true
-		btn.custom_minimum_size = Vector2(100, 36)
-		btn.pressed.connect(_on_command_button_pressed.bind(cmd.work_type, btn))
-		button_container.add_child(btn)
-		_buttons[cmd.work_type] = btn
+		_create_cmd_button(cmd.icon, cmd.name, cmd.work_type, cmd.desc)
 	
-	# 清除标记按钮
-	clear_btn.pressed.connect(_on_clear_pressed)
+	# 创建取消按钮（风格统一）
+	_create_cmd_button("❌", "取消", CLEAR_WORK_TYPE, "框选或点选清除已标记的资源")
 	
 	# 连接游戏信号
 	if _game:
 		_game.designation_mode_changed.connect(_on_designation_mode_changed)
+		_game.clear_mode_changed.connect(_on_clear_mode_changed)
 	
 	visible = true
+
+func _create_cmd_button(icon: String, name: String, work_type: int, desc: String):
+	"""统一创建标记/取消按钮"""
+	var btn = Button.new()
+	btn.text = "%s %s" % [icon, name]
+	btn.tooltip_text = desc
+	btn.toggle_mode = true
+	btn.custom_minimum_size = Vector2(100, 36)
+	
+	if work_type == CLEAR_WORK_TYPE:
+		_clear_btn = btn
+		btn.pressed.connect(_on_clear_pressed)
+	else:
+		btn.pressed.connect(_on_command_button_pressed.bind(work_type, btn))
+		_buttons[work_type] = btn
+	
+	button_container.add_child(btn)
 
 func _on_command_button_pressed(work_type: int, btn: Button):
 	if not _game:
 		return
 	
 	if _game.designation_mode and _game.designation_work_type == work_type:
-		# 已选中此按钮 → 退出标记模式
 		_game.exit_designation_mode()
 		btn.button_pressed = false
 	else:
-		# 取消其他按钮的选中状态
 		for wt in _buttons:
 			if wt != work_type:
 				_buttons[wt].button_pressed = false
-		# 进入标记模式
+		if _clear_btn:
+			_clear_btn.button_pressed = false
+		if _game.clear_mode:
+			_game.exit_clear_mode()
 		_game.enter_designation_mode(work_type)
 		btn.button_pressed = true
 
 func _on_clear_pressed():
-	"""清除所有指定类型的标记"""
-	if not _game:
+	"""进入/退出清除模式"""
+	if not _game or not _clear_btn:
 		return
 	
-	# 退出标记模式
-	_game.exit_designation_mode()
-	for wt in _buttons:
-		_buttons[wt].button_pressed = false
-	
-	# 清除所有标记
-	_game.clear_all_designations()
+	if _game.clear_mode:
+		_game.exit_clear_mode()
+		_clear_btn.button_pressed = false
+	else:
+		for wt in _buttons:
+			_buttons[wt].button_pressed = false
+		if _game.designation_mode:
+			_game.exit_designation_mode()
+		_game.enter_clear_mode()
+		_clear_btn.button_pressed = true
 
 func _on_designation_mode_changed(active: bool, work_type: int):
-	"""当外部（如按Esc）退出标记模式时，同步按钮状态"""
+	"""当外部退出标记模式时，同步按钮状态"""
 	if not active:
 		for wt in _buttons:
 			_buttons[wt].button_pressed = false
-		hint_label.text = "点击按钮后，在地图上\n点击或拖拽框选资源"
 	else:
 		for wt in _buttons:
 			_buttons[wt].button_pressed = (wt == work_type)
-		var cmd_name = ""
-		for cmd in commands:
-			if cmd.work_type == work_type:
-				cmd_name = cmd.name
-				break
-		hint_label.text = "在地图上点击或拖拽\n框选%s资源" % cmd_name
+		if _clear_btn:
+			_clear_btn.button_pressed = false
+	
+	if _clear_btn and not active:
+		_clear_btn.button_pressed = false
+
+func _on_clear_mode_changed(active: bool):
+	"""清除模式状态变化时更新UI"""
+	if _clear_btn:
+		_clear_btn.button_pressed = active
+	if active:
+		for wt in _buttons:
+			_buttons[wt].button_pressed = false

@@ -831,16 +831,19 @@ func _create_designation_overlay(grid_pos: Vector2i, work_type: int):
 	_designation_overlay.add_child(label)
 	_designation_sprites["%d,%d" % [grid_pos.x, grid_pos.y]] = label
 
-func _create_preview_icon(grid_pos: Vector2i, work_type: int):
+func _create_preview_icon(grid_pos: Vector2i, work_type: int, is_clear: bool = false):
 	"""为框选预览创建半透明图标"""
 	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
 	if _designation_preview_sprites.has(key):
 		return
-	# 如果已是正式标记，不重复显示预览
-	if _designation_sprites.has(key):
+	# 标记模式：已正式标记的不重复显示预览
+	if not is_clear and _designation_sprites.has(key):
+		return
+	# 清除模式：只预览已被正式标记的位置
+	if is_clear and not _designation_sprites.has(key):
 		return
 	
-	var icon_text = DESIGNATION_ICONS.get(work_type, "❓")
+	var icon_text = "✕" if is_clear else DESIGNATION_ICONS.get(work_type, "❓")
 	var pixel_center = Vector2(
 		grid_pos.x * world.tile_size + world.tile_size / 2.0,
 		grid_pos.y * world.tile_size + world.tile_size / 2.0
@@ -850,8 +853,10 @@ func _create_preview_icon(grid_pos: Vector2i, work_type: int):
 	label.text = icon_text
 	label.add_theme_constant_override("minimum_font_size", 16)
 	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
-	# 预览半透明
-	label.modulate = Color(1, 1, 1, 0.45)
+	if is_clear:
+		label.modulate = Color(1, 0.4, 0.4, 0.7)
+	else:
+		label.modulate = Color(1, 1, 1, 0.45)
 	var text_size = label.get_combined_minimum_size()
 	label.position = pixel_center - text_size / 2.0
 	label.size = text_size
@@ -860,8 +865,8 @@ func _create_preview_icon(grid_pos: Vector2i, work_type: int):
 	_designation_overlay.add_child(label)
 	_designation_preview_sprites[key] = label
 
-func update_designation_preview(from_grid: Vector2i, to_grid: Vector2i, work_type: int):
-	"""根据框选矩形更新标记预览——显示矩形内匹配资源的半透明图标"""
+func update_designation_preview(from_grid: Vector2i, to_grid: Vector2i, work_type: int, is_clear: bool = false):
+	"""根据框选矩形更新标记/清除预览"""
 	_clear_designation_preview()
 	
 	if from_grid.x < 0 or to_grid.x < 0:
@@ -875,15 +880,23 @@ func update_designation_preview(from_grid: Vector2i, to_grid: Vector2i, work_typ
 	for x in range(min_x, max_x + 1):
 		for y in range(min_y, max_y + 1):
 			var pos = Vector2i(x, y)
-			var dep = world.get_resource_at(pos) if world else null
-			if dep != null and dep.amount > 0:
-				if _is_resource_match_work_type(dep.type, work_type):
-					_create_preview_icon(pos, work_type)
-			# 搬运模式也预览地面物品
-			if work_type == 6 and world:  # HAULING
-				var stacks = world.get_ground_items_at(pos)
-				if not stacks.is_empty():
-					_create_preview_icon(pos, work_type)
+			if is_clear:
+				# 清除模式：检查是否已被标记
+				var key = "%d,%d" % [x, y]
+				var game = get_node_or_null("/root/Game")
+				if game and game.designated_resources.has(key):
+					_create_preview_icon(pos, -1, true)
+			else:
+				# 标记模式：检查是否有匹配的资源
+				var dep = world.get_resource_at(pos) if world else null
+				if dep != null and dep.amount > 0:
+					if _is_resource_match_work_type(dep.type, work_type):
+						_create_preview_icon(pos, work_type)
+				# 搬运模式也预览地面物品
+				if work_type == 6 and world:  # HAULING
+					var stacks = world.get_ground_items_at(pos)
+					if not stacks.is_empty():
+						_create_preview_icon(pos, work_type)
 
 func _clear_designation_preview():
 	"""清除框选预览图标"""

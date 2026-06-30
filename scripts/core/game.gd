@@ -143,8 +143,8 @@ func _process(delta):
 	if tech_system:
 		tech_system.process_research(delta)
 	
-	# 标记模式：更新框选视觉
-	if designation_mode and _is_designation_dragging:
+	# 标记/清除模式：更新框选视觉
+	if (designation_mode or clear_mode) and _is_designation_dragging:
 		var mouse_pos = get_global_mouse_position()
 		_drag_end_grid = Vector2i(
 			floori(mouse_pos.x / world.tile_size),
@@ -440,6 +440,24 @@ func _designate_resources_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 	if changed:
 		designated_resources_changed.emit()
 
+func _remove_designations_in_rect(from_grid: Vector2i, to_grid: Vector2i):
+	"""在矩形区域内清除所有标记"""
+	var min_x = mini(from_grid.x, to_grid.x)
+	var max_x = maxi(from_grid.x, to_grid.x)
+	var min_y = mini(from_grid.y, to_grid.y)
+	var max_y = maxi(from_grid.y, to_grid.y)
+	
+	var changed = false
+	for x in range(min_x, max_x + 1):
+		for y in range(min_y, max_y + 1):
+			var key = "%d,%d" % [x, y]
+			if designated_resources.has(key):
+				designated_resources.erase(key)
+				changed = true
+	
+	if changed:
+		designated_resources_changed.emit()
+
 func _update_designation_drag_visual():
 	"""更新框选拖拽的视觉反馈——将框选数据写入覆盖层并触发重绘"""
 	if not _drag_overlay:
@@ -465,14 +483,23 @@ func _update_designation_drag_visual():
 	
 	_drag_overlay.set("drag_rect_pos", pixel_pos)
 	_drag_overlay.set("drag_rect_size", pixel_size)
+	_drag_overlay.set("is_clear_mode", clear_mode)
 	_drag_overlay.queue_redraw()
 	
 	# 更新框选内的标记预览
-	if world_renderer and world_renderer.has_method("update_designation_preview"):
+	if designation_mode and world_renderer and world_renderer.has_method("update_designation_preview"):
 		world_renderer.update_designation_preview(
 			Vector2i(min_x, min_y),
 			Vector2i(max_x, max_y),
-			designation_work_type
+			designation_work_type,
+			false
+		)
+	if clear_mode and world_renderer and world_renderer.has_method("update_designation_preview"):
+		world_renderer.update_designation_preview(
+			Vector2i(min_x, min_y),
+			Vector2i(max_x, max_y),
+			-1,
+			true
 		)
 
 func _update_build_preview():
@@ -731,6 +758,10 @@ func _input(event):
 			exit_designation_mode()
 			return
 		
+		if clear_mode:
+			exit_clear_mode()
+			return
+		
 		if build_mode:
 			exit_build_mode()
 			return
@@ -760,10 +791,13 @@ func _input(event):
 			main_menu.visible = true
 			_gm.pause_game()
 	
-	# 右键退出标记模式或建造模式
+	# 右键退出标记/清除/建造模式
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 		if designation_mode:
 			exit_designation_mode()
+			return
+		if clear_mode:
+			exit_clear_mode()
 			return
 		if build_mode:
 			exit_build_mode()
@@ -815,12 +849,55 @@ func _input(event):
 					_drag_end_grid = Vector2i(-1, -1)
 			return
 	
+	# 清除模式的左键处理
+	if event is InputEventMouseButton and not build_mode and clear_mode:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				# 开始拖拽
+				var global_pos = get_global_mouse_position()
+				_drag_start_grid = Vector2i(
+					floori(global_pos.x / world.tile_size),
+					floori(global_pos.y / world.tile_size)
+				)
+				_drag_end_grid = _drag_start_grid
+				_is_designation_dragging = true
+				if world_renderer and world_renderer.has_method("_clear_designation_preview"):
+					world_renderer._clear_designation_preview()
+				_update_designation_drag_visual()
+			else:
+				# 鼠标释放：清除框选区域内的标记
+				if _is_designation_dragging:
+					_is_designation_dragging = false
+					_update_designation_drag_visual()
+					if world_renderer and world_renderer.has_method("_clear_designation_preview"):
+						world_renderer._clear_designation_preview()
+					
+					var global_pos = get_global_mouse_position()
+					var end_grid = Vector2i(
+						floori(global_pos.x / world.tile_size),
+						floori(global_pos.y / world.tile_size)
+					)
+					
+					if _drag_start_grid == end_grid:
+						# 点选：清除单个资源的标记
+						var key = "%d,%d" % [_drag_start_grid.x, _drag_start_grid.y]
+						if designated_resources.has(key):
+							designated_resources.erase(key)
+							designated_resources_changed.emit()
+					else:
+						# 框选：清除矩形内所有标记
+						_remove_designations_in_rect(_drag_start_grid, end_grid)
+					
+					_drag_start_grid = Vector2i(-1, -1)
+					_drag_end_grid = Vector2i(-1, -1)
+			return
+	
 	if event.is_action_pressed("left_click") and build_mode:
 		_try_place_building()
 		return
 	
-	# 定居者点击选择（非建造模式、非标记模式下的左键单击）
-	if event.is_action_pressed("left_click") and not build_mode and not designation_mode:
+	# 定居者点击选择（非建造/标记/清除模式下的左键单击）
+	if event.is_action_pressed("left_click") and not build_mode and not designation_mode and not clear_mode:
 		var global_pos = get_global_mouse_position()
 		var grid_pos = Vector2i(
 			floori(global_pos.x / world.tile_size),
