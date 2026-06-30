@@ -534,6 +534,78 @@ func _update_building_info_panel(bld, data):
 	hp_label.text = "耐久: %d" % data.hp
 	hp_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
 	building_info_extra_container.add_child(hp_label)
+	
+	# ===== 可制作配方（生产建筑专用） =====
+	_show_building_recipes(bld)
+
+func _show_building_recipes(bld):
+	"""在建筑信息面板中显示可制作的配方和添加制作按钮"""
+	var game = get_node_or_null("/root/Game")
+	if not game or not game.crafting_system or not game.tech_system:
+		return
+	
+	var recipes = game.crafting_system.get_available_recipes(bld.building_id, game.tech_system.researched_techs)
+	if recipes.is_empty():
+		return
+	
+	var recipe_sep = HSeparator.new()
+	building_info_extra_container.add_child(recipe_sep)
+	
+	var recipe_title = Label.new()
+	recipe_title.text = "可制作配方:"
+	recipe_title.add_theme_color_override("font_color", Color(0.6, 0.9, 0.6))
+	building_info_extra_container.add_child(recipe_title)
+	
+	for recipe in recipes:
+		var recipe_hbox = HBoxContainer.new()
+		recipe_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		
+		# 配方信息：输入 → 输出
+		var input_text = ""
+		var first = true
+		for item_id in recipe.inputs:
+			if not first:
+				input_text += " "
+			first = false
+			var item_data = ItemDefinitions.get_item(item_id)
+			var item_name = item_data.name if item_data else item_id
+			input_text += "%s×%d" % [item_name, recipe.inputs[item_id]]
+		
+		var output_text = ""
+		first = true
+		for item_id in recipe.outputs:
+			if not first:
+				output_text += " "
+			first = false
+			var item_data = ItemDefinitions.get_item(item_id)
+			var item_name = item_data.name if item_data else item_id
+			output_text += "%s×%d" % [item_name, recipe.outputs[item_id]]
+		
+		var info_label = Label.new()
+		info_label.text = "  %s: %s → %s" % [recipe.name, input_text, output_text]
+		info_label.custom_minimum_size = Vector2(160, 0)
+		info_label.autowrap_mode = 1
+		info_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+		info_label.add_theme_constant_override("minimum_font_size", 10)
+		recipe_hbox.add_child(info_label)
+		
+		# 添加制作按钮
+		var add_btn = Button.new()
+		add_btn.text = "制作"
+		add_btn.custom_minimum_size = Vector2(50, 24)
+		add_btn.add_theme_constant_override("minimum_font_size", 10)
+		var recipe_id = recipe.id
+		var bld_pos = bld.grid_pos
+		add_btn.pressed.connect(func():
+			if game and game.crafting_system:
+				game.crafting_system.add_to_queue(recipe_id, bld_pos)
+				var gm = get_node("/root/GameManager")
+				if gm:
+					gm.show_notification("已添加制作: %s" % recipe.name, gm.NotificationType.INFO)
+		)
+		recipe_hbox.add_child(add_btn)
+		
+		building_info_extra_container.add_child(recipe_hbox)
 
 func _update_population():
 	"""更新人口显示"""
