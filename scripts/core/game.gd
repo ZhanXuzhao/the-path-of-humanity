@@ -206,8 +206,9 @@ func _generate_initial_area():
 			world.ensure_chunk_generated(Vector2i(x, y))
 
 func _spawn_initial_settlers():
-	# 创建3个初始定居者（程序自动确保名字不重复）
+	# 创建初始定居者（数量由 GameConfig 配置）
 	var work_manager = get_node_or_null("/root/WorkManager")
+	var count = get_node("/root/GameConfig").initial_settler_count
 	
 	# 世界中心网格坐标
 	var center_grid = Vector2i(
@@ -227,12 +228,12 @@ func _spawn_initial_settlers():
 	# 预生成不重复的姓名
 	var used_names: Array = []
 	var name_list: Array = []
-	for i in 3:
+	for i in count:
 		var settler_name = Settler.generate_unique_name(used_names)
 		name_list.append(settler_name)
 		used_names.append(settler_name)
 	
-	for i in 3:
+	for i in count:
 		var settler = Settler.new()
 		settler.position = spawn_center + Vector2(randf_range(-100, 100), randf_range(-100, 100))
 		# 覆盖自动生成的随机名，使用预先算好的不重复姓名

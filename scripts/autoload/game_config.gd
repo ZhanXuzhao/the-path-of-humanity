@@ -55,6 +55,7 @@ var speed_levels: Array[float] = [0.1, 0.2, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0]
 var chunk_size: int = 16
 var world_chunks_x: int = 3
 var world_chunks_y: int = 3
+var initial_settler_count: int = 1
 
 # ===== 建筑设置 =====
 var storage_rack_capacity: int = 10000
