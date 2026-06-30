@@ -441,9 +441,12 @@ func toggle_resource_designation(grid_pos: Vector2i) -> bool:
 	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
 	var is_auto = (designation_work_type == -2)
 	
-	# 狩猎模式：标记/取消标记野猪
-	if designation_work_type == WorkManager.WorkType.HUNTING:
-		return _toggle_boar_designation_at(grid_pos)
+	# 狩猎/自动模式：标记/取消标记野猪
+	if designation_work_type == WorkManager.WorkType.HUNTING or is_auto:
+		if _toggle_boar_designation_at(grid_pos):
+			return true
+		if not is_auto:
+			return false  # 纯狩猎模式，没有找到野猪
 	
 	if designated_resources.has(key):
 		if is_auto:
@@ -622,9 +625,9 @@ func _designate_resources_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 	var max_y = maxi(from_grid.y, to_grid.y)
 	var is_auto = (designation_work_type == -2)
 	
-	# 狩猎模式：框选矩形内的所有野猪
-	if designation_work_type == WorkManager.WorkType.HUNTING:
-		var changed = false
+	# 标记矩形内的野猪（狩猎模式专用，或自动模式下也标记）
+	var boar_changed = false
+	if designation_work_type == WorkManager.WorkType.HUNTING or is_auto:
 		var tile_size = world.tile_size if world else 32.0
 		var rect_pixel_min = Vector2(min_x * tile_size, min_y * tile_size)
 		var rect_pixel_max = Vector2((max_x + 1) * tile_size, (max_y + 1) * tile_size)
@@ -640,12 +643,15 @@ func _designate_resources_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 					designated_boars[inst_id] = true
 					b.is_designated = true
 					b.queue_redraw()
-					changed = true
-		
-		if changed:
+					boar_changed = true
+	
+	# 纯狩猎模式标记完野猪即可返回
+	if designation_work_type == WorkManager.WorkType.HUNTING:
+		if boar_changed:
 			designated_resources_changed.emit()
 		return
 	
+	# 其他模式（含自动模式）：继续标记资源/地面物品
 	var changed = false
 	for x in range(min_x, max_x + 1):
 		for y in range(min_y, max_y + 1):
@@ -666,7 +672,7 @@ func _designate_resources_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 					designated_resources[key] = WorkManager.WorkType.HAULING
 					changed = true
 	
-	if changed:
+	if changed or boar_changed:
 		designated_resources_changed.emit()
 
 func _remove_designations_in_rect(from_grid: Vector2i, to_grid: Vector2i):
@@ -1171,9 +1177,12 @@ func _input(event):
 					
 					# 判断是点选还是框选
 					if _drag_start_grid == end_grid:
+						var is_auto = (designation_work_type == -2)
 						# 点选：先尝试切换野猪标记（使用鼠标实际像素位置）
-						if designation_work_type == WorkManager.WorkType.HUNTING:
-							_toggle_boar_designation_at_pos(global_pos)
+						if designation_work_type == WorkManager.WorkType.HUNTING or is_auto:
+							if not _toggle_boar_designation_at_pos(global_pos) and is_auto:
+								# 自动模式下未点到野猪，回退到常规资源标记
+								toggle_resource_designation(_drag_start_grid)
 						else:
 							toggle_resource_designation(_drag_start_grid)
 					else:
