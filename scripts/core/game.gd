@@ -73,7 +73,7 @@ var designated_resources: Dictionary = {}
 var _is_designation_dragging: bool = false
 var _drag_start_grid: Vector2i = Vector2i(-1, -1)
 var _drag_end_grid: Vector2i = Vector2i(-1, -1)
-var _drag_box_visual: ColorRect = null
+var _drag_overlay: Node2D = null  # 框选覆盖层（高z_index，显示在最上面）
 
 signal designation_mode_changed(active: bool, work_type: int)
 signal designated_resources_changed()
@@ -111,6 +111,17 @@ func _ready():
 	# 更新HUD速度标签（此时存档已加载完毕，time_speed 为实际值）
 	_update_speed_label()
 
+func _init_drag_overlay():
+	"""创建框选覆盖层（独立 Node2D，高 z_index，确保绘制在最上面）"""
+	if _drag_overlay != null:
+		return
+	_drag_overlay = Node2D.new()
+	_drag_overlay.name = "DragOverlay"
+	_drag_overlay.z_index = 200
+	_drag_overlay.set_script(preload("res://scripts/core/drag_overlay.gd"))
+	add_child(_drag_overlay)
+	move_child(_drag_overlay, get_child_count() - 1)  # 移到最末尾，最后渲染
+
 func _process(delta):
 	# 建造模式预览
 	if build_mode:
@@ -128,6 +139,15 @@ func _process(delta):
 	if tech_system:
 		tech_system.process_research(delta)
 	
+	# 标记模式：更新框选视觉
+	if designation_mode and _is_designation_dragging:
+		var mouse_pos = get_global_mouse_position()
+		_drag_end_grid = Vector2i(
+			floori(mouse_pos.x / world.tile_size),
+			floori(mouse_pos.y / world.tile_size)
+		)
+		_update_designation_drag_visual()
+
 	# 定居者AI定时更新（每1秒执行一次）
 	_autonomy_timer += delta
 	if _autonomy_timer >= 1.0:
@@ -155,14 +175,7 @@ func _process(delta):
 			if stacks.is_empty():
 				_deselect_ground_item()
 		
-		# 标记模式：更新框选视觉
-		if designation_mode and _is_designation_dragging:
-			var mouse_pos = get_global_mouse_position()
-			_drag_end_grid = Vector2i(
-				floori(mouse_pos.x / world.tile_size),
-				floori(mouse_pos.y / world.tile_size)
-			)
-			_update_designation_drag_visual()
+		
 
 func _generate_initial_area():
 	# 新游戏：随机化地图种子，确保每次地图不同
@@ -280,16 +293,7 @@ func enter_designation_mode(work_type: int):
 	designation_mode = true
 	designation_work_type = work_type
 	_is_designation_dragging = false
-	
-	# 创建框选视觉（矩形虚线框）
-	if _drag_box_visual == null:
-		_drag_box_visual = ColorRect.new()
-		_drag_box_visual.color = Color(0.3, 1.0, 0.3, 0.15)
-		_drag_box_visual.z_index = 150
-		_drag_box_visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		# 边框用4条线实现
-		_drag_box_visual.size = Vector2.ZERO
-		add_child(_drag_box_visual)
+	_init_drag_overlay()
 	
 	designation_mode_changed.emit(true, work_type)
 
@@ -298,11 +302,8 @@ func exit_designation_mode():
 	designation_mode = false
 	designation_work_type = -1
 	_is_designation_dragging = false
-	
-	if _drag_box_visual:
-		_drag_box_visual.size = Vector2.ZERO
-		_drag_box_visual.visible = false
-	
+	if _drag_overlay:
+		_drag_overlay.queue_redraw()
 	designation_mode_changed.emit(false, -1)
 
 func toggle_resource_designation(grid_pos: Vector2i) -> bool:
@@ -409,12 +410,17 @@ func _designate_resources_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 		designated_resources_changed.emit()
 
 func _update_designation_drag_visual():
-	"""更新框选拖拽的视觉反馈"""
-	if not _is_designation_dragging or _drag_start_grid.x < 0 or _drag_end_grid.x < 0:
-		if _drag_box_visual:
-			_drag_box_visual.visible = false
+	"""更新框选拖拽的视觉反馈——将框选数据写入覆盖层并触发重绘"""
+	if not _drag_overlay:
 		return
 	
+	if not _is_designation_dragging or _drag_start_grid.x < 0 or _drag_end_grid.x < 0:
+		_drag_overlay.visible = false
+		return
+	
+	_drag_overlay.visible = true
+	
+	# 计算框选矩形，存入覆盖层供其 _draw() 使用
 	var min_x = mini(_drag_start_grid.x, _drag_end_grid.x)
 	var max_x = maxi(_drag_start_grid.x, _drag_end_grid.x)
 	var min_y = mini(_drag_start_grid.y, _drag_end_grid.y)
@@ -426,9 +432,9 @@ func _update_designation_drag_visual():
 		(max_y - min_y + 1) * world.tile_size
 	)
 	
-	_drag_box_visual.position = pixel_pos
-	_drag_box_visual.size = pixel_size
-	_drag_box_visual.visible = true
+	_drag_overlay.set("drag_rect_pos", pixel_pos)
+	_drag_overlay.set("drag_rect_size", pixel_size)
+	_drag_overlay.queue_redraw()
 
 func _update_build_preview():
 	var mouse_pos = get_global_mouse_position()
@@ -740,12 +746,12 @@ func _input(event):
 				)
 				_drag_end_grid = _drag_start_grid
 				_is_designation_dragging = true
-				_drag_box_visual.visible = false
+				_update_designation_drag_visual()
 			else:
 				# 鼠标释放：完成框选
 				if _is_designation_dragging:
 					_is_designation_dragging = false
-					_drag_box_visual.visible = false
+					_update_designation_drag_visual()
 					
 					var global_pos = get_global_mouse_position()
 					var end_grid = Vector2i(
