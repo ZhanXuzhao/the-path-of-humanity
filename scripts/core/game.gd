@@ -509,11 +509,13 @@ func _toggle_boar_designation_at(grid_pos: Vector2i) -> bool:
 			if designated_boars.has(inst_id):
 				designated_boars.erase(inst_id)
 				b.is_designated = false
+				b.queue_redraw()
 				designated_resources_changed.emit()
 				return false
 			else:
 				designated_boars[inst_id] = true
 				b.is_designated = true
+				b.queue_redraw()
 				designated_resources_changed.emit()
 				return true
 	return false
@@ -531,11 +533,13 @@ func _toggle_boar_designation_at_pos(global_pos: Vector2) -> bool:
 			if designated_boars.has(inst_id):
 				designated_boars.erase(inst_id)
 				b.is_designated = false
+				b.queue_redraw()
 				designated_resources_changed.emit()
 				return true
 			else:
 				designated_boars[inst_id] = true
 				b.is_designated = true
+				b.queue_redraw()
 				designated_resources_changed.emit()
 				return true
 	return false
@@ -550,6 +554,7 @@ func clear_all_designations():
 	for b in boars:
 		if is_instance_valid(b):
 			b.is_designated = false
+			b.queue_redraw()
 	designated_boars.clear()
 	designated_resources_changed.emit()
 
@@ -617,6 +622,30 @@ func _designate_resources_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 	var max_y = maxi(from_grid.y, to_grid.y)
 	var is_auto = (designation_work_type == -2)
 	
+	# 狩猎模式：框选矩形内的所有野猪
+	if designation_work_type == WorkManager.WorkType.HUNTING:
+		var changed = false
+		var tile_size = world.tile_size if world else 32.0
+		var rect_pixel_min = Vector2(min_x * tile_size, min_y * tile_size)
+		var rect_pixel_max = Vector2((max_x + 1) * tile_size, (max_y + 1) * tile_size)
+		
+		for b in boars:
+			if not is_instance_valid(b) or b.state == b.BoarState.DEAD:
+				continue
+			# 检查野猪位置是否在矩形内
+			if b.position.x >= rect_pixel_min.x and b.position.x < rect_pixel_max.x \
+					and b.position.y >= rect_pixel_min.y and b.position.y < rect_pixel_max.y:
+				var inst_id = b.get_instance_id()
+				if not designated_boars.has(inst_id):
+					designated_boars[inst_id] = true
+					b.is_designated = true
+					b.queue_redraw()
+					changed = true
+		
+		if changed:
+			designated_resources_changed.emit()
+		return
+	
 	var changed = false
 	for x in range(min_x, max_x + 1):
 		for y in range(min_y, max_y + 1):
@@ -641,12 +670,31 @@ func _designate_resources_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 		designated_resources_changed.emit()
 
 func _remove_designations_in_rect(from_grid: Vector2i, to_grid: Vector2i):
-	"""在矩形区域内清除所有标记"""
+	"""在矩形区域内清除所有标记（包括资源标记和野猪标记）"""
 	var min_x = mini(from_grid.x, to_grid.x)
 	var max_x = maxi(from_grid.x, to_grid.x)
 	var min_y = mini(from_grid.y, to_grid.y)
 	var max_y = maxi(from_grid.y, to_grid.y)
 	
+	var tile_size = world.tile_size if world else 32.0
+	var rect_pixel_min = Vector2(min_x * tile_size, min_y * tile_size)
+	var rect_pixel_max = Vector2((max_x + 1) * tile_size, (max_y + 1) * tile_size)
+	
+	# 清除矩形内的野猪标记
+	var boar_changed = false
+	for b in boars:
+		if not is_instance_valid(b) or b.state == b.BoarState.DEAD:
+			continue
+		if b.position.x >= rect_pixel_min.x and b.position.x < rect_pixel_max.x \
+				and b.position.y >= rect_pixel_min.y and b.position.y < rect_pixel_max.y:
+			var inst_id = b.get_instance_id()
+			if designated_boars.has(inst_id):
+				designated_boars.erase(inst_id)
+				b.is_designated = false
+				b.queue_redraw()
+				boar_changed = true
+	
+	# 清除矩形内的资源标记
 	var changed = false
 	for x in range(min_x, max_x + 1):
 		for y in range(min_y, max_y + 1):
@@ -655,7 +703,7 @@ func _remove_designations_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 				designated_resources.erase(key)
 				changed = true
 	
-	if changed:
+	if changed or boar_changed:
 		designated_resources_changed.emit()
 
 func _update_designation_drag_visual():
