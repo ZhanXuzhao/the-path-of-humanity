@@ -1,0 +1,73 @@
+[gd_scene format=3 uid="uid://dgty3c8aueh4s"]
+
+[ext_resource type="Script" path="res://scripts/ui/name_confirm_dialog.gd" id="1_7tx6q"]
+
+[node name="NameConfirmDialog" type="Control"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("1_7tx6q")
+
+[node name="Bg" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.05, 0.05, 0.07, 0.85)
+mouse_filter = 1
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -200.0
+offset_right = 250.0
+offset_bottom = 200.0
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="VBox" type="VBoxContainer" parent="MarginContainer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/separation = 16
+
+[node name="TitleLabel" type="Label" parent="MarginContainer/VBox"]
+custom_minimum_size = Vector2(0, 48)
+theme_override_colors/font_color = Color(0.85, 0.65, 0.2, 1)
+theme_override_constants/minimum_font_size = 26
+text = "确认初始成员姓名"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="MarginContainer/VBox"]
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_constants/minimum_font_size = 14
+text = "为每位初始成员确认姓名，可点击"重新随机"更换"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="MarginContainer/VBox"]
+custom_minimum_size = Vector2(450, 200)
+size_flags_vertical = 3
+
+[node name="SlotsContainer" type="VBoxContainer" parent="MarginContainer/VBox/ScrollContainer"]
+theme_override_constants/separation = 8
+
+[node name="RerollAllBtn" type="Button" parent="MarginContainer/VBox"]
+custom_minimum_size = Vector2(200, 40)
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_constants/minimum_font_size = 16
+text = "全部重新随机"
+
+[node name="ConfirmBtn" type="Button" parent="MarginContainer/VBox"]
+custom_minimum_size = Vector2(200, 48)
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_constants/minimum_font_size = 20
+text = "确认开始 ✓"

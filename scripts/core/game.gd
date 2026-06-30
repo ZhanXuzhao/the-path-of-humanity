@@ -77,7 +77,7 @@ func _ready():
 		_restore_from_save(_gm._loaded_save_data)
 		_gm._loaded_save_data.clear()
 	else:
-		# 新游戏 - 初始化世界和定居者
+		# 新游戏 - 初始化世界和定居者（程序自动确保名字不重复）
 		_generate_initial_area()
 		_spawn_initial_settlers()
 	
@@ -142,7 +142,7 @@ func _generate_initial_area():
 			world.ensure_chunk_generated(Vector2i(x, y))
 
 func _spawn_initial_settlers():
-	# 创建3个初始定居者
+	# 创建3个初始定居者（程序自动确保名字不重复）
 	var work_manager = get_node_or_null("/root/WorkManager")
 	
 	# 世界中心网格坐标
@@ -160,9 +160,19 @@ func _spawn_initial_settlers():
 		spawn_center_grid.y * world.tile_size + world.tile_size / 2.0
 	)
 	
+	# 预生成不重复的姓名
+	var used_names: Array = []
+	var name_list: Array = []
+	for i in 3:
+		var name = Settler.generate_unique_name(used_names)
+		name_list.append(name)
+		used_names.append(name)
+	
 	for i in 3:
 		var settler = Settler.new()
 		settler.position = spawn_center + Vector2(randf_range(-100, 100), randf_range(-100, 100))
+		# 覆盖自动生成的随机名，使用预先算好的不重复姓名
+		settler.settler_name = name_list[i]
 		add_child(settler)
 		settlers.append(settler)
 		if work_manager:

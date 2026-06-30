@@ -1590,17 +1590,89 @@ func _find_and_harvest_berries():
 		target_world_pos = best_pos.world_pos
 		set_state(SettlerState.MOVING)
 
+# 姓氏池（100个）
+const SURNAMES = [
+	"李", "王", "张", "刘", "陈", "杨", "赵", "黄", "周", "吴",
+	"徐", "孙", "马", "胡", "朱", "郭", "何", "罗", "高", "林",
+	"梁", "宋", "郑", "谢", "韩", "唐", "冯", "于", "董", "萧",
+	"程", "曹", "袁", "邓", "许", "傅", "沈", "曾", "彭", "吕",
+	"苏", "卢", "蒋", "蔡", "贾", "丁", "魏", "薛", "叶", "阎",
+	"余", "潘", "杜", "戴", "夏", "钟", "汪", "田", "任", "姜",
+	"范", "方", "石", "姚", "谭", "廖", "邹", "熊", "金", "陆",
+	"郝", "孔", "白", "崔", "康", "毛", "邱", "秦", "江", "史",
+	"顾", "侯", "邵", "孟", "龙", "万", "段", "雷", "钱", "汤",
+	"尹", "黎", "易", "常", "武", "乔", "贺", "赖", "龚", "文"
+]
+
+# 男性名字池（100个）
+const MALE_NAMES = [
+	"伟", "强", "磊", "军", "勇", "明", "杰", "涛", "斌", "俊",
+	"浩", "鹏", "志", "峰", "超", "波", "辉", "刚", "健", "龙",
+	"毅", "飞", "宇", "文", "博", "华", "平", "民", "国", "建",
+	"旭", "阳", "海", "鑫", "铭", "辰", "睿", "晨", "曦", "昊天",
+	"浩宇", "志远", "鹏飞", "天宇", "翰林", "泽宇", "思远", "俊杰",
+	"浩然", "天佑", "文博", "明远", "子轩", "雨泽", "思哲", "宇轩",
+	"景行", "致远", "鸿涛", "宇恒", "嘉懿", "宏远", "云帆", "安澜",
+	"修远", "瑾瑜", "璟煜", "承泽", "瑞霖", "明熙", "晨曦", "皓轩",
+	"子涵", "一鸣", "奕辰", "弘毅", "启航", "嘉瑞", "沛泽", "锦程",
+	"骏驰", "铭泽", "景桓", "辰逸", "柏豪", "俊楠", "昊天", "泽楷"
+]
+
+# 女性名字池（100个）
+const FEMALE_NAMES = [
+	"芳", "娟", "敏", "静", "丽", "娜", "霞", "燕", "艳", "琳",
+	"雪", "梅", "琴", "兰", "红", "玲", "英", "萍", "华", "青",
+	"文", "秀", "美", "惠", "月", "洁", "云", "莲", "珍", "蓉",
+	"蕊", "婷", "慧", "萱", "妍", "琪", "瑶", "怡", "梦", "颖",
+	"悦", "蕾", "薇", "妮", "璇", "艺", "佳", "茜", "芷", "雯",
+	"馨", "梓涵", "雨涵", "语嫣", "婉婷", "若曦", "梦琪", "慕晴",
+	"诗涵", "雅静", "芷若", "嫣然", "心怡", "舒雅", "思颖", "晓萱",
+	"紫萱", "雅琴", "冰洁", "洛晴", "映雪", "听荷", "含玉", "书瑶",
+	"安雅", "清欢", "以寒", "雨薇", "诗韵", "若兰", "芷荷", "筠心",
+	"沛珊", "雪怡", "乐菱", "念薇", "疏桐", "宁馨", "语琴", "云梦",
+	"绮彤", "灵芸", "沐曦", "瑾萱", "茹雪", "芷柔", "黛眉", "碧菡"
+]
+
+# 随机生成一个不重复的名字
+static func generate_unique_name(existing_names: Array) -> String:
+	var is_male = randi() % 2 == 0
+	var surname = SURNAMES[randi() % SURNAMES.size()]
+	var given_name
+	if is_male:
+		given_name = MALE_NAMES[randi() % MALE_NAMES.size()]
+	else:
+		given_name = FEMALE_NAMES[randi() % FEMALE_NAMES.size()]
+	var full_name = surname + given_name
+	
+	# 去重：最多尝试50次
+	var attempts = 0
+	while full_name in existing_names and attempts < 50:
+		surname = SURNAMES[randi() % SURNAMES.size()]
+		if is_male:
+			given_name = MALE_NAMES[randi() % MALE_NAMES.size()]
+		else:
+			given_name = FEMALE_NAMES[randi() % FEMALE_NAMES.size()]
+		full_name = surname + given_name
+		attempts += 1
+	
+	return full_name
+
 func _randomize_name():
-	var first_names_male = ["阿明", "大壮", "铁柱", "志强", "建国"]
-	var first_names_female = ["小芳", "阿珍", "翠花", "秀英", "丽华"]
-	var last_names = ["李", "王", "张", "刘", "陈", "杨", "赵", "黄", "周", "吴"]
 	var is_male = randi() % 2 == 0
 	if is_male:
 		gender = Gender.MALE
-		settler_name = last_names[randi() % last_names.size()] + first_names_male[randi() % first_names_male.size()]
 	else:
 		gender = Gender.FEMALE
-		settler_name = last_names[randi() % last_names.size()] + first_names_female[randi() % first_names_female.size()]
+	settler_name = generate_unique_name([])
+
+func randomize_name_with_pool(existing_names: Array):
+	"""使用已有的名字池生成不重复的名字"""
+	var is_male = randi() % 2 == 0
+	if is_male:
+		gender = Gender.MALE
+	else:
+		gender = Gender.FEMALE
+	settler_name = generate_unique_name(existing_names)
 
 func _randomize_age():
 	age = 10.0 + randi() % 51  # 10~60 岁
