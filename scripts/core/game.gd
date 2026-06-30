@@ -1317,6 +1317,10 @@ func _assign_ai_tasks():
 				var job = t.get("crafting_job")
 				if job and job.assigned_settler_id != "":
 					continue
+				# 同一建筑同时只允许一人使用
+				var building_pos = t.get("building_pos", Vector2i.ZERO)
+				if building_pos != Vector2i.ZERO and crafting_system.is_building_occupied(building_pos):
+					continue
 			
 			# 建造任务：如果该定居者对同一建筑已重试过多次，跳过
 			if t.get("type") == "CONSTRUCT" and settler._construction_retry_count >= settler.MAX_CONSTRUCTION_RETRIES:

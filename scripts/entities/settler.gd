@@ -1061,6 +1061,18 @@ func _tick_craft():
 			
 			# 检查是否完成
 			if job.progress >= recipe.work_time:
+				# 产出物品放入定居者背包
+				for out_id in recipe.outputs:
+					var out_amt = recipe.outputs[out_id]
+					inventory.add_item(out_id, out_amt)
+				var out_desc = ""
+				for out_id in recipe.outputs:
+					var item_data = ItemDefinitions.get_item(out_id)
+					var item_name = item_data.name if item_data else out_id
+					if out_desc != "": out_desc += ", "
+					out_desc += "%s×%d" % [item_name, recipe.outputs[out_id]]
+				LogUtil.info(self, "制作完成: %s, 产出 %s" % [recipe.name, out_desc])
+				
 				game.crafting_system.complete_crafting(job, recipe)
 				queue.erase(job)
 				game.crafting_system.active_jobs.erase(job)

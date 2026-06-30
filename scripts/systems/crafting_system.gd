@@ -105,6 +105,16 @@ func get_pending_crafting_jobs() -> Array:
 				jobs.append(job)
 	return jobs
 
+func is_building_occupied(building_pos: Vector2i) -> bool:
+	"""检查指定建筑是否已有定居者在工作"""
+	var queue = crafting_queues.get(building_pos)
+	if queue == null:
+		return false
+	for job in queue:
+		if job.is_active and job.assigned_settler_id != "":
+			return true
+	return false
+
 func get_available_recipes(building_id: String, researched_techs: Array) -> Array:
 	"""获取建筑可用的已解锁配方"""
 	var all_recipes = ItemDefinitions.get_recipes_for_building(building_id)
