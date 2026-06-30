@@ -80,6 +80,7 @@ func _ready():
 	world.tile_changed.connect(_on_tile_changed)
 	world.ground_items_changed.connect(_on_ground_items_changed)
 	world.resource_depleted.connect(_on_resource_depleted)
+	world.chunk_generated.connect(_on_chunk_generated)
 	
 	# 连接建筑系统信号
 	if building_system:
@@ -153,19 +154,30 @@ func _render_existing_chunks():
 		var chunk = world.chunks[chunk_pos]
 		if not chunk.is_generated:
 			continue
-		var chunk_origin = chunk_pos * World.CHUNK_SIZE
-		for tile_pos in chunk.tiles:
-			var global_pos = chunk_origin + tile_pos
-			_render_tile(global_pos, chunk.tiles[tile_pos])
-		for res_pos in chunk.resources:
-			var global_pos = chunk_origin + res_pos
-			_render_resource(global_pos, chunk.resources[res_pos])
-		for bld_pos in chunk.buildings:
-			var global_pos = chunk_origin + bld_pos
-			var bld_id = chunk.buildings[bld_pos]
-			var bld_instance = building_system.get_building_at(global_pos) if building_system else null
-			if bld_instance and bld_instance.grid_pos == global_pos:
-				_render_building(global_pos, bld_id)
+		_render_chunk(chunk)
+
+func _on_chunk_generated(chunk_pos: Vector2i):
+	"""新区块生成时实时渲染"""
+	var chunk = world.chunks.get(chunk_pos)
+	if chunk == null or not chunk.is_generated:
+		return
+	_render_chunk(chunk)
+
+func _render_chunk(chunk: World.ChunkData):
+	"""渲染单个区块的所有内容（瓦片、资源、建筑）"""
+	var chunk_origin = chunk.pos * World.CHUNK_SIZE
+	for tile_pos in chunk.tiles:
+		var global_pos = chunk_origin + tile_pos
+		_render_tile(global_pos, chunk.tiles[tile_pos])
+	for res_pos in chunk.resources:
+		var global_pos = chunk_origin + res_pos
+		_render_resource(global_pos, chunk.resources[res_pos])
+	for bld_pos in chunk.buildings:
+		var global_pos = chunk_origin + bld_pos
+		var bld_id = chunk.buildings[bld_pos]
+		var bld_instance = building_system.get_building_at(global_pos) if building_system else null
+		if bld_instance and bld_instance.grid_pos == global_pos:
+			_render_building(global_pos, bld_id)
 
 func _render_tile(pos: Vector2i, tile_type: int):
 	"""渲染单个瓦片"""

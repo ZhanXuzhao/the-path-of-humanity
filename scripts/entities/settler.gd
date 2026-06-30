@@ -97,6 +97,7 @@ var inventory
 var target_world_pos: Vector2 = Vector2.ZERO   # 移动目标（像素坐标）
 var _path: Array[Vector2i] = []                # A*寻路路径（网格坐标，不含起点）
 var _path_target_grid: Vector2i = Vector2i(-1, -1)  # 上次计算路径的目标网格
+var _last_chunk_pos: Vector2i = Vector2i(-9999, -9999)  # 上次所在区块坐标（用于世界扩张）
 var work_tick_interval: float = 3.0             # 每次工作刻的间隔（秒）
 var _last_work_tick_time: float = 0.0           # 上次工作刻的现实时间戳（秒）
 var is_working_on_construction: bool = false    # 是否正在建造建筑
@@ -427,6 +428,12 @@ func _move_towards(delta):
 		int(position.x / tile_ts),
 		int(position.y / tile_ts)
 	)
+	
+	# 检测角色是否进入了新区块，若是则生成周围区块（实现世界地图向外扩张）
+	var current_chunk = game.world.global_to_chunk(current_grid)
+	if current_chunk != _last_chunk_pos:
+		_last_chunk_pos = current_chunk
+		game.world.ensure_surrounding_chunks_generated(current_chunk)
 	
 	# 检查当前是否站在不可行走的地形上（兜底保护）
 	if not game.world.is_walkable(current_grid):
@@ -1498,9 +1505,6 @@ func try_eat():
 		set_state(SettlerState.MOVING)
 		return
 	
-	# 3. 都没有的话，去找浆果丛采集
-	_find_and_harvest_berries()
-
 var _eat_timer: float = 0.0
 
 func _tick_eat(delta):
@@ -1562,63 +1566,6 @@ func _find_food_in_storage() -> Dictionary:
 				return {"bld": bld, "food_id": food_id}
 	
 	return {}
-
-func _find_and_harvest_berries():
-	"""找最近的浆果丛去采集"""
-	var game = get_node_or_null("/root/Game")
-	if game == null or game.world == null:
-		return
-	
-	# 搜索周围区块找浆果丛
-	var search_radius = 4
-	var center_chunk = game.world.global_to_chunk(Vector2i(
-		int(position.x / game.world.tile_size),
-		int(position.y / game.world.tile_size)
-	))
-	
-	var best_pos = null
-	var best_dist = INF
-	
-	for cx in range(center_chunk.x - search_radius, center_chunk.x + search_radius + 1):
-		for cy in range(center_chunk.y - search_radius, center_chunk.y + search_radius + 1):
-			var chunk_pos = Vector2i(cx, cy)
-			game.world.ensure_chunk_generated(chunk_pos)
-			var chunk = game.world.get_chunk(chunk_pos)
-			if not chunk.is_generated:
-				continue
-			for local_pos in chunk.resources:
-				var dep = chunk.resources[local_pos]
-				if dep == null or dep.amount <= 0:
-					continue
-				if dep.type != game.world.ResourceNodeType.BERRY_BUSH:
-					continue
-				var global_pos = chunk_pos * game.world.CHUNK_SIZE + local_pos
-				var res_key = "%d,%d" % [global_pos.x, global_pos.y]
-				# 跳过已被其他定居者占用的浆果丛
-				if game._claimed_harvest_resources and game._claimed_harvest_resources.has(res_key):
-					continue
-				var world_pos = Vector2(
-					global_pos.x * game.world.tile_size + game.world.tile_size / 2.0,
-					global_pos.y * game.world.tile_size + game.world.tile_size / 2.0
-				)
-				var dist = position.distance_squared_to(world_pos)
-				if dist < best_dist:
-					best_dist = dist
-					best_pos = {"global_pos": global_pos, "world_pos": world_pos}
-	
-	if best_pos != null:
-		current_task = {
-			"type": "HARVEST",
-			"target_pos": best_pos.global_pos,
-			"target_world_pos": best_pos.world_pos,
-			"skill": "woodcutting",
-			"priority": 4,
-		}
-		# 标记该资源已被占用
-		if game.has_method("claim_harvest_resource"):
-			game.claim_harvest_resource(best_pos.global_pos, settler_id)
-		target_world_pos = best_pos.world_pos
-		set_state(SettlerState.MOVING)
 
 # 姓氏池（100个）
 const SURNAMES = [

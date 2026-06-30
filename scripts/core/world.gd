@@ -8,6 +8,7 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 signal tile_changed(pos: Vector2i, tile_type: int)
 signal resource_depleted(pos: Vector2i)
 signal ground_items_changed(grid_pos: Vector2i)
+signal chunk_generated(chunk_pos: Vector2i)
 
 # 每个区块的大小（瓦片数）
 const CHUNK_SIZE := 16
@@ -138,13 +139,20 @@ func get_chunk(chunk_pos: Vector2i) -> ChunkData:
 	return chunks[chunk_pos]
 
 func ensure_chunk_generated(chunk_pos: Vector2i):
-	# 防止在世界边界外生成区块
-	if chunk_pos.x < 0 or chunk_pos.x >= WORLD_CHUNKS_X or chunk_pos.y < 0 or chunk_pos.y >= WORLD_CHUNKS_Y:
-		return
 	var chunk = get_chunk(chunk_pos)
 	if chunk.is_generated:
 		return
 	_generate_chunk(chunk)
+
+func ensure_surrounding_chunks_generated(center_chunk: Vector2i):
+	"""生成中心区块及其周围8个区块（已生成的忽略）"""
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var chunk_pos = center_chunk + Vector2i(dx, dy)
+			var chunk = get_chunk(chunk_pos)
+			if chunk.is_generated:
+				continue
+			_generate_chunk(chunk)
 
 func _generate_chunk(chunk: ChunkData):
 	# 使用多层噪声生成地形，产生自然连续的地貌
@@ -278,6 +286,7 @@ func _generate_chunk(chunk: ChunkData):
 					chunk.resources[tile_pos] = dep
 	
 	chunk.is_generated = true
+	chunk_generated.emit(chunk.pos)
 
 # -------- 确定性随机数辅助函数（基于世界坐标，保证跨区块边界连续）--------
 func _world_rand(pos: Vector2i, base_seed: int, channel: int) -> float:

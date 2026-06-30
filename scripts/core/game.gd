@@ -1368,7 +1368,7 @@ func _assign_ai_tasks():
 	var ground_cleanup_tasks = _scan_ground_item_storage_tasks(idle_settlers, haul_tasks)
 	tasks.append_array(ground_cleanup_tasks)
 	
-	# 4. 采集任务 - 在地图已生成区块中找最近的资源
+	# 4. 采集任务 - 在已生成的区块中找最近的资源（不主动生成新区块）
 	var harvest_tasks = _scan_nearby_resources(idle_settlers)
 	tasks.append_array(harvest_tasks)
 	
@@ -1453,11 +1453,10 @@ func _assign_ai_tasks():
 		LogUtil.d("settler.assign_task(best_task): %s -> %s" % [settler.settler_name, best_task.get("id", "")])
 
 func _scan_nearby_resources(idle_settlers: Array) -> Array:
-	"""扫描定居者周围的可采集资源"""
+	"""扫描定居者周围已生成区块中的可采集资源（不主动生成新区块）"""
 	var result: Array = []
 	var scanned_chunks: Dictionary = {}
 	
-	# 决定搜索范围：以所有空闲定居者位置为中心
 	var search_radius = 5  # 区块半径
 	if idle_settlers.is_empty():
 		return result
@@ -1474,9 +1473,9 @@ func _scan_nearby_resources(idle_settlers: Array) -> Array:
 				continue
 			scanned_chunks[chunk_pos] = true
 			
-			world.ensure_chunk_generated(chunk_pos)
-			var chunk = world.get_chunk(chunk_pos)
-			if not chunk.is_generated:
+			# 只扫描已经生成的区块，不主动生成新区块
+			var chunk = world.chunks.get(chunk_pos)
+			if chunk == null or not chunk.is_generated:
 				continue
 			
 			for local_pos in chunk.resources:
@@ -1498,16 +1497,6 @@ func _scan_nearby_resources(idle_settlers: Array) -> Array:
 				var world_pos = _grid_to_world(global_pos)
 				var item_id = dep.get_item_drop()
 				
-				# 根据资源类型映射技能
-				var skill_map = {
-					world.ResourceNodeType.TREE: "woodcutting",
-					world.ResourceNodeType.STONE_DEPOSIT: "mining",
-					world.ResourceNodeType.IRON_DEPOSIT: "mining",
-					world.ResourceNodeType.COPPER_DEPOSIT: "mining",
-					world.ResourceNodeType.COAL_DEPOSIT: "mining",
-					world.ResourceNodeType.BERRY_BUSH: "woodcutting",
-				}
-				
 				var work_type = WorkManager.WorkType.WOODCUTTING
 				match dep.type:
 					world.ResourceNodeType.STONE_DEPOSIT, world.ResourceNodeType.IRON_DEPOSIT, world.ResourceNodeType.COPPER_DEPOSIT, world.ResourceNodeType.COAL_DEPOSIT:
@@ -1522,7 +1511,6 @@ func _scan_nearby_resources(idle_settlers: Array) -> Array:
 					"target_world_pos": world_pos,
 					"resource_type": dep.type,
 					"harvest_item": item_id,
-					"skill": skill_map.get(dep.type, "woodcutting"),
 					"work_required": dep.harvest_time,
 					"work_type": work_type,
 				})
