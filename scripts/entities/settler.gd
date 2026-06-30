@@ -51,7 +51,7 @@ var needs = {
 # 需求衰减速度（每小时）——从 GameManager.settings 加载
 var NEED_DECAY = {
 	"hunger": 4.17,
-	"rest": 3.0,
+	"rest": 5.0,
 	"comfort": 1.0,
 	"social": 2.0,
 	"safety": 0.5,
@@ -1272,7 +1272,7 @@ func _tick_sleep(delta):
 		delta_hours = gm.time_speed * delta * (24.0 / gm.day_length)
 	
 	# 快速恢复精力
-	var sleep_restore = _settler_setting("sleep_restore_per_hour", 15.0)
+	var sleep_restore = _settler_setting("sleep_restore_per_hour", 50.0)
 	modify_need("rest", delta_hours * sleep_restore)
 	
 	# 最少睡眠时间（可配置，默认3秒），防止刚入睡就被打断导致睡眠循环
@@ -1500,7 +1500,7 @@ func _apply_config_settings():
 	
 	# 加载需求衰减配置
 	NEED_DECAY["hunger"] = _settler_setting("hunger_decay_per_hour", 4.17)
-	NEED_DECAY["rest"] = _settler_setting("rest_decay_per_hour", 3.0)
+	NEED_DECAY["rest"] = _settler_setting("rest_decay_per_hour", 5.0)
 	NEED_DECAY["comfort"] = _settler_setting("comfort_decay_per_hour", 1.0)
 	NEED_DECAY["social"] = _settler_setting("social_decay_per_hour", 2.0)
 	NEED_DECAY["safety"] = _settler_setting("safety_decay_per_hour", 0.5)
