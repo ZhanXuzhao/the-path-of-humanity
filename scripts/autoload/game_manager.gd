@@ -114,6 +114,11 @@ func _load_settings():
 	for v in cfg.get_value("speed", "levels", [0.5, 1.0, 2.0, 3.0, 5.0, 10.0]):
 		speed_levels.append(float(v))
 	
+	# 世界设置
+	settings["chunk_size"] = cfg.get_value("world", "chunk_size", 16)
+	settings["world_chunks_x"] = cfg.get_value("world", "world_chunks_x", 8)
+	settings["world_chunks_y"] = cfg.get_value("world", "world_chunks_y", 8)
+	
 	# 建筑设置
 	settings["storage_rack_capacity"] = cfg.get_value("building", "storage_rack_capacity", 1000)
 	

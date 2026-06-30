@@ -105,11 +105,14 @@ func _ready():
 		_gm.state = 1  # GameState.PLAYING
 		_restore_from_save(_gm._loaded_save_data)
 		_gm._loaded_save_data.clear()
+		# 加载存档后也将相机移到世界中心
+		_center_camera_on_world()
 	else:
 		# 新游戏 - 初始化世界和定居者
 		_gm.start_game()
 		_generate_initial_area()
 		_spawn_initial_settlers()
+		_center_camera_on_world()
 		
 		# 新游戏提示：使用指令面板标记资源
 		call_deferred("_show_command_panel_tutorial")
@@ -252,6 +255,15 @@ func _find_walkable_near(from_grid: Vector2i, max_radius: int) -> Vector2i:
 				if world.is_walkable(check):
 					return check
 	return from_grid  # 兜底：返回原坐标（虽然不太可能，但防止死循环）
+
+func _center_camera_on_world():
+	"""根据世界大小将相机移动到世界中心"""
+	var center_pixel = Vector2(
+		world.WORLD_CHUNKS_X * world.CHUNK_SIZE * world.tile_size / 2.0,
+		world.WORLD_CHUNKS_Y * world.CHUNK_SIZE * world.tile_size / 2.0
+	)
+	if camera:
+		camera.position = center_pixel
 
 # -------- 建造模式 --------
 func enter_build_mode(building_id: String):
