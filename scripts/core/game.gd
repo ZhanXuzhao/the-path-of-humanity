@@ -283,6 +283,16 @@ func _find_settler_at_pos(global_pos: Vector2):
 	
 	return closest
 
+func _is_settler_at_grid(settler, grid_pos: Vector2i) -> bool:
+	"""判断定居者是否在指定网格位置"""
+	if settler == null or not is_instance_valid(settler):
+		return false
+	var s_grid = Vector2i(
+		floori(settler.position.x / world.tile_size),
+		floori(settler.position.y / world.tile_size)
+	)
+	return s_grid == grid_pos
+
 func _try_select_settler() -> bool:
 	"""尝试在鼠标位置选择定居者，返回是否选中"""
 	var s = _find_settler_at_pos(get_global_mouse_position())
@@ -542,11 +552,37 @@ func _input(event):
 				_deselect_building()
 				_select_settler(clicked_settler)
 		elif clicked_settler != null:
-			# 只有定居者
-			_deselect_resource()
-			_deselect_ground_item()
-			_select_settler(clicked_settler)
-			_deselect_construction()
+			# 检查该格是否同时有资源节点或地面物品
+			var res_at_pos = world.get_resource_at(grid_pos)
+			var has_resource = res_at_pos != null and res_at_pos.amount > 0
+			var ground_at_pos = world.get_ground_items_at(grid_pos)
+			var has_ground = not ground_at_pos.is_empty()
+			
+			if has_resource or has_ground:
+				# 同时有定居者和资源/地面物品 → 轮流选择
+				var settler_at_this_grid = _is_settler_at_grid(selected_settler, grid_pos)
+				if selected_settler != null and is_instance_valid(selected_settler) and settler_at_this_grid:
+					# 当前选中该位置的定居者 → 切到资源/地面物品
+					_deselect_settler()
+					_deselect_construction()
+					_deselect_building()
+					if has_ground:
+						_select_ground_item(grid_pos, ground_at_pos)
+					else:
+						_select_resource(grid_pos, res_at_pos)
+				else:
+					# 当前选中其他对象或未选中 → 切到定居者
+					_deselect_resource()
+					_deselect_ground_item()
+					_deselect_construction()
+					_deselect_building()
+					_select_settler(clicked_settler)
+			else:
+				# 只有定居者，没有重叠对象
+				_deselect_resource()
+				_deselect_ground_item()
+				_select_settler(clicked_settler)
+				_deselect_construction()
 		elif clicked_bld != null:
 			# 只有建筑
 			_deselect_resource()
