@@ -11,18 +11,10 @@ config_version=5
 [application]
 
 config/name="ThePathOfHumanity"
-config/features=PackedStringArray("4.6", "Forward Plus")
-config/icon="res://icon.svg"
 config/description="从原始采集到星辰大海 - 一款文明演化模拟游戏"
 run/main_scene="res://scenes/game.tscn"
-
-[display]
-
-window/size/viewport_width=1280
-window/size/viewport_height=720
-window/size/mode=3
-window/size/always_on_top=false
-window/dpi/allow_hidpi=true
+config/features=PackedStringArray("4.6", "Forward Plus")
+config/icon="res://icon.svg"
 
 [autoload]
 
@@ -30,26 +22,32 @@ GameManager="*res://scripts/autoload/game_manager.gd"
 ItemDefinitions="*res://resources/item_definitions.gd"
 WorkManager="*res://scripts/autoload/work_manager.gd"
 
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/mode=3
+
 [input]
 
 left_click={
 "deadzone": 0.5,
-"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"button_index":1,"pressure":0.0,"alt_pressed":false,"shift_pressed":false,"control_pressed":false,"meta_pressed":false,"command_or_automatic":false,"double_click":false,"factor":1.0,"button_mask":0)
+"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"button_mask":0,"position":Vector2(0, 0),"global_position":Vector2(0, 0),"factor":1.0,"button_index":1,"canceled":false,"pressed":false,"double_click":false,"script":null)
 ]
 }
 right_click={
 "deadzone": 0.5,
-"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"button_index":2,"pressure":0.0,"alt_pressed":false,"shift_pressed":false,"control_pressed":false,"meta_pressed":false,"command_or_automatic":false,"double_click":false,"factor":1.0,"button_mask":0)
+"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"button_mask":0,"position":Vector2(0, 0),"global_position":Vector2(0, 0),"factor":1.0,"button_index":2,"canceled":false,"pressed":false,"double_click":false,"script":null)
 ]
 }
 scroll_wheel={
 "deadzone": 0.5,
-"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"button_index":4,"pressure":0.0,"alt_pressed":false,"shift_pressed":false,"control_pressed":false,"meta_pressed":false,"command_or_automatic":false,"double_click":false,"factor":1.0,"button_mask":0)
+"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"button_mask":0,"position":Vector2(0, 0),"global_position":Vector2(0, 0),"factor":1.0,"button_index":4,"canceled":false,"pressed":false,"double_click":false,"script":null)
 ]
 }
 scroll_wheel_down={
 "deadzone": 0.5,
-"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"button_index":5,"pressure":0.0,"alt_pressed":false,"shift_pressed":false,"control_pressed":false,"meta_pressed":false,"command_or_automatic":false,"double_click":false,"factor":1.0,"button_mask":0)
+"events": [Object(InputEventMouseButton,"resource_local_to_scene":false,"resource_name":"","device":0,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"button_mask":0,"position":Vector2(0, 0),"global_position":Vector2(0, 0),"factor":1.0,"button_index":5,"canceled":false,"pressed":false,"double_click":false,"script":null)
 ]
 }
 

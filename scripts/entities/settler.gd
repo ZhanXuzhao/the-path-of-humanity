@@ -112,6 +112,9 @@ const MAX_CONSTRUCTION_RETRIES: int = 2
 # 选中状态
 var is_selected: bool = false
 
+# 角色下方状态显示的字体缓存
+var _status_font: Font = null
+
 # 年龄和寿命
 var age: float
 var lifespan: float = 80.0
@@ -169,9 +172,8 @@ func _process(delta):
 	if gm and gm.state != gm.GameState.PLAYING:
 		return
 	
-	# 选中时每帧重绘，确保指示线跟随角色位置实时更新
-	if is_selected:
-		queue_redraw()
+	# 每帧重绘：更新角色下方状态显示（HP条、状态文字）和选中指示线
+	queue_redraw()
 	
 	match state:
 		SettlerState.IDLE:
@@ -201,7 +203,9 @@ func set_selected(selected: bool):
 	queue_redraw()
 
 func _draw():
-	"""绘制选择指示框和连接线"""
+	"""绘制角色下方状态（HP条、状态文字）和选中指示框"""
+	_draw_status_below()
+	
 	if is_selected:
 		var half_size = TILE_SIZE * 0.5
 		var rect = Rect2(-half_size, -half_size, TILE_SIZE, TILE_SIZE)
@@ -212,6 +216,46 @@ func _draw():
 		
 		# 绘制目标指示线
 		_draw_target_line()
+
+func _draw_status_below():
+	"""在角色下方绘制HP条和当前状态文字"""
+	# 初始化字体缓存
+	if _status_font == null:
+		_status_font = ThemeDB.fallback_font
+		if _status_font == null:
+			return
+	
+	var font_size = 11
+	
+	# ===== HP 条 =====
+	var bar_width = TILE_SIZE * 0.8
+	var bar_height = 3.0
+	var bar_x = -bar_width / 2.0
+	var bar_y = TILE_SIZE / 2.0 + 2.0  # 精灵底部下方
+	
+	# 背景
+	draw_rect(Rect2(bar_x, bar_y, bar_width, bar_height), Color(0.15, 0.15, 0.15, 0.8))
+	
+	# HP填充
+	var hp_ratio = hp / max_hp if max_hp > 0 else 0.0
+	var hp_color = Color(0.3, 1.0, 0.3, 0.9)  # 绿色
+	if hp_ratio < 0.3:
+		hp_color = Color(1.0, 0.3, 0.3, 0.9)  # 红色
+	elif hp_ratio < 0.6:
+		hp_color = Color(1.0, 0.8, 0.2, 0.9)  # 黄色
+	if hp_ratio > 0.0:
+		draw_rect(Rect2(bar_x, bar_y, bar_width * hp_ratio, bar_height), hp_color)
+	
+	# ===== 状态文字 =====
+	var state_text = get_state_display(state, current_task if current_task else {})
+	var text_y = bar_y + bar_height + 1.0
+	var text_size = _status_font.get_string_size(state_text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
+	var text_pos = Vector2(-text_size.x / 2.0, text_y + text_size.y)
+	
+	# 文字阴影（轻微偏移增加可读性）
+	_status_font.draw_string(get_canvas_item(), text_pos + Vector2(1, 1), state_text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(0, 0, 0, 0.7))
+	# 文字本体
+	_status_font.draw_string(get_canvas_item(), text_pos, state_text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(1, 1, 1, 0.95))
 
 func _draw_target_line():
 	"""绘制连接到目标位置的指示虚线（选中时显示），有导航路径时沿路径绘制"""
