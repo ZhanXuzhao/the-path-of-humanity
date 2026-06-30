@@ -6,8 +6,12 @@ class_name CommandPanel
 
 const WorkManager = preload("res://scripts/autoload/work_manager.gd")
 
+# 自动模式特殊值
+const AUTO_WORK_TYPE := -2
+
 # 指令按钮配置（使用 Dictionary 代替 struct）
 var commands: Array[Dictionary] = [
+	{"name": "采集", "work_type": AUTO_WORK_TYPE, "icon": "🧺", "desc": "自动标记采矿/伐木/农业/搬运目标"},
 	{"name": "采矿", "work_type": WorkManager.WorkType.MINING, "icon": "⛏️", "desc": "标记矿石资源（铁矿、铜矿、煤矿、石矿）"},
 	{"name": "伐木", "work_type": WorkManager.WorkType.WOODCUTTING, "icon": "🪓", "desc": "标记树木资源"},
 	{"name": "农业", "work_type": WorkManager.WorkType.FARMING, "icon": "🌾", "desc": "标记浆果丛资源"},

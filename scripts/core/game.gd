@@ -365,30 +365,39 @@ func exit_clear_mode():
 func toggle_resource_designation(grid_pos: Vector2i) -> bool:
 	"""切换指定网格位置的资源标记状态，返回标记后的状态（true=已标记）"""
 	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
+	var is_auto = (designation_work_type == -2)
 	
 	if designated_resources.has(key):
-		# 如果已标记，且工作类型相同则取消标记；类型不同则更新
-		if designated_resources[key] == designation_work_type:
+		if is_auto:
+			# 自动模式：无论什么类型，再次点击即取消
 			designated_resources.erase(key)
 			designated_resources_changed.emit()
 			return false
 		else:
-			designated_resources[key] = designation_work_type
-			designated_resources_changed.emit()
-			return true
+			# 如果已标记，且工作类型相同则取消标记；类型不同则更新
+			if designated_resources[key] == designation_work_type:
+				designated_resources.erase(key)
+				designated_resources_changed.emit()
+				return false
+			else:
+				designated_resources[key] = designation_work_type
+				designated_resources_changed.emit()
+				return true
 	else:
 		# 检查该位置是否有可标记的资源
 		var dep = world.get_resource_at(grid_pos) if world else null
 		if dep != null and dep.amount > 0:
 			if _is_resource_match_work_type(dep.type, designation_work_type):
-				designated_resources[key] = designation_work_type
-				designated_resources_changed.emit()
-				return true
-		# 搬运模式：也标记地面物品
-		if designation_work_type == WorkManager.WorkType.HAULING and world:
+				var actual_type = _auto_detect_work_type(dep.type) if is_auto else designation_work_type
+				if actual_type >= 0:
+					designated_resources[key] = actual_type
+					designated_resources_changed.emit()
+					return true
+		# 搬运/自动模式：也标记地面物品
+		if (designation_work_type == WorkManager.WorkType.HAULING or is_auto) and world:
 			var stacks = world.get_ground_items_at(grid_pos)
 			if not stacks.is_empty():
-				designated_resources[key] = designation_work_type
+				designated_resources[key] = WorkManager.WorkType.HAULING
 				designated_resources_changed.emit()
 				return true
 	
@@ -427,6 +436,18 @@ func remove_designation_at(grid_pos: Vector2i):
 		designated_resources.erase(key)
 		designated_resources_changed.emit()
 
+func _auto_detect_work_type(resource_type: int) -> int:
+	"""根据资源类型自动推断工作类型"""
+	match resource_type:
+		World.ResourceNodeType.STONE_DEPOSIT, World.ResourceNodeType.IRON_DEPOSIT, World.ResourceNodeType.COPPER_DEPOSIT, World.ResourceNodeType.COAL_DEPOSIT:
+			return WorkManager.WorkType.MINING
+		World.ResourceNodeType.TREE:
+			return WorkManager.WorkType.WOODCUTTING
+		World.ResourceNodeType.BERRY_BUSH:
+			return WorkManager.WorkType.FARMING
+		_:
+			return -1
+
 func _is_resource_match_work_type(resource_type: int, work_type: int) -> bool:
 	"""检查资源类型是否匹配指定的工作类型"""
 	match work_type:
@@ -441,6 +462,15 @@ func _is_resource_match_work_type(resource_type: int, work_type: int) -> bool:
 			return resource_type == World.ResourceNodeType.TREE
 		WorkManager.WorkType.FARMING:
 			return resource_type == World.ResourceNodeType.BERRY_BUSH
+		-2:  # 自动模式：匹配所有可采集资源
+			return resource_type in [
+				World.ResourceNodeType.STONE_DEPOSIT,
+				World.ResourceNodeType.IRON_DEPOSIT,
+				World.ResourceNodeType.COPPER_DEPOSIT,
+				World.ResourceNodeType.COAL_DEPOSIT,
+				World.ResourceNodeType.TREE,
+				World.ResourceNodeType.BERRY_BUSH,
+			]
 		_:
 			return false
 
@@ -450,6 +480,7 @@ func _designate_resources_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 	var max_x = maxi(from_grid.x, to_grid.x)
 	var min_y = mini(from_grid.y, to_grid.y)
 	var max_y = maxi(from_grid.y, to_grid.y)
+	var is_auto = (designation_work_type == -2)
 	
 	var changed = false
 	for x in range(min_x, max_x + 1):
@@ -459,14 +490,16 @@ func _designate_resources_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 			if dep != null and dep.amount > 0:
 				if _is_resource_match_work_type(dep.type, designation_work_type):
 					var key = "%d,%d" % [x, y]
-					designated_resources[key] = designation_work_type
-					changed = true
-			# 搬运模式也标记地面物品
-			if designation_work_type == WorkManager.WorkType.HAULING and world:
+					var actual_type = _auto_detect_work_type(dep.type) if is_auto else designation_work_type
+					if actual_type >= 0:
+						designated_resources[key] = actual_type
+						changed = true
+			# 搬运/自动模式也标记地面物品
+			if (designation_work_type == WorkManager.WorkType.HAULING or is_auto) and world:
 				var stacks = world.get_ground_items_at(pos)
 				if not stacks.is_empty():
 					var key = "%d,%d" % [x, y]
-					designated_resources[key] = designation_work_type
+					designated_resources[key] = WorkManager.WorkType.HAULING
 					changed = true
 	
 	if changed:

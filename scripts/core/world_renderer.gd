@@ -64,6 +64,7 @@ const DESIGNATION_ICONS = {
 	1: "🪓",   # WOODCUTTING
 	5: "🌾",   # FARMING
 	6: "📦",   # HAULING
+	-2: "🔄",  # AUTO 自动
 }
 
 func _ready():
@@ -845,6 +846,18 @@ func _create_preview_icon(grid_pos: Vector2i, work_type: int, is_clear: bool = f
 	_designation_overlay.add_child(label)
 	_designation_preview_sprites[key] = label
 
+func _auto_detect_work_type(resource_type: int) -> int:
+	"""根据资源类型推断工作类型（与 Game.gd 同步）"""
+	match resource_type:
+		World.ResourceNodeType.STONE_DEPOSIT, World.ResourceNodeType.IRON_DEPOSIT, World.ResourceNodeType.COPPER_DEPOSIT, World.ResourceNodeType.COAL_DEPOSIT:
+			return 0  # MINING
+		World.ResourceNodeType.TREE:
+			return 1  # WOODCUTTING
+		World.ResourceNodeType.BERRY_BUSH:
+			return 5  # FARMING
+		_:
+			return -1
+
 func update_designation_preview(from_grid: Vector2i, to_grid: Vector2i, work_type: int, is_clear: bool = false):
 	"""根据框选矩形更新标记/清除预览"""
 	_clear_designation_preview()
@@ -856,6 +869,7 @@ func update_designation_preview(from_grid: Vector2i, to_grid: Vector2i, work_typ
 	var max_x = maxi(from_grid.x, to_grid.x)
 	var min_y = mini(from_grid.y, to_grid.y)
 	var max_y = maxi(from_grid.y, to_grid.y)
+	var is_auto = (work_type == -2)
 	
 	for x in range(min_x, max_x + 1):
 		for y in range(min_y, max_y + 1):
@@ -871,12 +885,13 @@ func update_designation_preview(from_grid: Vector2i, to_grid: Vector2i, work_typ
 				var dep = world.get_resource_at(pos) if world else null
 				if dep != null and dep.amount > 0:
 					if _is_resource_match_work_type(dep.type, work_type):
-						_create_preview_icon(pos, work_type)
-				# 搬运模式也预览地面物品
-				if work_type == 6 and world:  # HAULING
+						var actual_type = _auto_detect_work_type(dep.type) if is_auto else work_type
+						_create_preview_icon(pos, actual_type)
+				# 搬运/自动模式也预览地面物品
+				if (work_type == 6 or is_auto) and world:  # HAULING or AUTO
 					var stacks = world.get_ground_items_at(pos)
 					if not stacks.is_empty():
-						_create_preview_icon(pos, work_type)
+						_create_preview_icon(pos, 6)  # 地面物品用 HAULING 图标
 
 func _clear_designation_preview():
 	"""清除框选预览图标"""
@@ -907,5 +922,14 @@ func _is_resource_match_work_type(resource_type: int, work_type: int) -> bool:
 			return resource_type == World.ResourceNodeType.TREE
 		5:  # FARMING
 			return resource_type == World.ResourceNodeType.BERRY_BUSH
+		-2:  # AUTO 自动模式：匹配所有可采集资源
+			return resource_type in [
+				World.ResourceNodeType.STONE_DEPOSIT,
+				World.ResourceNodeType.IRON_DEPOSIT,
+				World.ResourceNodeType.COPPER_DEPOSIT,
+				World.ResourceNodeType.COAL_DEPOSIT,
+				World.ResourceNodeType.TREE,
+				World.ResourceNodeType.BERRY_BUSH,
+			]
 		_:
 			return false
