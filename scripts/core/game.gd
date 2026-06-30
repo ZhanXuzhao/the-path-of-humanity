@@ -163,6 +163,9 @@ func _process(delta):
 		# 分配任务给空闲定居者
 		_assign_ai_tasks()
 		
+		# 仍有空闲的定居者 → 没活干了，去睡觉（没工作是前提）
+		_handle_idle_sleep()
+		
 		# 检查选中的定居者是否还存活
 		if selected_settler != null and not is_instance_valid(selected_settler):
 			_deselect_settler()
@@ -1162,18 +1165,27 @@ func _update_settlers(delta):
 		if s.is_overweight():
 			s._auto_store_overweight()
 			continue
-		
-		# 3. 无工作时就去睡觉（不考虑睡眠度和时间）
-		LogUtil.info(s, "IDLE -> sleep")
-		var home = s.find_nearest_residential()
-		if not home.is_empty():
-			s.try_sleep(home.pos, home.world_pos)
-			continue
-		# 没有住所也尝试原地休息
-		s.try_sleep(Vector2i.ZERO, s.position)
 	
 	# 清理已失效的资源采集占用标记
 	_cleanup_harvest_claims()
+
+func _handle_idle_sleep():
+	"""仍有空闲的定居者 → 没活干了，去睡觉（没工作是前提）"""
+	var is_night = not _gm.is_daytime()
+	for s in settlers:
+		if not is_instance_valid(s):
+			continue
+		if s.state != Settler.SettlerState.IDLE:
+			continue
+		# 只有精力不足(<30)或夜晚时才睡觉
+		var rest = s.needs.get("rest", 100)
+		if rest < 30.0 or is_night:
+			LogUtil.info(s, "IDLE -> sleep (rest=%.1f, night=%s)" % [rest, is_night])
+			var home = s.find_nearest_residential()
+			if not home.is_empty():
+				s.try_sleep(home.pos, home.world_pos)
+				continue
+			s.try_sleep(Vector2i.ZERO, s.position)
 
 func _assign_ai_tasks():
 	"""为所有空闲定居者分配任务（使用 WorkManager 的优先级配置）"""
