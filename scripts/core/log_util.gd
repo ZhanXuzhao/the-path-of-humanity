@@ -71,21 +71,17 @@ func error(settler, message: String, force: bool = false):
 
 # -------- 无需 settler 参数的快捷方法 --------
 # @param message:  日志文本
-# @param force:    true 时强制打印（无视 verbose 和选中状态）
-func d(message: String, force: bool = false):
-	debug(null, message, force)
+func d(message: String):
+	debug(null, message, true)
 
 # @param message:  日志文本
-# @param force:    true 时强制打印
-func i(message: String, force: bool = false):
-	info(null, message, force)
+func i(message: String):
+	info(null, message, true)
 
 # @param message:  日志文本
-# @param force:    true 时强制打印
-func w(message: String, force: bool = false):
-	warn(null, message, force)
+func w(message: String):
+	warn(null, message, true)
 
 # @param message:  日志文本
-# @param force:    true 时强制打印
-func e(message: String, force: bool = false):
-	error(null, message, force)
+func e(message: String):
+	error(null, message, true)

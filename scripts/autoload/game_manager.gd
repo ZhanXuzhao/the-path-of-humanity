@@ -292,6 +292,7 @@ func load_game(silent: bool = false) -> bool:
 	time_speed = data.get("time_speed", 1.0)
 	stats = data.get("stats", {})
 	state = GameState.PLAYING
+	LogUtil.i("存档已加载：第%d天，时间%.2f time speed: %.2f " % [current_day, game_time, time_speed])
 	
 	# v1 旧存档：将旧版全局资源池掉落地面作为过渡
 	if data.get("version", 1) < 2 and data.has("resources"):

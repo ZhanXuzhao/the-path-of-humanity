@@ -85,6 +85,9 @@ func _ready():
 	if building_system:
 		building_system.world = world
 		building_system.building_completed.connect(_on_building_completed)
+	
+	# 更新HUD速度标签（此时存档已加载完毕，time_speed 为实际值）
+	_update_speed_label()
 
 func _process(delta):
 	# 建造模式预览
