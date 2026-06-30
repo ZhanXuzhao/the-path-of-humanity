@@ -1886,12 +1886,12 @@ const ARROW_MELEE_DAMAGE: float = 2.0
 const ARROW_MELEE_COOLDOWN: float = 2.0
 
 func has_bow() -> bool:
-	"""检查是否持有弓"""
-	return inventory.has_item("bow", 1)
+	"""检查是否持有弓（被动装备，人人都有）"""
+	return true
 
 func has_arrow() -> bool:
-	"""检查是否有箭矢"""
-	return inventory.has_item("arrow", 1)
+	"""检查是否有箭矢（被动装备，人人都有，不消耗）"""
+	return true
 
 func shoot_at(target_node: Node2D) -> bool:
 	"""向目标发射箭矢，返回是否成功发射"""
@@ -1907,8 +1907,7 @@ func shoot_at(target_node: Node2D) -> bool:
 	if dist > ARROW_RANGE:
 		return false
 	
-	# 消耗箭矢
-	inventory.remove_item("arrow", 1)
+	# 箭不消耗（被动装备）
 	_last_arrow_shot_time = now
 	
 	# 创建箭矢投射物
