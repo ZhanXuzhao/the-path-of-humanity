@@ -28,6 +28,13 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var settler_hp_label: Label = $SettlerInfoPanel/ScrollContainer/VBox/HpBarHBox/HPLabel
 @onready var settler_needs_container: VBoxContainer = $SettlerInfoPanel/ScrollContainer/VBox/NeedsContainer
 
+# 野猪信息面板
+@onready var boar_info_panel: Panel = $BoarInfoPanel
+@onready var boar_state_label: Label = $BoarInfoPanel/ScrollContainer/VBox/StateLabel
+@onready var boar_hp_bar: ProgressBar = $BoarInfoPanel/ScrollContainer/VBox/HpBarHBox/HPBar
+@onready var boar_hp_label: Label = $BoarInfoPanel/ScrollContainer/VBox/HpBarHBox/HPLabel
+@onready var boar_needs_container: VBoxContainer = $BoarInfoPanel/ScrollContainer/VBox/NeedsContainer
+
 # 存储建筑信息面板
 @onready var storage_panel: Panel = $StoragePanel
 @onready var storage_name_label: Label = $StoragePanel/ScrollContainer/VBox/NameLabel
@@ -118,6 +125,7 @@ func _ready():
 
 # 定居者信息面板相关变量
 var _tracked_settler = null
+var _tracked_boar = null
 
 # 标记当前存储面板显示的是地面物品还是置物架（两者复用同一面板）
 var _showing_ground_items: bool = false
@@ -138,10 +146,13 @@ func _settler_info_connections():
 		game.resource_deselected.connect(_on_resource_deselected)
 		game.ground_item_selected.connect(_on_ground_item_selected)
 		game.ground_item_deselected.connect(_on_ground_item_deselected_storage)
+		game.boar_selected.connect(_on_boar_selected)
+		game.boar_deselected.connect(_on_boar_deselected)
 
 func _hide_all_info_panels():
 	"""隐藏所有左下角信息面板，确保同时只显示一个"""
 	settler_info_panel.visible = false
+	boar_info_panel.visible = false
 	storage_panel.visible = false
 	building_info_panel.visible = false
 	construction_panel.visible = false
@@ -205,6 +216,72 @@ func _on_settler_deselected():
 	"""取消选中时隐藏信息面板"""
 	settler_info_panel.visible = false
 	_tracked_settler = null
+
+# -------- 野猪信息面板 --------
+func _on_boar_selected(boar):
+	"""选中野猪时显示信息面板"""
+	_hide_all_info_panels()
+	boar_info_panel.visible = true
+	_tracked_boar = boar
+	_build_boar_info_ui(boar)
+
+func _on_boar_deselected():
+	"""取消选中时隐藏野猪面板"""
+	boar_info_panel.visible = false
+	_tracked_boar = null
+
+func _build_boar_info_ui(boar):
+	"""构建野猪信息面板"""
+	if not is_instance_valid(boar):
+		return
+	
+	boar_state_label.text = "状态: " + Boar.get_state_display(boar.state)
+	boar_hp_label.text = "生命:"
+	boar_hp_bar.max_value = boar.max_hp
+	boar_hp_bar.value = boar.hp
+	
+	# 重建需求条
+	for child in boar_needs_container.get_children():
+		child.queue_free()
+	
+	var need_configs = {
+		"hunger": "饥饿度",
+		"energy": "精力",
+	}
+	
+	for need_id in need_configs:
+		var val = boar.hunger if need_id == "hunger" else boar.energy
+		var hbox = HBoxContainer.new()
+		var label = Label.new()
+		label.text = need_configs[need_id] + ":"
+		label.custom_minimum_size = Vector2(50, 0)
+		label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+		label.add_theme_constant_override("minimum_font_size", 12)
+		
+		var bar = ProgressBar.new()
+		bar.max_value = 100.0
+		bar.value = val
+		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bar.show_percentage = true
+		
+		# 饥饿度用橙色，精力用蓝色
+		if need_id == "hunger":
+			bar.add_theme_stylebox_override("fill", _make_stylebox(Color(1.0, 0.6, 0.2, 0.8)))
+		else:
+			bar.add_theme_stylebox_override("fill", _make_stylebox(Color(0.3, 0.6, 1.0, 0.8)))
+		
+		hbox.add_child(label)
+		hbox.add_child(bar)
+		boar_needs_container.add_child(hbox)
+
+func _make_stylebox(color: Color) -> StyleBoxFlat:
+	var sb = StyleBoxFlat.new()
+	sb.bg_color = color
+	sb.corner_radius_top_left = 2
+	sb.corner_radius_top_right = 2
+	sb.corner_radius_bottom_right = 2
+	sb.corner_radius_bottom_left = 2
+	return sb
 
 # -------- 存储建筑面板 / 通用建筑信息面板 --------
 func _on_building_selected(bld):
@@ -696,6 +773,29 @@ func _process(delta):
 		var game = get_node("/root/Game")
 		if game:
 			game.selected_settler = null
+	
+	# 选中野猪时实时更新信息面板
+	if boar_info_panel.visible and is_instance_valid(_tracked_boar):
+		var b = _tracked_boar
+		boar_state_label.text = "状态: " + Boar.get_state_display(b.state)
+		boar_hp_bar.max_value = b.max_hp
+		boar_hp_bar.value = b.hp
+		# 更新需求条数值
+		for child in boar_needs_container.get_children():
+			if child is HBoxContainer and child.get_child_count() >= 2:
+				var bar = child.get_child(1)
+				if bar is ProgressBar:
+					var label = child.get_child(0)
+					if label and label is Label:
+						if "饥饿度" in label.text:
+							bar.value = b.hunger
+						elif "精力" in label.text:
+							bar.value = b.energy
+	elif boar_info_panel.visible and not is_instance_valid(_tracked_boar):
+		_on_boar_deselected()
+		var game = get_node("/root/Game")
+		if game:
+			game.selected_boar = null
 	
 	# 选中地面物品时实时更新物品列表（复用存储面板）
 	if storage_panel.visible and _showing_ground_items:

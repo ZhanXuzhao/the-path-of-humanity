@@ -218,6 +218,58 @@ layout_mode = 2
 [node name="NeedsContainer" type="VBoxContainer" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox" unique_id=947407570]
 layout_mode = 2
 
+[node name="BoarInfoPanel" type="Panel" parent="UI/HUD"]
+visible = false
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -470.0
+offset_right = 262.0
+offset_bottom = -10.0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("2")
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/BoarInfoPanel"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
+
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/BoarInfoPanel/ScrollContainer"]
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+text = "🐗 野猪"
+
+[node name="StateLabel" type="Label" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox"]
+layout_mode = 2
+text = "状态: 游走中"
+
+[node name="HpBarHBox" type="HBoxContainer" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox"]
+layout_mode = 2
+
+[node name="HPLabel" type="Label" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox/HpBarHBox"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+text = "生命:"
+
+[node name="HPBar" type="ProgressBar" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox/HpBarHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+value = 100.0
+
+[node name="NeedsSep" type="HSeparator" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox"]
+layout_mode = 2
+
+[node name="NeedsContainer" type="VBoxContainer" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox"]
+layout_mode = 2
+
 [node name="StoragePanel" type="Panel" parent="UI/HUD" unique_id=1748318168]
 visible = false
 anchors_preset = 2

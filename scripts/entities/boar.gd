@@ -5,6 +5,21 @@ class_name Boar
 
 signal died(pos: Vector2i)
 
+# 状态中文名称
+const STATE_NAMES := {
+	BoarState.IDLE: "闲置",
+	BoarState.WANDERING: "游走中",
+	BoarState.MOVING_TO_FOOD: "觅食中",
+	BoarState.EATING: "进食中",
+	BoarState.SLEEPING: "睡眠中",
+	BoarState.COMBAT: "战斗中",
+	BoarState.FLEEING: "逃跑中",
+	BoarState.DEAD: "已死亡",
+}
+
+static func get_state_display(state_val: int) -> String:
+	return STATE_NAMES.get(state_val, "未知")
+
 # 贴图资源路径
 const BOAR_TEXTURE_PATH := "res://assets/art/creatures/boar.svg"
 
@@ -116,6 +131,9 @@ func _draw():
 	# 绘制HP条
 	if hp < max_hp:
 		_draw_hp_bar()
+	
+	# 选中时在脚下绘制状态文字
+	_draw_status_below()
 
 func _draw_hp_bar():
 	"""在野猪上方绘制HP条（与角色风格一致）"""
@@ -140,6 +158,24 @@ func _draw_hp_bar():
 	elif hp_ratio < 0.6:
 		hp_color = Color(1.0, 0.8, 0.2, 0.9)  # 黄色
 	draw_rect(Rect2(bar_x, bar_y, bar_width * hp_ratio, bar_height), hp_color)
+
+func _draw_status_below():
+	"""在野猪脚下绘制当前状态文字（选中时显示）"""
+	if _status_font == null:
+		_status_font = ThemeDB.fallback_font
+		if _status_font == null:
+			return
+	
+	var font_size = 11
+	var state_text = get_state_display(state)
+	var text_y = TILE_SIZE / 2.0 + 2.0  # 精灵底部下方
+	var text_size = _status_font.get_string_size(state_text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
+	var text_pos = Vector2(-text_size.x / 2.0, text_y + text_size.y)
+	
+	# 文字阴影
+	_status_font.draw_string(get_canvas_item(), text_pos + Vector2(1, 1), state_text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(0, 0, 0, 0.7))
+	# 文字本体
+	_status_font.draw_string(get_canvas_item(), text_pos, state_text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(1, 1, 1, 0.95))
 
 func _process(delta):
 	var game = get_node_or_null("/root/Game")
