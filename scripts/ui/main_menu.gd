@@ -34,6 +34,8 @@ func _on_visibility_changed():
 func _on_start_pressed():
 	# 无论主菜单还是暂停菜单，都新建游戏
 	_gm.start_game()
+	# 删除旧存档，确保 game.gd._ready() 走新游戏分支
+	_gm.delete_save()
 	get_tree().change_scene_to_file("res://scenes/game.tscn")
 
 func _on_save_pressed():
