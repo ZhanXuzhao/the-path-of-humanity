@@ -90,6 +90,7 @@ func _load_settings():
 	
 	# 资源采集设置
 	settings["harvest_amount"] = cfg.get_value("resources", "harvest_amount", 5.0)
+	settings["harvest_count"] = cfg.get_value("resources", "harvest_count", 5)
 	settings["resource_amount_multiplier"] = cfg.get_value("resources", "resource_amount_multiplier", 5.0)
 
 	# 工作速度设置

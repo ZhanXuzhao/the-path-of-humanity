@@ -537,38 +537,44 @@ func _do_work_tick(task_type: String):
 			_tick_go_sleep()
 
 func _tick_harvest():
-	"""执行一次采集工作"""
+	"""执行一次采集工作——只采集当前站立格子上的一个资源点，每次最多 harvest_count 个"""
 	var game = get_node_or_null("/root/Game")
 	if game == null or game.world == null:
 		complete_task()
 		return
 	
+	var gm = get_node("/root/GameManager")
+	var max_amount = int(gm.settings.get("harvest_count", 5))
+	
 	var grid_pos: Vector2i = current_task.get("target_pos", Vector2i.ZERO)
 	
-	# 释放该资源的占用标记（无论是否采完都先释放，确保资源耗尽时标记被清理）
+	# 释放该资源的占用标记
 	if game.has_method("release_harvest_resource"):
 		game.release_harvest_resource(grid_pos)
 	
-	var result = game.world.harvest_resource(grid_pos)
+	# 采集单个资源点（最多 harvest_count 个）
+	var result = game.world.harvest_resource(grid_pos, max_amount)
 	if result.is_empty() or result.amount <= 0:
 		complete_task()
 		return
 	
 	var item_id = result.item_id
-	var amount = result.amount
-	var _gm = get_node("/root/GameManager")
+	var total_amount = result.amount
 	
-	# 采集到背包（优先放入个人背包）
-	inventory.add_item(item_id, amount)
-	LogUtil.info(self, "采集到 %d 个 %s" % [amount, item_id])
-	# 检查是否超重——超重时去存放，但每次存放更多物品以减少往返次数
+	# 采集到背包
+	inventory.add_item(item_id, total_amount)
+	LogUtil.info(self, "采集到 %d 个 %s" % [total_amount, item_id])
+	
+	# 检查是否超重——超重时去存放
 	if is_overweight():
 		complete_task()
 		return
 	
-	# 资源还在，重新占用标记（防止其他定居者中途抢走该资源）
-	if game.has_method("claim_harvest_resource"):
-		game.claim_harvest_resource(grid_pos, settler_id)
+	# 重新占用该点（如果仍有剩余资源）
+	var dep = game.world.get_resource_at(grid_pos)
+	if dep != null and dep.amount > 0:
+		if game.has_method("claim_harvest_resource"):
+			game.claim_harvest_resource(grid_pos, settler_id)
 	
 	# 增加经验
 	add_skill_experience(current_task.get("skill", ""), 1.0)
