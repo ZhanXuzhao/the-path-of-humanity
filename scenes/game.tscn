@@ -299,21 +299,20 @@ layout_mode = 2
 layout_mode = 2
 
 [node name="BuildingInfoPanel" type="Panel" parent="UI/HUD" unique_id=1432108525]
-visible = false
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_top = -500.0
-offset_right = 300.0
+offset_right = 361.0
 grow_vertical = 0
 theme_override_styles/panel = SubResource("2")
 
 [node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/BuildingInfoPanel" unique_id=521093744]
 layout_mode = 0
-offset_left = 4.0
-offset_top = 4.0
-offset_right = 196.0
-offset_bottom = 296.0
+offset_left = 19.0
+offset_top = 25.0
+offset_right = 336.0
+offset_bottom = 480.0
 
 [node name="VBox" type="VBoxContainer" parent="UI/HUD/BuildingInfoPanel/ScrollContainer" unique_id=1928493603]
 layout_mode = 2
@@ -379,6 +378,7 @@ theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
 text = "总量: 0"
 
 [node name="BuildMenu" type="Panel" parent="UI" unique_id=1575822565]
+visible = false
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
