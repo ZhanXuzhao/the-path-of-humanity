@@ -126,6 +126,9 @@ var assigned_bed_pos: Vector2i = Vector2i(-1, -1)
 var age: float
 var lifespan: float = 80.0
 
+# 自动回血累积器（累积游戏小时数，满1小时一次性恢复）
+var _passive_heal_accumulator: float = 0.0
+
 func _init():
 	settler_id = str(Time.get_ticks_usec())
 	inventory = Inventory.new()
@@ -1931,9 +1934,21 @@ func has_ranged_weapon() -> bool:
 
 # -------- 自动回血 --------
 func apply_passive_heal(delta_hours: float):
-	"""每小时恢复5点HP"""
-	if hp < max_hp:
-		heal(5.0 * delta_hours)
+	"""累积游戏小时数，每满1小时恢复一次HP（防止浮点累积误差）"""
+	if hp >= max_hp:
+		_passive_heal_accumulator = 0.0
+		return
+	
+	_passive_heal_accumulator += delta_hours
+	var heal_per_hour = _settler_setting("passive_heal_per_hour", 5.0)
+	
+	# 每累积满1小时，一次性回血
+	while _passive_heal_accumulator >= 1.0:
+		_passive_heal_accumulator -= 1.0
+		heal(heal_per_hour)
+		if hp >= max_hp:
+			_passive_heal_accumulator = 0.0
+			break
 
 # -------- 序列化 --------
 func to_dict() -> Dictionary:

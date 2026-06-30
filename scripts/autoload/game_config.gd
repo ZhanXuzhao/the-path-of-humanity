@@ -27,6 +27,7 @@ var sleep_min_time: float = 3.0
 var sleep_max_time: float = 8.0
 var storage_search_radius: float = 300.0
 var food_search_radius: float = 400.0
+var passive_heal_per_hour: float = 5.0
 
 # ===== 资源采集设置 =====
 var harvest_amount: float = 5.0

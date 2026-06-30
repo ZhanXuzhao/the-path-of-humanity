@@ -191,10 +191,11 @@ func _process(delta):
 	# 定居者AI定时更新（每1秒执行一次）
 	_autonomy_timer += delta
 	if _autonomy_timer >= 1.0:
+		var elapsed = _autonomy_timer
 		_autonomy_timer = 0.0
 		
-		# 更新定居者需求和AI
-		_update_settlers(delta)
+		# 更新定居者需求和AI（传入实际经过的秒数，而非单帧delta）
+		_update_settlers(elapsed)
 		
 		# 分配任务给空闲定居者
 		_assign_ai_tasks()
@@ -2159,12 +2160,6 @@ func _update_boars(_delta):
 			var dir = nearest_boar.position - settler.position
 			settler.facing_direction = dir.normalized()
 			settler.shoot_at(nearest_boar)
-
-func _auto_heal_settlers(delta_hours: float):
-	"""所有定居者自动回血"""
-	for s in settlers:
-		if is_instance_valid(s):
-			s.apply_passive_heal(delta_hours)
 
 func _is_mouse_over_ui() -> bool:
 	"""检查鼠标是否悬浮在任意可见 UI 控件上方（点击UI时不触发世界操作）"""
