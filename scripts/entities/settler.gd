@@ -257,6 +257,17 @@ func _draw_status_below():
 	_status_font.draw_string(get_canvas_item(), text_pos + Vector2(1, 1), state_text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(0, 0, 0, 0.7))
 	# 文字本体
 	_status_font.draw_string(get_canvas_item(), text_pos, state_text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(1, 1, 1, 0.95))
+	
+	# ===== 工作进度条（仅工作中显示） =====
+	if state == SettlerState.WORKING:
+		var progress = _get_work_progress()
+		if progress > 0.0:
+			var prog_bar_y = text_y + text_size.y + 2.0
+			# 背景
+			draw_rect(Rect2(bar_x, prog_bar_y, bar_width, bar_height), Color(0.15, 0.15, 0.15, 0.8))
+			# 进度填充（橙色进度条）
+			var prog_color = Color(1.0, 0.7, 0.2, 0.9)  # 橙色
+			draw_rect(Rect2(bar_x, prog_bar_y, bar_width * progress, bar_height), prog_color)
 
 func _draw_target_line():
 	"""绘制连接到目标位置的指示虚线（选中时显示），有导航路径时沿路径绘制"""
@@ -288,6 +299,34 @@ func _draw_target_line():
 		var local_target = target_world_pos - position
 		draw_dashed_line(Vector2.ZERO, local_target, line_color, 1.5, 4.0, true)
 		draw_circle(local_target, 3.0, line_color)
+
+func _get_work_progress() -> float:
+	"""返回当前工作进度 (0.0~1.0)，用于显示工作进度条"""
+	if state != SettlerState.WORKING or current_task == null:
+		return 0.0
+	
+	var task_type = current_task.get("type", "")
+	if task_type == "":
+		return 0.0
+	
+	# 计算工作速度
+	var skill_id = current_task.get("skill", "")
+	var skill_level = get_skill(skill_id)
+	var base_speed = _settler_setting("work_speed_base", 1.0)
+	var level_bonus = _settler_setting("work_speed_level_bonus", 0.1)
+	var work_speed = base_speed + (skill_level - 1.0) * level_bonus
+	
+	var gm = get_node("/root/GameManager")
+	var speed_mult = gm.time_speed if gm else 1.0
+	
+	var now = Time.get_ticks_msec() / 1000.0
+	var adjusted_interval = work_tick_interval / (work_speed * speed_mult)
+	
+	if adjusted_interval <= 0:
+		return 0.0
+	
+	var elapsed = now - _last_work_tick_time
+	return clampf(elapsed / adjusted_interval, 0.0, 1.0)
 
 # 根据任务数据获取工作类别显示文字
 static func get_work_type_from_task(task_data: Dictionary) -> String:
