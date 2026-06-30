@@ -112,6 +112,9 @@ const MAX_CONSTRUCTION_RETRIES: int = 2
 # 选中状态
 var is_selected: bool = false
 
+# 朝向方向（单位向量），用于显示朝向小三角
+var facing_direction: Vector2 = Vector2.DOWN
+
 # 角色下方状态显示的字体缓存
 var _status_font: Font = null
 
@@ -195,6 +198,8 @@ func _process(delta):
 			_move_towards(delta)
 		SettlerState.WORKING:
 			_execute_work(delta)
+			# 工作中朝向目标方向
+			_update_facing_to_target()
 		SettlerState.SLEEPING:
 			_tick_sleep(delta)
 		SettlerState.EATING:
@@ -209,6 +214,7 @@ func set_selected(selected: bool):
 func _draw():
 	"""绘制角色下方状态（HP条、状态文字）和选中指示框"""
 	_draw_status_below()
+	_draw_direction_triangle()
 	
 	if is_selected:
 		var half_size = TILE_SIZE * 0.5
@@ -305,6 +311,22 @@ func _draw_target_line():
 		var local_target = target_world_pos - position
 		draw_dashed_line(Vector2.ZERO, local_target, line_color, 1.5, 4.0, true)
 		draw_circle(local_target, 3.0, line_color)
+
+func _draw_direction_triangle():
+	"""在角色朝向方向绘制一个小三角指示器"""
+	var tri_size = 4.0
+	var offset = TILE_SIZE * 0.5 + 2.0  # 从角色中心到边缘 + 间距
+	
+	# 计算三角三个顶点
+	var tip = facing_direction * (offset + tri_size)
+	var perp = Vector2(-facing_direction.y, facing_direction.x)
+	var base_center = facing_direction * offset
+	var bl = base_center + perp * tri_size * 0.5
+	var br = base_center - perp * tri_size * 0.5
+	
+	var points = PackedVector2Array([tip, bl, br])
+	var color = Color(1.0, 0.85, 0.3, 0.95)  # 金色
+	draw_colored_polygon(points, color)
 
 func _get_work_progress() -> float:
 	"""返回当前工作进度 (0.0~1.0)，用于显示工作进度条"""
@@ -453,9 +475,11 @@ func _move_towards(delta):
 	var dist = offset.length()
 	
 	if dist > 2.0:
+		var dir = offset.normalized()
+		facing_direction = dir
 		var gm = get_node("/root/GameManager")
 		var speed_mult = gm.time_speed if gm else 1.0
-		position += offset.normalized() * move_speed * delta * speed_mult
+		position += dir * move_speed * delta * speed_mult
 	else:
 		# 到达当前路径点
 		if not _path.is_empty():
@@ -488,6 +512,25 @@ func _move_towards(delta):
 					_last_work_tick_time = Time.get_ticks_msec() / 1000.0
 		else:
 			set_state(SettlerState.IDLE, true)
+
+func _update_facing_to_target():
+	"""工作中朝向任务目标方向"""
+	if current_task == null:
+		return
+	var target_pos = current_task.get("target_pos", Vector2i(-1, -1))
+	if target_pos.x < 0:
+		return
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.world == null:
+		return
+	var ts = game.world.tile_size
+	var target_center = Vector2(
+		target_pos.x * ts + ts / 2.0,
+		target_pos.y * ts + ts / 2.0
+	)
+	var dir = target_center - position
+	if dir.length_squared() > 4.0:
+		facing_direction = dir.normalized()
 
 # -------- 工作系统 --------
 func _execute_work(delta):
