@@ -20,6 +20,7 @@ config/icon="res://icon.svg"
 
 GameManager="*res://scripts/autoload/game_manager.gd"
 ItemDefinitions="*res://resources/item_definitions.gd"
+LogUtil="*res://scripts/core/log_util.gd"
 WorkManager="*res://scripts/autoload/work_manager.gd"
 
 

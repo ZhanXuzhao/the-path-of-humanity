@@ -103,29 +103,32 @@ func _process(delta):
 	if tech_system:
 		tech_system.process_research(delta)
 	
-	# 更新定居者需求和AI
-	_update_settlers(delta)
-	
-	# 检查选中的定居者是否还存活
-	if selected_settler != null and not is_instance_valid(selected_settler):
-		_deselect_settler()
-	
-	# 检查选中的资源节点是否还存在（可能已被采集完）
-	if selected_resource_pos.x >= 0:
-		var res = world.get_resource_at(selected_resource_pos)
-		if res == null or res.amount <= 0:
-			_deselect_resource()
-	
-	# 检查选中的地面物品是否还存在（可能已被拾取完）
-	if selected_ground_item_pos.x >= 0:
-		var stacks = world.get_ground_items_at(selected_ground_item_pos)
-		if stacks.is_empty():
-			_deselect_ground_item()
-	
-	# 定居者自主行为已合并到 _update_settlers 中（每帧检查）
-	
-	# 分配任务给空闲定居者
-	_assign_ai_tasks()
+	# 定居者AI定时更新（每1秒执行一次）
+	_autonomy_timer += delta
+	if _autonomy_timer >= 1.0:
+		_autonomy_timer = 0.0
+		
+		# 更新定居者需求和AI
+		_update_settlers(delta)
+		
+		# 分配任务给空闲定居者
+		_assign_ai_tasks()
+		
+		# 检查选中的定居者是否还存活
+		if selected_settler != null and not is_instance_valid(selected_settler):
+			_deselect_settler()
+		
+		# 检查选中的资源节点是否还存在（可能已被采集完）
+		if selected_resource_pos.x >= 0:
+			var res = world.get_resource_at(selected_resource_pos)
+			if res == null or res.amount <= 0:
+				_deselect_resource()
+		
+		# 检查选中的地面物品是否还存在（可能已被拾取完）
+		if selected_ground_item_pos.x >= 0:
+			var stacks = world.get_ground_items_at(selected_ground_item_pos)
+			if stacks.is_empty():
+				_deselect_ground_item()
 
 func _generate_initial_area():
 	# 新游戏：随机化地图种子，确保每次地图不同
@@ -745,6 +748,7 @@ func _update_settlers(delta):
 			should_sleep = true
 		
 		if should_sleep:
+			LogUtil.info(s, "should_sleep")
 			var home = s.find_nearest_residential()
 			if not home.is_empty():
 				s.try_sleep(home.pos, home.world_pos)

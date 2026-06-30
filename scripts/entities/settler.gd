@@ -8,7 +8,6 @@ signal task_assigned(task_id: String)
 signal task_completed(task_id: String)
 
 const ItemDefinitions = preload("res://resources/item_definitions.gd")
-const LogUtil = preload("res://scripts/core/log_util.gd")
 
 # 角色属性
 var settler_name: String
@@ -348,7 +347,8 @@ func _move_towards(delta):
 	if target_world_pos == Vector2.ZERO:
 		_path.clear()
 		_path_target_grid = Vector2i(-1, -1)
-		set_state(SettlerState.IDLE, true)
+		LogUtil.info(self, "移动目标为零，结束当前任务")
+		complete_task()
 		return
 	
 	var game = get_node_or_null("/root/Game")

@@ -1,6 +1,8 @@
-# 日志工具类 - LogUtil (纯静态脚本，通过 preload 使用)
+# 日志工具类 - LogUtil (Autoload 单例)
 # 提供统一的日志输出，默认只打印选中角色的信息
 # 用法: LogUtil.info(settler, "消息")  或  LogUtil.info(null, "全局消息", true)
+
+extends Node
 
 # 日志级别
 enum Level {
@@ -11,9 +13,9 @@ enum Level {
 }
 
 # 是否强制打印所有日志（调试用）
-static var verbose: bool = false
+var verbose: bool = false
 
-static func _should_log(settler = null, force: bool = false) -> bool:
+func _should_log(settler = null, force: bool = false) -> bool:
 	if force or verbose:
 		return true
 	if settler == null:
@@ -22,7 +24,7 @@ static func _should_log(settler = null, force: bool = false) -> bool:
 		return settler.is_selected
 	return false
 
-static func _format_message(settler, level: Level, message: String) -> String:
+func _format_message(settler, level: Level, message: String) -> String:
 	var prefix = ""
 	match level:
 		Level.DEBUG: prefix = "[D]"
@@ -39,18 +41,18 @@ static func _format_message(settler, level: Level, message: String) -> String:
 	else:
 		return "%s %s" % [prefix, message]
 
-static func debug(settler, message: String, force: bool = false):
+func debug(settler, message: String, force: bool = false):
 	if not _should_log(settler, force): return
 	print(_format_message(settler, Level.DEBUG, message))
 
-static func info(settler, message: String, force: bool = false):
+func info(settler, message: String, force: bool = false):
 	if not _should_log(settler, force): return
 	print(_format_message(settler, Level.INFO, message))
 
-static func warn(settler, message: String, force: bool = false):
+func warn(settler, message: String, force: bool = false):
 	if not _should_log(settler, force): return
 	print(_format_message(settler, Level.WARN, message))
 
-static func error(settler, message: String, force: bool = false):
+func error(settler, message: String, force: bool = false):
 	if not _should_log(settler, force): return
 	print(_format_message(settler, Level.ERROR, message))
