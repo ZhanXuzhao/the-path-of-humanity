@@ -441,13 +441,12 @@ func _build_settler_info_ui(settler):
 	
 	var need_names = {
 		"hunger": "饱食度",
-		"rest": "精力",
-		"comfort": "舒适度",
-		"social": "社交",
-		"safety": "安全感",
+		"rest": "睡眠",
 	}
 	
 	for need_id in settler.needs:
+		if not need_names.has(need_id):
+			continue
 		var hbox = HBoxContainer.new()
 		var label = Label.new()
 		label.text = need_names.get(need_id, need_id) + ":"
