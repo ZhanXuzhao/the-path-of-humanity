@@ -326,6 +326,9 @@ func enter_designation_mode(work_type: int):
 	_is_designation_dragging = false
 	_init_drag_overlay()
 	
+	# 鼠标变为十字准星
+	Input.set_default_cursor_shape(Input.CURSOR_CROSS)
+	
 	designation_mode_changed.emit(true, work_type)
 
 func exit_designation_mode():
@@ -337,6 +340,8 @@ func exit_designation_mode():
 		_drag_overlay.queue_redraw()
 	if world_renderer and world_renderer.has_method("_clear_designation_preview"):
 		world_renderer._clear_designation_preview()
+	# 恢复默认鼠标
+	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 	designation_mode_changed.emit(false, -1)
 
 func enter_clear_mode():
@@ -350,6 +355,9 @@ func enter_clear_mode():
 	_is_designation_dragging = false
 	_init_drag_overlay()
 	
+	# 鼠标变为禁止图标
+	Input.set_default_cursor_shape(Input.CURSOR_FORBIDDEN)
+	
 	clear_mode_changed.emit(true)
 
 func exit_clear_mode():
@@ -360,6 +368,8 @@ func exit_clear_mode():
 		_drag_overlay.queue_redraw()
 	if world_renderer and world_renderer.has_method("_clear_designation_preview"):
 		world_renderer._clear_designation_preview()
+	# 恢复默认鼠标
+	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 	clear_mode_changed.emit(false)
 
 func toggle_resource_designation(grid_pos: Vector2i) -> bool:
@@ -855,6 +865,32 @@ func _input(event):
 		if main_menu:
 			main_menu.visible = true
 			_gm.pause_game()
+	
+	# Q 键切换采集标记模式（自动）
+	if event.is_action_pressed("Q") or (event is InputEventKey and event.keycode == KEY_Q and event.pressed):
+		if designation_mode and designation_work_type == -2:
+			exit_designation_mode()
+		else:
+			if build_mode:
+				exit_build_mode()
+			if clear_mode:
+				exit_clear_mode()
+			enter_designation_mode(-2)
+		get_viewport().set_input_as_handled()
+		return
+	
+	# C 键切换清除模式
+	if event.is_action_pressed("C") or (event is InputEventKey and event.keycode == KEY_C and event.pressed):
+		if clear_mode:
+			exit_clear_mode()
+		else:
+			if build_mode:
+				exit_build_mode()
+			if designation_mode:
+				exit_designation_mode()
+			enter_clear_mode()
+		get_viewport().set_input_as_handled()
+		return
 	
 	# 右键退出标记/清除/建造模式
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
