@@ -458,7 +458,9 @@ func _execute_work(delta):
 	# 根据技能计算工作速度
 	var skill_id = current_task.get("skill", "")
 	var skill_level = get_skill(skill_id)
-	var work_speed = max(0.1, skill_level * 0.4)  # 技能越高干得越快
+	var base_speed = _settler_setting("work_speed_base", 1.0)
+	var level_bonus = _settler_setting("work_speed_level_bonus", 0.1)
+	var work_speed = base_speed + (skill_level - 1.0) * level_bonus  # 技能越高干得越快
 	
 	# 根据时间加速倍率同步提升工作速度
 	var gm = get_node("/root/GameManager")
@@ -472,6 +474,7 @@ func _execute_work(delta):
 		_do_work_tick(task_type)
 
 func _do_work_tick(task_type: String):
+	LogUtil.info(self, "执行工作刻: %s" % task_type)
 	match task_type:
 		"HARVEST":
 			_tick_harvest()
@@ -1561,7 +1564,7 @@ func get_skill(skill_id: String) -> float:
 
 func add_skill_experience(skill_id: String, amount: float):
 	if skills.has(skill_id):
-		skills[skill_id] += amount * 0.1
+		skills[skill_id] = minf(10.0, skills[skill_id] + amount * 0.1)
 
 # -------- 任务系统 --------
 func assign_task(task_data: Dictionary) -> bool:

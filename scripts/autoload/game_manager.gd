@@ -92,6 +92,10 @@ func _load_settings():
 	settings["harvest_amount"] = cfg.get_value("resources", "harvest_amount", 5.0)
 	settings["resource_amount_multiplier"] = cfg.get_value("resources", "resource_amount_multiplier", 5.0)
 
+	# 工作速度设置
+	settings["work_speed_base"] = cfg.get_value("work_speed", "base_speed", 1.0)
+	settings["work_speed_level_bonus"] = cfg.get_value("work_speed", "level_bonus", 0.1)
+
 	# 工作优先级设置
 	settings["mining_priority"] = cfg.get_value("work", "mining_priority", 2)
 	settings["woodcutting_priority"] = cfg.get_value("work", "woodcutting_priority", 3)
