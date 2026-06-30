@@ -31,10 +31,7 @@ var time_speed: float = 1.0        # 时间流逝速度
 var day_length: float = 240.0      # 一天的长度（现实秒），默认240秒=4分钟(10现实秒=1游戏小时)
 var current_day: int = 1           # 当前天数
 
-# 游戏设置（从配置文件加载）
-var settings: Dictionary = {}
-
-# 速度档位列表（从配置文件加载）
+# 速度档位列表（从 GameConfig 加载）
 var speed_levels: Array[float] = []
 
 # 游戏状态
@@ -53,76 +50,10 @@ var stats = {
 
 func _ready():
 	process_mode = PROCESS_MODE_ALWAYS
-	_load_settings()
+	# 从 GameConfig 获取配置值
+	day_length = GameConfig.day_length
+	speed_levels = GameConfig.speed_levels.duplicate()
 	_setup_autosave()
-
-func _load_settings():
-	"""从 res://resources/game_settings.cfg 加载游戏设置"""
-	var cfg = ConfigFile.new()
-	var err = cfg.load("res://resources/game_settings.cfg")
-	if err != OK:
-		push_error("无法加载游戏设置文件：", err)
-		return
-	
-	# 时间设置
-	day_length = cfg.get_value("time", "day_length", 240.0)
-	
-	# 相机设置
-	settings["scroll_speed"] = cfg.get_value("camera", "scroll_speed", 300.0)
-	settings["edge_scroll_margin"] = cfg.get_value("camera", "edge_scroll_margin", 20)
-	
-	# 定居者设置
-	settings["carry_capacity"] = cfg.get_value("settler", "carry_capacity", 50.0)
-	settings["base_move_speed"] = cfg.get_value("settler", "base_move_speed", 60.0)
-	settings["dexterity_move_bonus"] = cfg.get_value("settler", "dexterity_move_bonus", 3.0)
-	settings["base_hp"] = cfg.get_value("settler", "base_hp", 80.0)
-	settings["constitution_hp_bonus"] = cfg.get_value("settler", "constitution_hp_bonus", 4.0)
-	settings["hunger_decay_per_hour"] = cfg.get_value("settler", "hunger_decay_per_hour", 4.17)
-	settings["rest_decay_per_hour"] = cfg.get_value("settler", "rest_decay_per_hour", 5.0)
-	settings["comfort_decay_per_hour"] = cfg.get_value("settler", "comfort_decay_per_hour", 1.0)
-	settings["social_decay_per_hour"] = cfg.get_value("settler", "social_decay_per_hour", 2.0)
-	settings["safety_decay_per_hour"] = cfg.get_value("settler", "safety_decay_per_hour", 0.5)
-	settings["food_restore_amount"] = cfg.get_value("settler", "food_restore_amount", 100.0)
-	settings["sleep_restore_per_hour"] = cfg.get_value("settler", "sleep_restore_per_hour", 50.0)
-	settings["sleep_min_time"] = cfg.get_value("settler", "sleep_min_time", 3.0)
-	settings["sleep_max_time"] = cfg.get_value("settler", "sleep_max_time", 8.0)
-	settings["storage_search_radius"] = cfg.get_value("settler", "storage_search_radius", 300.0)
-	settings["food_search_radius"] = cfg.get_value("settler", "food_search_radius", 400.0)
-	
-	# 资源采集设置
-	settings["harvest_amount"] = cfg.get_value("resources", "harvest_amount", 5.0)
-	settings["harvest_count"] = cfg.get_value("resources", "harvest_count", 5)
-	settings["resource_amount_multiplier"] = cfg.get_value("resources", "resource_amount_multiplier", 5.0)
-
-	# 工作速度设置
-	settings["work_speed_base"] = cfg.get_value("work_speed", "base_speed", 1.0)
-	settings["work_speed_level_bonus"] = cfg.get_value("work_speed", "level_bonus", 0.1)
-
-	# 工作优先级设置
-	settings["mining_priority"] = cfg.get_value("work", "mining_priority", 2)
-	settings["woodcutting_priority"] = cfg.get_value("work", "woodcutting_priority", 3)
-	settings["construction_priority"] = cfg.get_value("work", "construction_priority", 4)
-	settings["crafting_priority"] = cfg.get_value("work", "crafting_priority", 3)
-	settings["cooking_priority"] = cfg.get_value("work", "cooking_priority", 2)
-	settings["farming_priority"] = cfg.get_value("work", "farming_priority", 2)
-	settings["hauling_priority"] = cfg.get_value("work", "hauling_priority", 1)
-	settings["research_priority"] = cfg.get_value("work", "research_priority", 3)
-	settings["combat_priority"] = cfg.get_value("work", "combat_priority", 1)
-	
-	# 速度档位
-	speed_levels = []
-	for v in cfg.get_value("speed", "levels", [0.5, 1.0, 2.0, 3.0, 5.0, 10.0]):
-		speed_levels.append(float(v))
-	
-	# 世界设置
-	settings["chunk_size"] = cfg.get_value("world", "chunk_size", 16)
-	settings["world_chunks_x"] = cfg.get_value("world", "world_chunks_x", 8)
-	settings["world_chunks_y"] = cfg.get_value("world", "world_chunks_y", 8)
-	
-	# 建筑设置
-	settings["storage_rack_capacity"] = cfg.get_value("building", "storage_rack_capacity", 1000)
-	
-	print("游戏设置已加载")
 
 func _setup_autosave():
 	# 每分钟自动存档计时器

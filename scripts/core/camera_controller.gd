@@ -8,7 +8,7 @@ var zoom_level: float = 2.0
 const MIN_ZOOM: float = 0.5
 const MAX_ZOOM: float = 5.0
 
-# 从 GameManager.settings 读取滚动参数
+# 从 GameConfig 读取滚动参数
 var _scroll_speed: float = 300.0
 var _edge_scroll_margin: int = 20
 
@@ -16,11 +16,9 @@ var _edge_scroll_margin: int = 20
 var _focus_tween: Tween = null
 
 func _ready():
-	# 从 GameManager 读取配置的滚动参数
-	if GameManager.settings.has("scroll_speed"):
-		_scroll_speed = GameManager.settings.scroll_speed
-	if GameManager.settings.has("edge_scroll_margin"):
-		_edge_scroll_margin = GameManager.settings.edge_scroll_margin
+	# 从 GameConfig 读取配置的滚动参数
+	_scroll_speed = GameConfig.scroll_speed
+	_edge_scroll_margin = GameConfig.edge_scroll_margin
 	# 鼠标中键拖动
 	set_process_input(true)
 

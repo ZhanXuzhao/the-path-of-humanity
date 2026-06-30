@@ -48,7 +48,7 @@ var needs = {
 	"safety": 80.0,      # 安全感 - 受防御影响
 }
 
-# 需求衰减速度（每小时）——从 GameManager.settings 加载
+# 需求衰减速度（每小时）——从 GameConfig 加载
 var NEED_DECAY = {
 	"hunger": 4.17,
 	"rest": 5.0,
@@ -81,11 +81,11 @@ var max_hp: float = 100.0
 var move_speed: float = 60.0  # 像素/秒
 var carry_capacity: float = 50.0  # 负重上限
 
-# 读取 GameManager 配置的快捷方式
+# 读取 GameConfig 配置的快捷方式
 static func _settler_setting(key: String, default_value):
-	var gm = Engine.get_main_loop().root.get_node_or_null("/root/GameManager")
-	if gm and gm.settings.has(key):
-		return gm.settings[key]
+	var gc = Engine.get_main_loop().root.get_node_or_null("/root/GameConfig")
+	if gc and key in gc:
+		return gc.get(key)
 	return default_value
 
 # 当前行为
@@ -586,8 +586,7 @@ func _tick_harvest():
 		complete_task()
 		return
 	
-	var gm = get_node("/root/GameManager")
-	var max_amount = int(gm.settings.get("harvest_count", 5))
+	var max_amount = GameConfig.harvest_count
 	
 	# 使用任务中的 target_pos（资源格子位置）作为采集目标
 	# 角色实际站在资源格子旁边的可行走格子上
@@ -1709,7 +1708,7 @@ func _randomize_age():
 	age = 10.0 + randi() % 51  # 10~60 岁
 
 func _apply_config_settings():
-	"""从GameManager.config加载可配置参数"""
+	"""从 GameConfig 加载可配置参数"""
 	var base_hp = _settler_setting("base_hp", 80.0)
 	var con_bonus = _settler_setting("constitution_hp_bonus", 4.0)
 	var base_speed = _settler_setting("base_move_speed", 60.0)

@@ -13,8 +13,8 @@ signal ground_items_changed(grid_pos: Vector2i)
 const CHUNK_SIZE := 16
 
 # 世界大小（区块数），可通过 game_settings.cfg 配置
-var WORLD_CHUNKS_X := 8
-var WORLD_CHUNKS_Y := 8
+var WORLD_CHUNKS_X := 3
+var WORLD_CHUNKS_Y := 3
 
 # 地形类型枚举
 enum TileType {
@@ -114,26 +114,21 @@ var tile_size: int = 32
 var rng := RandomNumberGenerator.new()
 var world_seed: int = 0  # 地图随机种子，新游戏时随机生成
 
-# 可配置参数
+# 可配置参数（初始化时从 GameConfig 加载）
 var resource_multiplier: float = 5.0     # 资源初始点数倍率
 var default_harvest_amount: float = 5.0  # 每次采集获得的资源量
 
 func _ready():
 	rng.randomize()
-	# 从 GameManager 加载世界设置
+	# 从 GameConfig 加载配置
 	_load_world_settings()
+	resource_multiplier = GameConfig.resource_amount_multiplier
+	default_harvest_amount = GameConfig.harvest_amount
 
 func _load_world_settings():
-	"""从 GameManager 加载世界配置参数"""
-	var gm = get_node_or_null("/root/GameManager")
-	if gm and gm.settings.has("world_chunks_x"):
-		WORLD_CHUNKS_X = gm.settings["world_chunks_x"] as int
-		WORLD_CHUNKS_Y = gm.settings["world_chunks_y"] as int
-
-func apply_settings(multiplier: float, harvest_amt: float):
-	"""从 GameManager 加载可配置参数"""
-	resource_multiplier = multiplier
-	default_harvest_amount = harvest_amt
+	"""从 GameConfig 加载世界配置参数"""
+	WORLD_CHUNKS_X = GameConfig.world_chunks_x
+	WORLD_CHUNKS_Y = GameConfig.world_chunks_y
 
 # -------- 区块生成 --------
 func get_chunk(chunk_pos: Vector2i) -> ChunkData:
