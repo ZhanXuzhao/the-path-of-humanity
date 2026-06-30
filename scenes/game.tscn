@@ -295,6 +295,52 @@ layout_mode = 2
 [node name="StatusLabel" type="Label" parent="UI/HUD/ConstructionPanel/ScrollContainer/VBox" unique_id=1976277253]
 layout_mode = 2
 
+[node name="BuildingInfoPanel" type="Panel" parent="UI/HUD" unique_id=1432108525]
+visible = false
+offset_left = 8.0
+offset_top = 400.0
+offset_right = 260.0
+offset_bottom = 580.0
+theme_override_styles/panel = SubResource("2")
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/BuildingInfoPanel" unique_id=521093744]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 248.0
+offset_bottom = 176.0
+
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/BuildingInfoPanel/ScrollContainer" unique_id=1928493603]
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="UI/HUD/BuildingInfoPanel/ScrollContainer/VBox" unique_id=106648544]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.9, 0.6, 1)
+text = "建筑名称"
+
+[node name="DescLabel" type="Label" parent="UI/HUD/BuildingInfoPanel/ScrollContainer/VBox" unique_id=557805546]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
+text = "建筑描述"
+
+[node name="Sep1" type="HSeparator" parent="UI/HUD/BuildingInfoPanel/ScrollContainer/VBox" unique_id=1522883270]
+layout_mode = 2
+
+[node name="CategoryLabel" type="Label" parent="UI/HUD/BuildingInfoPanel/ScrollContainer/VBox" unique_id=529564999]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+text = "分类: "
+
+[node name="SizeLabel" type="Label" parent="UI/HUD/BuildingInfoPanel/ScrollContainer/VBox" unique_id=2038569121]
+layout_mode = 2
+text = "大小: "
+
+[node name="Sep2" type="HSeparator" parent="UI/HUD/BuildingInfoPanel/ScrollContainer/VBox" unique_id=1130381899]
+layout_mode = 2
+
+[node name="ExtraInfoContainer" type="VBoxContainer" parent="UI/HUD/BuildingInfoPanel/ScrollContainer/VBox" unique_id=1712786151]
+layout_mode = 2
+
 [node name="ResourcePanel" type="Panel" parent="UI/HUD" unique_id=219414468]
 visible = false
 offset_left = 8.0

@@ -352,7 +352,7 @@ func _try_select_building():
 
 func _try_select_building_at(grid_pos: Vector2i):
 	"""在指定网格位置选择建筑
-	- 已完成且有存储功能 → 存储面板
+	- 已完成 → 通用建筑信息面板（存储建筑显示库存）
 	- 未完成（施工中）→ 建筑进度面板
 	"""
 	# 选中建筑时取消其他选中
@@ -365,16 +365,10 @@ func _try_select_building_at(grid_pos: Vector2i):
 		_deselect_building()
 		return
 	
-	# 已完成且有存储功能的建筑 → 存储面板
+	# 已完成建筑 → 通用建筑信息
 	if bld.is_completed:
-		var data = bld.get_data()
-		if data != null and data.storage_capacity > 0 and bld.inventory != null:
-			_deselect_construction()
-			_select_building(bld)
-			return
-		# 已完成的非存储建筑 → 取消所有选中
 		_deselect_construction()
-		_deselect_building()
+		_select_building(bld)
 		return
 	
 	# 未完成的建筑（施工中）→ 建筑进度面板
@@ -527,15 +521,8 @@ func _input(event):
 		var clicked_settler = _find_settler_at_pos(global_pos)
 		var clicked_bld = building_system.get_building_at(grid_pos) if building_system else null
 		
-		# 判断建筑是否可选择（存储建筑或施工中建筑）
-		var bld_selectable = false
-		if clicked_bld != null:
-			if clicked_bld.is_completed:
-				var data = clicked_bld.get_data()
-				if data != null and data.storage_capacity > 0 and clicked_bld.inventory != null:
-					bld_selectable = true
-			else:
-				bld_selectable = true
+		# 判断建筑是否可选择（所有建筑均可选）
+		var bld_selectable = clicked_bld != null
 		
 		if clicked_settler != null and bld_selectable:
 			# 同时有定居者和建筑 → 轮流选择

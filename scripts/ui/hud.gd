@@ -34,6 +34,14 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var storage_capacity_label: Label = $StoragePanel/ScrollContainer/VBox/CapacityLabel
 @onready var storage_items_container: VBoxContainer = $StoragePanel/ScrollContainer/VBox/ItemsContainer
 
+# 通用建筑信息面板（非存储建筑）
+@onready var building_info_panel: Panel = $BuildingInfoPanel
+@onready var building_info_name_label: Label = $BuildingInfoPanel/ScrollContainer/VBox/NameLabel
+@onready var building_info_desc_label: Label = $BuildingInfoPanel/ScrollContainer/VBox/DescLabel
+@onready var building_info_category_label: Label = $BuildingInfoPanel/ScrollContainer/VBox/CategoryLabel
+@onready var building_info_size_label: Label = $BuildingInfoPanel/ScrollContainer/VBox/SizeLabel
+@onready var building_info_extra_container: VBoxContainer = $BuildingInfoPanel/ScrollContainer/VBox/ExtraInfoContainer
+
 # 在建建筑进度面板
 @onready var construction_panel: Panel = $ConstructionPanel
 @onready var construction_name_label: Label = $ConstructionPanel/ScrollContainer/VBox/NameLabel
@@ -135,6 +143,7 @@ func _hide_all_info_panels():
 	"""隐藏所有左下角信息面板，确保同时只显示一个"""
 	settler_info_panel.visible = false
 	storage_panel.visible = false
+	building_info_panel.visible = false
 	construction_panel.visible = false
 	resource_panel.visible = false
 
@@ -197,18 +206,27 @@ func _on_settler_deselected():
 	settler_info_panel.visible = false
 	_tracked_settler = null
 
-# -------- 存储建筑面板 --------
+# -------- 存储建筑面板 / 通用建筑信息面板 --------
 func _on_building_selected(bld):
-	"""选中存储建筑时显示物品列表"""
+	"""选中建筑时显示信息面板（存储建筑显示库存，其他显示基本信息）"""
 	_hide_all_info_panels()
 	_showing_ground_items = false
-	storage_panel.visible = true
-	_update_storage_panel(bld)
+	
+	var data = bld.get_data()
+	if data and data.storage_capacity > 0 and bld.inventory != null:
+		# 存储建筑 → 显示库存面板
+		storage_panel.visible = true
+		_update_storage_panel(bld)
+	else:
+		# 非存储建筑 → 显示通用建筑信息面板
+		building_info_panel.visible = true
+		_update_building_info_panel(bld, data)
 
 func _on_building_deselected():
 	"""取消选中建筑"""
 	_showing_ground_items = false
 	storage_panel.visible = false
+	building_info_panel.visible = false
 
 # -------- 在建建筑进度面板 --------
 func _on_construction_selected(bld):
@@ -412,6 +430,110 @@ func _update_storage_panel(bld):
 		hbox.add_child(icon_label)
 		hbox.add_child(name_label)
 		storage_items_container.add_child(hbox)
+
+func _update_building_info_panel(bld, data):
+	"""更新通用建筑信息面板内容（非存储建筑）"""
+	if not is_instance_valid(bld):
+		return
+	
+	if data == null:
+		building_info_name_label.text = "未知建筑"
+		building_info_desc_label.text = ""
+		building_info_category_label.text = ""
+		building_info_size_label.text = ""
+		return
+	
+	var display_name = bld.display_name if bld.display_name != "" else data.name
+	building_info_name_label.text = display_name
+	building_info_desc_label.text = data.description
+	
+	# 分类
+	var category_names = {
+		ItemDefinitions.BuildingCategory.STORAGE: "存储",
+		ItemDefinitions.BuildingCategory.PRODUCTION: "生产",
+		ItemDefinitions.BuildingCategory.EXTRACTION: "采集",
+		ItemDefinitions.BuildingCategory.DEFENSE: "防御",
+		ItemDefinitions.BuildingCategory.RESIDENTIAL: "居住",
+		ItemDefinitions.BuildingCategory.INFRASTRUCTURE: "基础设施",
+		ItemDefinitions.BuildingCategory.RESEARCH: "研究",
+		ItemDefinitions.BuildingCategory.FURNITURE: "家具",
+	}
+	var cat_name = category_names.get(data.category, "其他")
+	building_info_category_label.text = "分类: %s" % cat_name
+	building_info_size_label.text = "大小: %d×%d" % [data.size.x, data.size.y]
+	
+	# 额外信息（按建筑类型）
+	for child in building_info_extra_container.get_children():
+		child.queue_free()
+	
+	# 床铺显示分配对象
+	if bld.building_id == "wooden_bed" and bld.assigned_settler_name != "":
+		var assign_label = Label.new()
+		assign_label.text = "分配: %s" % bld.assigned_settler_name
+		assign_label.add_theme_color_override("font_color", Color(0.6, 0.9, 1.0))
+		building_info_extra_container.add_child(assign_label)
+		
+		var gm = get_node("/root/GameManager")
+		if gm and bld.assigned_settler_id != "":
+			var game = get_node_or_null("/root/Game")
+			var settler = game.get_settler_by_id(bld.assigned_settler_id) if game else null
+			if settler and is_instance_valid(settler):
+				var state_text = Settler.get_state_display(settler.state)
+				var state_label = Label.new()
+				state_label.text = "状态: %s" % state_text
+				state_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+				building_info_extra_container.add_child(state_label)
+	
+	# 生产建筑显示产出信息
+	if data.production_time > 0 and not data.produces.is_empty():
+		var prod_text = "产出: "
+		var first = true
+		for item_id in data.produces:
+			if not first:
+				prod_text += ", "
+			first = false
+			var item_data = ItemDefinitions.get_item(item_id)
+			var item_name = item_data.name if item_data else item_id
+			prod_text += "%s×%d" % [item_name, data.produces[item_id]]
+		var prod_label = Label.new()
+		prod_label.text = prod_text
+		prod_label.add_theme_color_override("font_color", Color(0.8, 0.9, 0.6))
+		building_info_extra_container.add_child(prod_label)
+		
+		var cycle_label = Label.new()
+		cycle_label.text = "周期: %.1f秒" % data.production_time
+		cycle_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+		building_info_extra_container.add_child(cycle_label)
+	
+	# 居住建筑显示容量
+	if data.category == ItemDefinitions.BuildingCategory.RESIDENTIAL:
+		var cap_label = Label.new()
+		cap_label.text = "可容纳定居者"
+		cap_label.add_theme_color_override("font_color", Color(0.6, 0.9, 0.6))
+		building_info_extra_container.add_child(cap_label)
+	
+	# 显示建筑材料（建造时需要的）
+	if not data.materials.is_empty():
+		var mat_sep = HSeparator.new()
+		building_info_extra_container.add_child(mat_sep)
+		var mat_title = Label.new()
+		mat_title.text = "建造材料:"
+		mat_title.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+		building_info_extra_container.add_child(mat_title)
+		for mat_id in data.materials:
+			var amount = data.materials[mat_id]
+			var item_data = ItemDefinitions.get_item(mat_id)
+			var item_name = item_data.name if item_data else mat_id
+			var mat_label = Label.new()
+			mat_label.text = "  %s × %d" % [item_name, amount]
+			mat_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+			building_info_extra_container.add_child(mat_label)
+
+	# 显示建筑耐久度
+	var hp_label = Label.new()
+	hp_label.text = "耐久: %d" % data.hp
+	hp_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+	building_info_extra_container.add_child(hp_label)
 
 func _update_population():
 	"""更新人口显示"""
