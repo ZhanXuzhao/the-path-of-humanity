@@ -253,7 +253,7 @@ func save_game(silent: bool = false) -> bool:
 		return false
 	
 	var save_data = {
-		"version": 2,  # v2: 移除了全局资源池
+		"version": 3,  # v3: 添加 designated_resources 标记数据
 		"game_time": game_time,
 		"current_day": current_day,
 		"time_speed": time_speed,
@@ -264,6 +264,7 @@ func save_game(silent: bool = false) -> bool:
 		"crafting": game.crafting_system.to_dict() if game.crafting_system else {},
 		"settlers": _serialize_settlers(game.settlers),
 		"work_priorities": get_node_or_null("/root/WorkManager").to_dict() if get_node_or_null("/root/WorkManager") else {},
+		"designated_resources": game.designated_resources.duplicate(),
 	}
 	
 	var file = FileAccess.open("user://savegame.dat", FileAccess.WRITE)

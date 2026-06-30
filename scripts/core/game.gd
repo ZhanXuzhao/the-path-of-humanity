@@ -173,6 +173,9 @@ func _process(delta):
 			if res == null or res.amount <= 0:
 				_deselect_resource()
 		
+		# 清理已失效的资源采集标记（资源已被采完但标记未移除）
+		_cleanup_depleted_designations()
+		
 		# 检查选中的地面物品是否还存在（可能已被拾取完）
 		if selected_ground_item_pos.x >= 0:
 			var stacks = world.get_ground_items_at(selected_ground_item_pos)
@@ -393,6 +396,13 @@ func clear_designations_by_type(work_type: int):
 	for key in to_remove:
 		designated_resources.erase(key)
 	if not to_remove.is_empty():
+		designated_resources_changed.emit()
+
+func remove_designation_at(grid_pos: Vector2i):
+	"""移除指定网格位置的资源采集标记"""
+	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
+	if designated_resources.has(key):
+		designated_resources.erase(key)
 		designated_resources_changed.emit()
 
 func _is_resource_match_work_type(resource_type: int, work_type: int) -> bool:
@@ -1105,6 +1115,11 @@ func _restore_from_save(data: Dictionary):
 			settler.from_dict(s_data)
 			add_child(settler)
 			settlers.append(settler)
+	
+	# 恢复资源采集标记（v3+）
+	if data.has("designated_resources"):
+		designated_resources = data.designated_resources.duplicate()
+		designated_resources_changed.emit()
 
 # -------- 定居者管理 --------
 func get_idle_settlers() -> Array:
@@ -1641,6 +1656,33 @@ func release_harvest_resource(grid_pos: Vector2i):
 	"""释放一个资源的采集占用标记"""
 	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
 	_claimed_harvest_resources.erase(key)
+
+func _cleanup_depleted_designations():
+	"""清理已被采完但仍然保留在 designated_resources 中的标记"""
+	var to_remove: Array[String] = []
+	for res_key in designated_resources:
+		var parts = res_key.split(",")
+		if parts.size() != 2:
+			to_remove.append(res_key)
+			continue
+		var grid_pos = Vector2i(int(parts[0]), int(parts[1]))
+		if world:
+			var dep = world.get_resource_at(grid_pos)
+			if dep == null or dep.amount <= 0:
+				# 资源已不存在或已耗尽
+				to_remove.append(res_key)
+				continue
+		# 搬运模式下的地面物品标记：检查地面物品是否还在
+		var wt = designated_resources[res_key]
+		if wt == WorkManager.WorkType.HAULING and world:
+			var stacks = world.get_ground_items_at(grid_pos)
+			if stacks.is_empty():
+				to_remove.append(res_key)
+	
+	for key in to_remove:
+		designated_resources.erase(key)
+	if not to_remove.is_empty():
+		designated_resources_changed.emit()
 
 func _cleanup_harvest_claims():
 	"""清理已失效的资源采集占用标记"""

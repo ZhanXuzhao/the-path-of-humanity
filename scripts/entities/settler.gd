@@ -600,6 +600,9 @@ func _tick_harvest():
 	# 采集单个资源点（最多 harvest_count 个）
 	var result = game.world.harvest_resource(grid_pos, max_amount)
 	if result.is_empty() or result.amount <= 0:
+		# 资源已耗尽，同时移除采集标记
+		if game.has_method("remove_designation_at"):
+			game.remove_designation_at(grid_pos)
 		complete_task()
 		return
 	
@@ -620,6 +623,10 @@ func _tick_harvest():
 	if dep != null and dep.amount > 0:
 		if game.has_method("claim_harvest_resource"):
 			game.claim_harvest_resource(grid_pos, settler_id)
+	else:
+		# 资源已被完全采完，移除采集标记
+		if game.has_method("remove_designation_at"):
+			game.remove_designation_at(grid_pos)
 	
 	# 增加经验
 	add_skill_experience(current_task.get("skill", ""), 1.0)
