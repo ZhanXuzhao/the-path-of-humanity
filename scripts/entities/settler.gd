@@ -537,7 +537,7 @@ func _do_work_tick(task_type: String):
 			_tick_go_sleep()
 
 func _tick_harvest():
-	"""执行一次采集工作——只采集当前站立格子上的一个资源点，每次最多 harvest_count 个"""
+	"""执行一次采集工作——采集任务目标格子上的资源（角色站在相邻格子上采集）"""
 	var game = get_node_or_null("/root/Game")
 	if game == null or game.world == null:
 		complete_task()
@@ -546,6 +546,8 @@ func _tick_harvest():
 	var gm = get_node("/root/GameManager")
 	var max_amount = int(gm.settings.get("harvest_count", 5))
 	
+	# 使用任务中的 target_pos（资源格子位置）作为采集目标
+	# 角色实际站在资源格子旁边的可行走格子上
 	var grid_pos: Vector2i = current_task.get("target_pos", Vector2i.ZERO)
 	
 	# 释放该资源的占用标记
@@ -1157,6 +1159,18 @@ func _drop_inventory_to_ground():
 			game.world.drop_item_on_ground(grid_pos, item_id, amt)
 	inventory.clear()
 
+func _find_adjacent_walkable(resource_grid: Vector2i, world) -> Vector2i:
+	"""寻找资源格子旁边最近的可行走网格（用于采集时站位）"""
+	var dirs = [
+		Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0),
+		Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1),
+	]
+	for d in dirs:
+		var check = resource_grid + d
+		if world.is_walkable(check):
+			return check
+	return Vector2i(-1, -1)  # 无可用站位
+
 func _find_nearby_storage(max_dist: float = -1.0) -> Array:
 	"""查找附近有空间的存储建筑（用于存放物品），按距离排序"""
 	if max_dist < 0:
@@ -1626,17 +1640,30 @@ func add_skill_experience(skill_id: String, amount: float):
 # -------- 任务系统 --------
 func assign_task(task_data: Dictionary) -> bool:
 	"""分配任务，返回是否可以接受"""
-	# 检查目标位置是否可通行（防止将任务分配到水面上）
 	var target_pixel = task_data.get("target_world_pos", Vector2.ZERO)
+	
 	if target_pixel != Vector2.ZERO:
 		var game = get_node_or_null("/root/Game")
 		if game and game.world:
-			var target_grid = Vector2i(
-				int(target_pixel.x / game.world.tile_size),
-				int(target_pixel.y / game.world.tile_size)
-			)
-			if not game.world.is_walkable(target_grid):
-				return false  # 目标不可达，拒绝接受任务
+			var ts = game.world.tile_size
+			# 采集任务：站在资源旁边的可行走格子上，隔一格采集
+			if task_data.get("type") == "HARVEST":
+				var resource_grid = task_data.get("target_pos", Vector2i.ZERO)
+				var stand_grid = _find_adjacent_walkable(resource_grid, game.world)
+				if stand_grid != Vector2i(-1, -1):
+					target_pixel = Vector2(
+						stand_grid.x * ts + ts / 2.0,
+						stand_grid.y * ts + ts / 2.0
+					)
+				elif not game.world.is_walkable(resource_grid):
+					return false  # 资源格本身也不可行走，无法采集
+			else:
+				var target_grid = Vector2i(
+					int(target_pixel.x / ts),
+					int(target_pixel.y / ts)
+				)
+				if not game.world.is_walkable(target_grid):
+					return false  # 目标不可达，拒绝接受任务
 	
 	current_task = task_data
 	
