@@ -91,6 +91,9 @@ func _ready():
 	if menu_btn:
 		menu_btn.pressed.connect(_on_menu_pressed)
 	
+	# 初始化速度标签显示（从存档恢复后的实际速度）
+	_update_speed_label()
+	
 	# 延迟一帧初始化资源显示（等 Game 场景就绪）
 	call_deferred("_refresh_resource_display")
 	
@@ -566,6 +569,7 @@ func _update_speed_label():
 	if not speed_label:
 		return
 	var speed = game_manager.time_speed
+	LogUtil.info("更新速度标签: 当前速度 = %s" % game_manager.time_speed)
 	if speed == int(speed):
 		speed_label.text = "×%d" % speed
 	else:

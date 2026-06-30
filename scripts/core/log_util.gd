@@ -41,18 +41,51 @@ func _format_message(settler, level: Level, message: String) -> String:
 	else:
 		return "%s %s" % [prefix, message]
 
+# @param settler:  定居者对象，非 null 且选中时才会打印；传 null 且 force=false 则静默
+# @param message:  日志文本
+# @param force:    true 时无视 settler 选择状态强制打印
 func debug(settler, message: String, force: bool = false):
 	if not _should_log(settler, force): return
 	print(_format_message(settler, Level.DEBUG, message))
 
+# @param settler:  定居者对象，非 null 且选中时才会打印；传 null 且 force=false 则静默
+# @param message:  日志文本
+# @param force:    true 时无视 settler 选择状态强制打印
 func info(settler, message: String, force: bool = false):
 	if not _should_log(settler, force): return
 	print(_format_message(settler, Level.INFO, message))
 
+# @param settler:  定居者对象，非 null 且选中时才会打印；传 null 且 force=false 则静默
+# @param message:  日志文本
+# @param force:    true 时无视 settler 选择状态强制打印
 func warn(settler, message: String, force: bool = false):
 	if not _should_log(settler, force): return
 	print(_format_message(settler, Level.WARN, message))
 
+# @param settler:  定居者对象，非 null 且选中时才会打印；传 null 且 force=false 则静默
+# @param message:  日志文本
+# @param force:    true 时无视 settler 选择状态强制打印
 func error(settler, message: String, force: bool = false):
 	if not _should_log(settler, force): return
 	print(_format_message(settler, Level.ERROR, message))
+
+# -------- 无需 settler 参数的快捷方法 --------
+# @param message:  日志文本
+# @param force:    true 时强制打印（无视 verbose 和选中状态）
+func d(message: String, force: bool = false):
+	debug(null, message, force)
+
+# @param message:  日志文本
+# @param force:    true 时强制打印
+func i(message: String, force: bool = false):
+	info(null, message, force)
+
+# @param message:  日志文本
+# @param force:    true 时强制打印
+func w(message: String, force: bool = false):
+	warn(null, message, force)
+
+# @param message:  日志文本
+# @param force:    true 时强制打印
+func e(message: String, force: bool = false):
+	error(null, message, force)
