@@ -4,6 +4,7 @@ extends Node2D
 class_name Game
 
 const ItemDefinitions = preload("res://resources/item_definitions.gd")
+const WorkManager = preload("res://scripts/autoload/work_manager.gd")
 
 @onready var world = $World
 @onready var building_system = $Systems/BuildingSystem
@@ -59,6 +60,24 @@ var _autonomy_timer: float = 0.0
 # key: "x,y" -> settler_id，表示该资源正被哪个定居者采集
 var _claimed_harvest_resources: Dictionary = {}
 
+# ==================== 指令标记系统 ====================
+# 标记模式——玩家可标记哪些资源允许采集
+var designation_mode: bool = false
+var designation_work_type: int = -1  # WorkManager.WorkType
+
+# 已标记的资源 {"x,y": work_type}
+# 只有被标记的资源才会被定居者采集
+var designated_resources: Dictionary = {}
+
+# 框选拖拽状态
+var _is_designation_dragging: bool = false
+var _drag_start_grid: Vector2i = Vector2i(-1, -1)
+var _drag_end_grid: Vector2i = Vector2i(-1, -1)
+var _drag_box_visual: ColorRect = null
+
+signal designation_mode_changed(active: bool, work_type: int)
+signal designated_resources_changed()
+
 # 清理过期采集占用的定时器（每30帧清理一次）
 func _ready():
 	# 自动加载存档（静默读取，不弹通知）
@@ -80,6 +99,9 @@ func _ready():
 		# 新游戏 - 初始化世界和定居者（程序自动确保名字不重复）
 		_generate_initial_area()
 		_spawn_initial_settlers()
+		
+		# 新游戏提示：使用指令面板标记资源
+		call_deferred("_show_command_panel_tutorial")
 	
 	# 初始化系统引用
 	if building_system:
@@ -132,6 +154,15 @@ func _process(delta):
 			var stacks = world.get_ground_items_at(selected_ground_item_pos)
 			if stacks.is_empty():
 				_deselect_ground_item()
+		
+		# 标记模式：更新框选视觉
+		if designation_mode and _is_designation_dragging:
+			var mouse_pos = get_global_mouse_position()
+			_drag_end_grid = Vector2i(
+				floori(mouse_pos.x / world.tile_size),
+				floori(mouse_pos.y / world.tile_size)
+			)
+			_update_designation_drag_visual()
 
 func _generate_initial_area():
 	# 新游戏：随机化地图种子，确保每次地图不同
@@ -238,6 +269,166 @@ func exit_build_mode():
 			build_menu.selected_building = ""
 			for i in build_menu.category_tabs.get_child_count():
 				build_menu.category_tabs.get_child(i).button_pressed = false
+
+# ==================== 指令标记模式 ====================
+
+func enter_designation_mode(work_type: int):
+	"""进入标记模式，玩家可以标记指定类型的资源"""
+	if build_mode:
+		exit_build_mode()
+	
+	designation_mode = true
+	designation_work_type = work_type
+	_is_designation_dragging = false
+	
+	# 创建框选视觉（矩形虚线框）
+	if _drag_box_visual == null:
+		_drag_box_visual = ColorRect.new()
+		_drag_box_visual.color = Color(0.3, 1.0, 0.3, 0.15)
+		_drag_box_visual.z_index = 150
+		_drag_box_visual.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# 边框用4条线实现
+		_drag_box_visual.size = Vector2.ZERO
+		add_child(_drag_box_visual)
+	
+	designation_mode_changed.emit(true, work_type)
+
+func exit_designation_mode():
+	"""退出标记模式"""
+	designation_mode = false
+	designation_work_type = -1
+	_is_designation_dragging = false
+	
+	if _drag_box_visual:
+		_drag_box_visual.size = Vector2.ZERO
+		_drag_box_visual.visible = false
+	
+	designation_mode_changed.emit(false, -1)
+
+func toggle_resource_designation(grid_pos: Vector2i) -> bool:
+	"""切换指定网格位置的资源标记状态，返回标记后的状态（true=已标记）"""
+	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
+	
+	if designated_resources.has(key):
+		# 如果已标记，且工作类型相同则取消标记；类型不同则更新
+		if designated_resources[key] == designation_work_type:
+			designated_resources.erase(key)
+			designated_resources_changed.emit()
+			return false
+		else:
+			designated_resources[key] = designation_work_type
+			designated_resources_changed.emit()
+			return true
+	else:
+		# 检查该位置是否有可标记的资源
+		var dep = world.get_resource_at(grid_pos) if world else null
+		if dep != null and dep.amount > 0:
+			if _is_resource_match_work_type(dep.type, designation_work_type):
+				designated_resources[key] = designation_work_type
+				designated_resources_changed.emit()
+				return true
+		# 搬运模式：也标记地面物品
+		if designation_work_type == WorkManager.WorkType.HAULING and world:
+			var stacks = world.get_ground_items_at(grid_pos)
+			if not stacks.is_empty():
+				designated_resources[key] = designation_work_type
+				designated_resources_changed.emit()
+				return true
+	
+	return false
+
+func is_resource_designated(grid_pos: Vector2i) -> bool:
+	"""检查指定网格位置的资源是否已被标记"""
+	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
+	return designated_resources.has(key)
+
+func get_designated_work_type(grid_pos: Vector2i) -> int:
+	"""获取指定资源的标记工作类型，-1表示未标记"""
+	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
+	return designated_resources.get(key, -1)
+
+func clear_all_designations():
+	"""清除所有标记"""
+	designated_resources.clear()
+	designated_resources_changed.emit()
+
+func clear_designations_by_type(work_type: int):
+	"""清除指定工作类型的所有标记"""
+	var to_remove: Array[String] = []
+	for key in designated_resources:
+		if designated_resources[key] == work_type:
+			to_remove.append(key)
+	for key in to_remove:
+		designated_resources.erase(key)
+	if not to_remove.is_empty():
+		designated_resources_changed.emit()
+
+func _is_resource_match_work_type(resource_type: int, work_type: int) -> bool:
+	"""检查资源类型是否匹配指定的工作类型"""
+	match work_type:
+		WorkManager.WorkType.MINING:
+			return resource_type in [
+				World.ResourceNodeType.STONE_DEPOSIT,
+				World.ResourceNodeType.IRON_DEPOSIT,
+				World.ResourceNodeType.COPPER_DEPOSIT,
+				World.ResourceNodeType.COAL_DEPOSIT,
+			]
+		WorkManager.WorkType.WOODCUTTING:
+			return resource_type == World.ResourceNodeType.TREE
+		WorkManager.WorkType.FARMING:
+			return resource_type == World.ResourceNodeType.BERRY_BUSH
+		_:
+			return false
+
+func _designate_resources_in_rect(from_grid: Vector2i, to_grid: Vector2i):
+	"""在矩形区域内标记所有匹配工作类型的资源"""
+	var min_x = mini(from_grid.x, to_grid.x)
+	var max_x = maxi(from_grid.x, to_grid.x)
+	var min_y = mini(from_grid.y, to_grid.y)
+	var max_y = maxi(from_grid.y, to_grid.y)
+	
+	var changed = false
+	for x in range(min_x, max_x + 1):
+		for y in range(min_y, max_y + 1):
+			var pos = Vector2i(x, y)
+			var dep = world.get_resource_at(pos) if world else null
+			if dep != null and dep.amount > 0:
+				if _is_resource_match_work_type(dep.type, designation_work_type):
+					var key = "%d,%d" % [x, y]
+					designated_resources[key] = designation_work_type
+					changed = true
+			# 搬运模式也标记地面物品
+			if designation_work_type == WorkManager.WorkType.HAULING and world:
+				var stacks = world.get_ground_items_at(pos)
+				if not stacks.is_empty():
+					var key = "%d,%d" % [x, y]
+					designated_resources[key] = designation_work_type
+					changed = true
+	
+	if changed:
+		designated_resources_changed.emit()
+
+func _update_designation_drag_visual():
+	"""更新框选拖拽的视觉反馈"""
+	if not _is_designation_dragging or _drag_start_grid.x < 0 or _drag_end_grid.x < 0:
+		if _drag_box_visual:
+			_drag_box_visual.visible = false
+		return
+	
+	var min_x = mini(_drag_start_grid.x, _drag_end_grid.x)
+	var max_x = maxi(_drag_start_grid.x, _drag_end_grid.x)
+	var min_y = mini(_drag_start_grid.y, _drag_end_grid.y)
+	var max_y = maxi(_drag_start_grid.y, _drag_end_grid.y)
+	
+	var pixel_pos = Vector2(min_x * world.tile_size, min_y * world.tile_size)
+	var pixel_size = Vector2(
+		(max_x - min_x + 1) * world.tile_size,
+		(max_y - min_y + 1) * world.tile_size
+	)
+	
+	_drag_box_visual.position = pixel_pos
+	_drag_box_visual.size = pixel_size
+	_drag_box_visual.visible = true
 
 func _update_build_preview():
 	var mouse_pos = get_global_mouse_position()
@@ -491,6 +682,10 @@ func _input(event):
 			_deselect_ground_item()
 			return
 		
+		if designation_mode:
+			exit_designation_mode()
+			return
+		
 		if build_mode:
 			exit_build_mode()
 			return
@@ -520,21 +715,62 @@ func _input(event):
 			main_menu.visible = true
 			_gm.pause_game()
 	
-	# 右键退出建造模式
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed and build_mode:
-		exit_build_mode()
-		return
+	# 右键退出标记模式或建造模式
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
+		if designation_mode:
+			exit_designation_mode()
+			return
+		if build_mode:
+			exit_build_mode()
+			return
 	
 	# 点击UI控件时不处理世界点击逻辑
 	if event.is_action_pressed("left_click") and _is_mouse_over_ui():
 		return
 	
+	# 标记模式的左键处理
+	if event is InputEventMouseButton and not build_mode and designation_mode:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				# 开始拖拽或点选
+				var global_pos = get_global_mouse_position()
+				_drag_start_grid = Vector2i(
+					floori(global_pos.x / world.tile_size),
+					floori(global_pos.y / world.tile_size)
+				)
+				_drag_end_grid = _drag_start_grid
+				_is_designation_dragging = true
+				_drag_box_visual.visible = false
+			else:
+				# 鼠标释放：完成框选
+				if _is_designation_dragging:
+					_is_designation_dragging = false
+					_drag_box_visual.visible = false
+					
+					var global_pos = get_global_mouse_position()
+					var end_grid = Vector2i(
+						floori(global_pos.x / world.tile_size),
+						floori(global_pos.y / world.tile_size)
+					)
+					
+					# 判断是点选还是框选
+					if _drag_start_grid == end_grid:
+						# 点选：切换单个资源的标记状态
+						toggle_resource_designation(_drag_start_grid)
+					else:
+						# 框选：标记矩形内所有匹配资源
+						_designate_resources_in_rect(_drag_start_grid, end_grid)
+					
+					_drag_start_grid = Vector2i(-1, -1)
+					_drag_end_grid = Vector2i(-1, -1)
+			return
+	
 	if event.is_action_pressed("left_click") and build_mode:
 		_try_place_building()
 		return
 	
-	# 定居者点击选择（非建造模式下的左键单击）
-	if event.is_action_pressed("left_click") and not build_mode:
+	# 定居者点击选择（非建造模式、非标记模式下的左键单击）
+	if event.is_action_pressed("left_click") and not build_mode and not designation_mode:
 		var global_pos = get_global_mouse_position()
 		var grid_pos = Vector2i(
 			floori(global_pos.x / world.tile_size),
@@ -676,6 +912,11 @@ func _input(event):
 		if event.keycode == KEY_EQUAL:
 			_speed_up()
 			get_viewport().set_input_as_handled()
+
+# -------- 指令面板教程提示 --------
+func _show_command_panel_tutorial():
+	"""新游戏时显示指令面板使用提示"""
+	_gm.show_notification("使用右侧指令面板标记资源，定居者只会采集标记的资源", 8)
 
 # -------- 速度控制（-= 快捷键） --------
 func _speed_up():
@@ -1010,6 +1251,10 @@ func _scan_nearby_resources(idle_settlers: Array) -> Array:
 				if _claimed_harvest_resources.has(res_key):
 					continue
 				
+				# 指令面板：只采集被标记的资源
+				if not designated_resources.has(res_key):
+					continue
+				
 				var world_pos = _grid_to_world(global_pos)
 				var item_id = dep.get_item_drop()
 				
@@ -1150,6 +1395,11 @@ func _scan_ground_item_storage_tasks(_idle_settlers: Array, existing_haul_tasks:
 	for pos in world.ground_items:
 		var stacks = world.ground_items[pos]
 		if stacks.is_empty():
+			continue
+		
+		# 指令面板：搬运模式下只处理被标记的地面物品
+		var haul_key = "%d,%d" % [pos.x, pos.y]
+		if not designated_resources.is_empty() and not designated_resources.has(haul_key):
 			continue
 		
 		for stack in stacks:

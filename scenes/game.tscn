@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" uid="uid://cm5p4exrbq2j6" path="res://scenes/main_menu.tscn" id="10_kae2"]
 [ext_resource type="Script" uid="uid://b8ill76nlbxvo" path="res://scripts/ui/minimap.gd" id="11_x8m9"]
 [ext_resource type="Script" uid="uid://b2alnb6envcwj" path="res://scripts/ui/work_panel.gd" id="12_0k7l"]
+[ext_resource type="Script" path="res://scripts/ui/command_panel.gd" id="13_h4x8"]
 
 [sub_resource type="StyleBoxFlat" id="2"]
 content_margin_left = 6.0
@@ -535,6 +536,61 @@ offset_bottom = 620.0
 [node name="ResetAllBtn" type="Button" parent="UI/WorkPanel/BottomBar" unique_id=1499309424]
 layout_mode = 2
 text = "全部重置为默认"
+
+[node name="CommandPanel" type="Panel" parent="UI" unique_id=1234567890]
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.15
+anchor_right = 1.0
+anchor_bottom = 0.65
+offset_left = -140.0
+offset_top = 0.0
+offset_right = -8.0
+offset_bottom = 0.0
+mouse_filter = 1
+theme_override_styles/panel = SubResource("2")
+script = ExtResource("13_h4x8")
+
+[node name="MarginContainer" type="MarginContainer" parent="UI/CommandPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="VBox" type="VBoxContainer" parent="UI/CommandPanel/MarginContainer"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="UI/CommandPanel/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.8, 1.0, 1)
+theme_override_constants/minimum_font_size = 14
+text = "指令面板"
+
+[node name="Sep" type="HSeparator" parent="UI/CommandPanel/MarginContainer/VBox"]
+layout_mode = 2
+
+[node name="ButtonContainer" type="VBoxContainer" parent="UI/CommandPanel/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="HintLabel" type="Label" parent="UI/CommandPanel/MarginContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_constants/minimum_font_size = 10
+text = "点击按钮后，在地图上\n点击或拖拽框选资源"
+autowrap_mode = 2
+
+[node name="ClearSep" type="HSeparator" parent="UI/CommandPanel/MarginContainer/VBox"]
+layout_mode = 2
+
+[node name="ClearBtn" type="Button" parent="UI/CommandPanel/MarginContainer/VBox"]
+layout_mode = 2
+custom_minimum_size = Vector2(100, 30)
+text = "清除标记"
 
 [node name="Minimap" type="Control" parent="UI" unique_id=848653378]
 layout_mode = 3
