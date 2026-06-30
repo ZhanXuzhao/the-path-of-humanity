@@ -84,6 +84,7 @@ func _load_settings():
 	settings["safety_decay_per_hour"] = cfg.get_value("settler", "safety_decay_per_hour", 0.5)
 	settings["food_restore_amount"] = cfg.get_value("settler", "food_restore_amount", 100.0)
 	settings["sleep_restore_per_hour"] = cfg.get_value("settler", "sleep_restore_per_hour", 15.0)
+	settings["sleep_min_time"] = cfg.get_value("settler", "sleep_min_time", 3.0)
 	settings["storage_search_radius"] = cfg.get_value("settler", "storage_search_radius", 300.0)
 	settings["food_search_radius"] = cfg.get_value("settler", "food_search_radius", 400.0)
 	

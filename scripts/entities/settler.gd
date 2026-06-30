@@ -8,6 +8,7 @@ signal task_assigned(task_id: String)
 signal task_completed(task_id: String)
 
 const ItemDefinitions = preload("res://resources/item_definitions.gd")
+const LogUtil = preload("res://scripts/core/log_util.gd")
 
 # 角色属性
 var settler_name: String
@@ -1240,6 +1241,7 @@ func try_sleep(bld_pos: Vector2i, world_pos: Vector2):
 	current_task = {"type": "SLEEP", "target_bld_pos": bld_pos}
 	target_world_pos = world_pos
 	set_state(SettlerState.MOVING)
+	LogUtil.info(self, "开始前往睡眠位置 %s" % bld_pos)
 
 func _tick_go_sleep():
 	"""移动到睡眠位置后开始睡觉"""
@@ -1252,8 +1254,9 @@ func _tick_go_sleep():
 	if bld == null:
 		complete_task()
 		return
-	# 到达床位后开始睡觉（受冷却控制，最多等1秒）
+	# 到达床位后开始睡觉
 	set_state(SettlerState.SLEEPING)
+	LogUtil.info(self, "到达床位，开始睡觉")
 
 func _tick_sleep(delta):
 	"""睡眠中恢复精力"""
@@ -1266,19 +1269,21 @@ func _tick_sleep(delta):
 	var sleep_restore = _settler_setting("sleep_restore_per_hour", 15.0)
 	modify_need("rest", delta_hours * sleep_restore)
 	
-	# 最少睡满1秒（防止刚入睡就被打断导致睡眠循环）
+	# 最少睡眠时间（可配置，默认3秒），防止刚入睡就被打断导致睡眠循环
 	var now = Time.get_ticks_msec() / 1000.0
-	var min_sleep_time = 1.0
+	var min_sleep_time = _settler_setting("sleep_min_time", 3.0)
 	
 	# 检查是否天亮了或精力已满
 	if needs["rest"] >= 95.0 and now - _last_state_change_time >= min_sleep_time:
+		LogUtil.info(self, "睡眠结束：精力已满(%.1f)" % needs["rest"])
 		complete_task()
 		return
 	
-	# 检查是否白天了（最少睡满1秒防循环）
+	# 检查是否白天了
 	if gm and now - _last_state_change_time >= min_sleep_time:
 		var hour = int(gm.game_time)
 		if hour >= 6 and hour < 18:
+			LogUtil.info(self, "睡眠结束：天亮了(游戏时间 %.1f)" % gm.game_time)
 			complete_task()
 
 func find_nearest_residential() -> Dictionary:

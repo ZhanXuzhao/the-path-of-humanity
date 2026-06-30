@@ -22,6 +22,7 @@ GameManager="*res://scripts/autoload/game_manager.gd"
 ItemDefinitions="*res://resources/item_definitions.gd"
 WorkManager="*res://scripts/autoload/work_manager.gd"
 
+
 [display]
 
 window/size/viewport_width=1280
