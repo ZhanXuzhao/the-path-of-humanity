@@ -740,11 +740,11 @@ func _update_settlers(delta):
 			s._auto_store_overweight()
 			continue
 		
-		# 3. 夜晚/凌晨处理（天黑或0-6点且需要睡眠）
+		# 3. 夜晚/凌晨处理——天黑时（18-6点）精力不足则睡眠
+		# 用 70 作为阈值，配合 _tick_sleep 中 >=95 的醒来条件形成迟滞，
+		# 防止 settler 刚睡醒（精力≈95）因微量衰减又立刻触发睡眠的死循环
 		var should_sleep = false
 		if is_night and s.needs.get("rest", 100) < 70:
-			should_sleep = true
-		elif not is_night and _gm.game_time < 6.0 and s.needs.get("rest", 100) < 95:
 			should_sleep = true
 		
 		if should_sleep:

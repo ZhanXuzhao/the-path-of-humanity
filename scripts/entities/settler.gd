@@ -1240,6 +1240,10 @@ func try_sleep(bld_pos: Vector2i, world_pos: Vector2):
 	"""尝试去睡觉"""
 	current_task = {"type": "SLEEP", "target_bld_pos": bld_pos}
 	target_world_pos = world_pos
+	# 如果已经在睡眠位置，直接开始睡觉，避免 MOVING→complete_task 死循环
+	if position.distance_squared_to(world_pos) < 4.0:
+		_tick_go_sleep()
+		return
 	set_state(SettlerState.MOVING)
 	LogUtil.info(self, "开始前往睡眠位置 %s" % bld_pos)
 
@@ -1250,13 +1254,15 @@ func _tick_go_sleep():
 		complete_task()
 		return
 	var bld_pos: Vector2i = current_task.get("target_bld_pos", Vector2i.ZERO)
-	var bld = game.building_system.get_building_at(bld_pos)
-	if bld == null:
-		complete_task()
-		return
-	# 到达床位后开始睡觉
+	if bld_pos != Vector2i.ZERO:
+		var bld = game.building_system.get_building_at(bld_pos)
+		if bld == null:
+			# 建筑不存在（可能被拆了），放弃睡眠任务，防止 IDLE→MOVING 死循环
+			complete_task()
+			return
+	# 到达床位后开始睡觉（无建筑时也能原地休息）
 	set_state(SettlerState.SLEEPING)
-	LogUtil.info(self, "到达床位，开始睡觉")
+	LogUtil.info(self, "开始睡觉")
 
 func _tick_sleep(delta):
 	"""睡眠中恢复精力"""
