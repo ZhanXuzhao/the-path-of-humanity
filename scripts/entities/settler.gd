@@ -552,6 +552,7 @@ func _tick_construct():
 		var fetch_source = current_task.get("fetch_source_type", "storage")
 		var fetch_item = current_task.get("fetch_item_id", "")
 		var fetch_amount = current_task.get("fetch_amount", 0)
+		var site_center: Vector2
 		
 		if fetch_item != "" and fetch_amount > 0:
 			# 根据剩余负重计算实际能取多少
@@ -559,7 +560,7 @@ func _tick_construct():
 			if max_carry <= 0:
 				# 背包已满，直接回去工地先存入
 				current_task["construct_phase"] = "return_to_site"
-				var site_center = _bld_world_center(bld)
+				site_center = _bld_world_center(bld)
 				target_world_pos = site_center
 				set_state(SettlerState.MOVING)
 				return
@@ -585,7 +586,7 @@ func _tick_construct():
 		
 		# 转向回建筑工地
 		current_task["construct_phase"] = "return_to_site"
-		var site_center = _bld_world_center(bld)
+		site_center = _bld_world_center(bld)
 		target_world_pos = site_center
 		set_state(SettlerState.MOVING)
 		return
@@ -793,7 +794,6 @@ func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 		
 		# 选中此来源
 		if cand.type == "storage":
-			var bld = cand.bld
 			current_task["fetch_storage_pos"] = cand.bld_pos
 			current_task["fetch_item_id"] = mat_id
 			current_task["fetch_amount"] = carry_limit

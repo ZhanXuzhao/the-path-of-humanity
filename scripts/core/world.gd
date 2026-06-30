@@ -370,7 +370,7 @@ func find_path(from_pos: Vector2i, to_pos: Vector2i, max_steps: int = 500) -> Ar
 	var f_score := Dictionary()    # Vector2i -> float
 	
 	var key_from = _pos_key(from_pos)
-	var key_to = _pos_key(to_pos)
+	var _key_to = _pos_key(to_pos)
 	g_score[key_from] = 0.0
 	f_score[key_from] = _astar_heuristic(from_pos, to_pos)
 	
