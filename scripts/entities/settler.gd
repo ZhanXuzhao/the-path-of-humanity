@@ -384,10 +384,6 @@ func _move_towards(delta):
 		
 		if _path.is_empty() and start_grid != target_grid:
 			# 无路可走，取消任务
-			print("[移动] %s _move_towards ❌ 寻路失败!  from=%s to=%s  task=%s phase=%s" % [
-				settler_name, start_grid, target_grid,
-				current_task.get("type","") if current_task else "null",
-				current_task.get("construct_phase","?") if current_task else "?"])
 			complete_task()
 			return
 		
@@ -1515,7 +1511,8 @@ func set_state(new_state: SettlerState, force: bool = false) -> bool:
 	var old_state_str = get_state_display(state, current_task if current_task else {})
 	var new_state_str = get_state_display(new_state, current_task if current_task else {})
 	var phase_str = current_task.get("construct_phase","?") if current_task else "null"
-	print("[状态] %s %s -> %s  phase=%s%s" % [settler_name, old_state_str, new_state_str, phase_str, " (强制)" if force else ""])
+	if is_selected:
+		print("[状态] %s %s -> %s  phase=%s%s" % [settler_name, old_state_str, new_state_str, phase_str, " (强制)" if force else ""])
 	state = new_state
 	_last_state_change_time = now
 	return true
