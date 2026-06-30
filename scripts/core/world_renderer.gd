@@ -56,6 +56,7 @@ var _ground_item_info_label: Label  # 缓存的标签引用
 # ==================== 指令标记视觉 ====================
 var _designation_overlay: Node2D  # 标记覆盖层
 var _designation_sprites: Dictionary = {}  # "x,y" -> Node2D (每个标记位置的图标容器)
+var _designation_preview_sprites: Dictionary = {}  # "x,y" -> Node2D (拖拽预览图标)
 
 # 工作类型对应的图标 Emoji
 const DESIGNATION_ICONS = {
@@ -830,9 +831,88 @@ func _create_designation_overlay(grid_pos: Vector2i, work_type: int):
 	_designation_overlay.add_child(label)
 	_designation_sprites["%d,%d" % [grid_pos.x, grid_pos.y]] = label
 
+func _create_preview_icon(grid_pos: Vector2i, work_type: int):
+	"""为框选预览创建半透明图标"""
+	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
+	if _designation_preview_sprites.has(key):
+		return
+	# 如果已是正式标记，不重复显示预览
+	if _designation_sprites.has(key):
+		return
+	
+	var icon_text = DESIGNATION_ICONS.get(work_type, "❓")
+	var pixel_center = Vector2(
+		grid_pos.x * world.tile_size + world.tile_size / 2.0,
+		grid_pos.y * world.tile_size + world.tile_size / 2.0
+	)
+	
+	var label = Label.new()
+	label.text = icon_text
+	label.add_theme_constant_override("minimum_font_size", 16)
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	# 预览半透明
+	label.modulate = Color(1, 1, 1, 0.45)
+	var text_size = label.get_combined_minimum_size()
+	label.position = pixel_center - text_size / 2.0
+	label.size = text_size
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	
+	_designation_overlay.add_child(label)
+	_designation_preview_sprites[key] = label
+
+func update_designation_preview(from_grid: Vector2i, to_grid: Vector2i, work_type: int):
+	"""根据框选矩形更新标记预览——显示矩形内匹配资源的半透明图标"""
+	_clear_designation_preview()
+	
+	if from_grid.x < 0 or to_grid.x < 0:
+		return
+	
+	var min_x = mini(from_grid.x, to_grid.x)
+	var max_x = maxi(from_grid.x, to_grid.x)
+	var min_y = mini(from_grid.y, to_grid.y)
+	var max_y = maxi(from_grid.y, to_grid.y)
+	
+	for x in range(min_x, max_x + 1):
+		for y in range(min_y, max_y + 1):
+			var pos = Vector2i(x, y)
+			var dep = world.get_resource_at(pos) if world else null
+			if dep != null and dep.amount > 0:
+				if _is_resource_match_work_type(dep.type, work_type):
+					_create_preview_icon(pos, work_type)
+			# 搬运模式也预览地面物品
+			if work_type == 6 and world:  # HAULING
+				var stacks = world.get_ground_items_at(pos)
+				if not stacks.is_empty():
+					_create_preview_icon(pos, work_type)
+
+func _clear_designation_preview():
+	"""清除框选预览图标"""
+	for key in _designation_preview_sprites:
+		if is_instance_valid(_designation_preview_sprites[key]):
+			_designation_preview_sprites[key].queue_free()
+	_designation_preview_sprites.clear()
+
 func _clear_all_designation_overlays():
 	"""清除所有指令标记覆盖层"""
 	for key in _designation_sprites:
 		if is_instance_valid(_designation_sprites[key]):
 			_designation_sprites[key].queue_free()
 	_designation_sprites.clear()
+	_clear_designation_preview()
+
+func _is_resource_match_work_type(resource_type: int, work_type: int) -> bool:
+	"""检查资源类型是否匹配指定的工作类型（与 Game.gd 保持同步）"""
+	match work_type:
+		0:  # MINING
+			return resource_type in [
+				World.ResourceNodeType.STONE_DEPOSIT,
+				World.ResourceNodeType.IRON_DEPOSIT,
+				World.ResourceNodeType.COPPER_DEPOSIT,
+				World.ResourceNodeType.COAL_DEPOSIT,
+			]
+		1:  # WOODCUTTING
+			return resource_type == World.ResourceNodeType.TREE
+		5:  # FARMING
+			return resource_type == World.ResourceNodeType.BERRY_BUSH
+		_:
+			return false

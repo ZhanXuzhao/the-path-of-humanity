@@ -304,6 +304,8 @@ func exit_designation_mode():
 	_is_designation_dragging = false
 	if _drag_overlay:
 		_drag_overlay.queue_redraw()
+	if world_renderer and world_renderer.has_method("_clear_designation_preview"):
+		world_renderer._clear_designation_preview()
 	designation_mode_changed.emit(false, -1)
 
 func toggle_resource_designation(grid_pos: Vector2i) -> bool:
@@ -435,6 +437,14 @@ func _update_designation_drag_visual():
 	_drag_overlay.set("drag_rect_pos", pixel_pos)
 	_drag_overlay.set("drag_rect_size", pixel_size)
 	_drag_overlay.queue_redraw()
+	
+	# 更新框选内的标记预览
+	if world_renderer and world_renderer.has_method("update_designation_preview"):
+		world_renderer.update_designation_preview(
+			Vector2i(min_x, min_y),
+			Vector2i(max_x, max_y),
+			designation_work_type
+		)
 
 func _update_build_preview():
 	var mouse_pos = get_global_mouse_position()
@@ -746,12 +756,17 @@ func _input(event):
 				)
 				_drag_end_grid = _drag_start_grid
 				_is_designation_dragging = true
+				if world_renderer and world_renderer.has_method("_clear_designation_preview"):
+					world_renderer._clear_designation_preview()
 				_update_designation_drag_visual()
 			else:
 				# 鼠标释放：完成框选
 				if _is_designation_dragging:
 					_is_designation_dragging = false
 					_update_designation_drag_visual()
+					# 清除标记预览
+					if world_renderer and world_renderer.has_method("_clear_designation_preview"):
+						world_renderer._clear_designation_preview()
 					
 					var global_pos = get_global_mouse_position()
 					var end_grid = Vector2i(
