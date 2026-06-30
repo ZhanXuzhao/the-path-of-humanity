@@ -702,35 +702,15 @@ func _on_building_completed(pos: Vector2i):
 		if bld.building_id == "wooden_bed":
 			_update_bed_name_label(bld)
 
-func _update_bed_name_label(bld):
-	"""在床铺下方显示分配的定居者姓名"""
-	var bld_pos = bld.grid_pos
-	
-	# 先移除旧标签
+func _update_bed_name_label(_bld):
+	"""床铺分配信息仅在信息面板中显示，不再显示在游戏画面上"""
+	# 移除旧标签（清理残留）
+	var bld_pos = _bld.grid_pos
 	if _bed_name_labels.has(bld_pos):
 		if is_instance_valid(_bed_name_labels[bld_pos]):
 			_bed_name_labels[bld_pos].queue_free()
 		_bed_name_labels.erase(bld_pos)
-	
-	if bld.assigned_settler_name == "":
-		return
-	
-	# 创建姓名标签
-	var label = Label.new()
-	label.text = bld.assigned_settler_name
-	label.add_theme_color_override("font_color", Color(0.8, 0.9, 1.0))
-	label.add_theme_constant_override("minimum_font_size", 10)
-	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
-	
-	var size = bld.get_size()
-	var center_x = bld_pos.x * world.tile_size + size.x * world.tile_size / 2.0
-	var label_y = bld_pos.y * world.tile_size + size.y * world.tile_size + 2.0
-	label.position = Vector2(center_x - 50.0, label_y)  # 预留100px宽度居中
-	label.size = Vector2(100, 16)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.z_index = 15  # 在建筑和进度条之上
-	add_child(label)
-	_bed_name_labels[bld_pos] = label
+	# 不在游戏画面中显示分配对象姓名
 
 func _remove_bed_name_label(bld_pos: Vector2i):
 	"""移除床铺姓名标签"""

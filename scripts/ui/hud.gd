@@ -466,7 +466,7 @@ func _update_building_info_panel(bld, data):
 	for child in building_info_extra_container.get_children():
 		child.queue_free()
 	
-	# 床铺显示分配对象
+	# 床铺显示分配对象（信息面板中）
 	if bld.building_id == "wooden_bed" and bld.assigned_settler_name != "":
 		var assign_label = Label.new()
 		assign_label.text = "分配: %s" % bld.assigned_settler_name

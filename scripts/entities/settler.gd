@@ -1407,18 +1407,30 @@ func _tick_sleep(delta):
 	var sleep_restore = _settler_setting("sleep_restore_per_hour", 50.0)
 	modify_need("rest", delta_hours * sleep_restore)
 	
-	# 最少睡眠时间（可配置，默认3秒），防止刚入睡就被打断导致睡眠循环
+	# 最小睡眠时间（防止频繁打断），最大睡眠时间（防止一直睡不干活）
 	var now = Time.get_ticks_msec() / 1000.0
 	var min_sleep_time = _settler_setting("sleep_min_time", 3.0)
+	var max_sleep_time = _settler_setting("sleep_max_time", 8.0)
+	var elapsed = now - _last_state_change_time
 	
-	# 检查是否天亮了或精力已满
-	if needs["rest"] >= 95.0 and now - _last_state_change_time >= min_sleep_time:
+	# 最短睡够 min_sleep_time 秒后才检查是否醒来
+	if elapsed < min_sleep_time:
+		return
+	
+	# 睡够 max_sleep_time 秒后强制醒来检查是否有工作
+	if elapsed >= max_sleep_time:
+		LogUtil.info(self, "睡眠结束：睡够了(%.1f秒)" % elapsed)
+		complete_task()
+		return
+	
+	# 精力已满（≥95）则醒来
+	if needs["rest"] >= 95.0:
 		LogUtil.info(self, "睡眠结束：精力已满(%.1f)" % needs["rest"])
 		complete_task()
 		return
 	
-	# 检查是否白天了
-	if gm and now - _last_state_change_time >= min_sleep_time:
+	# 白天则醒来工作
+	if gm:
 		var hour = int(gm.game_time)
 		if hour >= 6 and hour < 18:
 			LogUtil.info(self, "睡眠结束：天亮了(游戏时间 %.1f)" % gm.game_time)
@@ -1737,6 +1749,14 @@ func set_state(new_state: SettlerState, force: bool = false) -> bool:
 		print("[状态] %s %s -> %s  phase=%s%s" % [settler_name, old_state_str, new_state_str, phase_str, " (强制)" if force else ""])
 	state = new_state
 	_last_state_change_time = now
+	
+	# 睡觉时角色横过来，其他状态扶正
+	if settler_sprite:
+		if state == SettlerState.SLEEPING:
+			settler_sprite.rotation = deg_to_rad(-90.0)
+		else:
+			settler_sprite.rotation = 0.0
+	
 	return true
 
 # -------- 需求更新 --------

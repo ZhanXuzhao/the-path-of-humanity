@@ -1163,21 +1163,14 @@ func _update_settlers(delta):
 			s._auto_store_overweight()
 			continue
 		
-		# 3. 夜晚/凌晨处理——天黑时（18-6点）精力不足则睡眠
-		# 用 70 作为阈值，配合 _tick_sleep 中 >=95 的醒来条件形成迟滞，
-		# 防止 settler 刚睡醒（精力≈95）因微量衰减又立刻触发睡眠的死循环
-		var should_sleep = false
-		if is_night and s.needs.get("rest", 100) < 70:
-			should_sleep = true
-		
-		if should_sleep:
-			LogUtil.info(s, "should_sleep")
-			var home = s.find_nearest_residential()
-			if not home.is_empty():
-				s.try_sleep(home.pos, home.world_pos)
-				continue
-			# 没有住所也尝试原地休息
-			s.try_sleep(Vector2i.ZERO, s.position)
+		# 3. 无工作时就去睡觉（不考虑睡眠度和时间）
+		LogUtil.info(s, "IDLE -> sleep")
+		var home = s.find_nearest_residential()
+		if not home.is_empty():
+			s.try_sleep(home.pos, home.world_pos)
+			continue
+		# 没有住所也尝试原地休息
+		s.try_sleep(Vector2i.ZERO, s.position)
 	
 	# 清理已失效的资源采集占用标记
 	_cleanup_harvest_claims()
