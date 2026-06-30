@@ -1369,6 +1369,7 @@ func _assign_ai_tasks():
 		
 		tasks.remove_at(best_idx)
 		settler.assign_task(best_task)
+		LogUtil.d("settler.assign_task(best_task): %s -> %s" % [settler.settler_name, best_task.get("id", "")])
 
 func _scan_nearby_resources(idle_settlers: Array) -> Array:
 	"""扫描定居者周围的可采集资源"""

@@ -1810,6 +1810,7 @@ func assign_task(task_data: Dictionary) -> bool:
 						stand_grid.y * ts + ts / 2.0
 					)
 				elif not game.world.is_walkable(resource_grid):
+					LogUtil.debug(self, "资源格 %s 不可行走，无法采集" % resource_grid)
 					return false  # 资源格本身也不可行走，无法采集
 			else:
 				var target_grid = Vector2i(
@@ -1817,6 +1818,7 @@ func assign_task(task_data: Dictionary) -> bool:
 					int(target_pixel.y / ts)
 				)
 				if not game.world.is_walkable(target_grid):
+					LogUtil.debug(self, "目标格 %s 不可行走，无法执行任务" % target_grid)
 					return false  # 目标不可达，拒绝接受任务
 	
 	current_task = task_data
