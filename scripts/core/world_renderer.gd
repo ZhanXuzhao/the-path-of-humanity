@@ -55,23 +55,14 @@ var _ground_item_info_label: Label  # 缓存的标签引用
 
 # ==================== 指令标记视觉 ====================
 var _designation_overlay: Node2D  # 标记覆盖层
-var _designation_sprites: Dictionary = {}  # "x,y" -> Node2D (每个标记位置的小图标/边框)
-var _last_designation_state: Dictionary = {}  # 缓存上次标记状态，用于增量更新
+var _designation_sprites: Dictionary = {}  # "x,y" -> Node2D (每个标记位置的图标容器)
 
-# 工作类型对应的标记颜色
-const DESIGNATION_COLORS = {
-	0: Color(0.8, 0.8, 0.8, 0.8),  # MINING - 灰色
-	1: Color(0.6, 1.0, 0.4, 0.8),  # WOODCUTTING - 绿色
-	5: Color(1.0, 0.7, 0.2, 0.8),  # FARMING - 橙色
-	6: Color(0.4, 0.7, 1.0, 0.8),  # HAULING - 蓝色
-}
-
-# 工作类型对应的标记边框颜色（更鲜艳）
-const DESIGNATION_BORDER_COLORS = {
-	0: Color(0.9, 0.9, 0.9, 0.9),   # MINING
-	1: Color(0.4, 1.0, 0.2, 0.9),   # WOODCUTTING
-	5: Color(1.0, 0.6, 0.1, 0.9),   # FARMING
-	6: Color(0.2, 0.6, 1.0, 0.9),   # HAULING
+# 工作类型对应的图标 Emoji
+const DESIGNATION_ICONS = {
+	0: "⛏️",   # MINING
+	1: "🪓",   # WOODCUTTING
+	5: "🌾",   # FARMING
+	6: "📦",   # HAULING
 }
 
 func _ready():
@@ -814,81 +805,30 @@ func _rebuild_designation_overlays():
 		_create_designation_overlay(grid_pos, work_type)
 
 func _create_designation_overlay(grid_pos: Vector2i, work_type: int):
-	"""为指定位置的资源创建标记覆盖层"""
-	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
-	if _designation_sprites.has(key):
+	"""为指定位置的资源创建图标标记"""
+	if _designation_sprites.has("%d,%d" % [grid_pos.x, grid_pos.y]):
 		return
 	
-	var pixel_pos = Vector2(
-		grid_pos.x * world.tile_size,
-		grid_pos.y * world.tile_size
+	var icon_text = DESIGNATION_ICONS.get(work_type, "❓")
+	
+	var pixel_center = Vector2(
+		grid_pos.x * world.tile_size + world.tile_size / 2.0,
+		grid_pos.y * world.tile_size + world.tile_size / 2.0
 	)
-	var ts = world.tile_size
 	
-	# 创建容器节点
-	var container = Node2D.new()
-	container.z_index = 0
-	_designation_overlay.add_child(container)
-	_designation_sprites[key] = container
+	# 图标标签
+	var label = Label.new()
+	label.text = icon_text
+	label.add_theme_constant_override("minimum_font_size", 16)
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	# 标签居中定位
+	var text_size = label.get_combined_minimum_size()
+	label.position = pixel_center - text_size / 2.0
+	label.size = text_size
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	
-	# 获取工作类型对应的颜色
-	var fill_color = DESIGNATION_COLORS.get(work_type, Color(1, 1, 1, 0.3))
-	var border_color = DESIGNATION_BORDER_COLORS.get(work_type, Color(1, 1, 1, 0.8))
-	
-	# 半透明填充
-	var fill = ColorRect.new()
-	fill.color = fill_color
-	fill.position = pixel_pos
-	fill.size = Vector2(ts, ts)
-	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	container.add_child(fill)
-	
-	# 边框（使用4条边）
-	var bw = 2.0
-	# 上边框
-	var top = ColorRect.new()
-	top.color = border_color
-	top.position = pixel_pos
-	top.size = Vector2(ts, bw)
-	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	container.add_child(top)
-	# 下边框
-	var bottom = ColorRect.new()
-	bottom.color = border_color
-	bottom.position = pixel_pos + Vector2(0, ts - bw)
-	bottom.size = Vector2(ts, bw)
-	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	container.add_child(bottom)
-	# 左边框
-	var left = ColorRect.new()
-	left.color = border_color
-	left.position = pixel_pos
-	left.size = Vector2(bw, ts)
-	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	container.add_child(left)
-	# 右边框
-	var right = ColorRect.new()
-	right.color = border_color
-	right.position = pixel_pos + Vector2(ts - bw, 0)
-	right.size = Vector2(bw, ts)
-	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	container.add_child(right)
-	
-	# 角落的小三角标记（加强识别性）
-	var corner_size = 6.0
-	# 左上角
-	var corner_tl = ColorRect.new()
-	corner_tl.color = border_color
-	corner_tl.position = pixel_pos
-	corner_tl.size = Vector2(corner_size, bw)
-	corner_tl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	container.add_child(corner_tl)
-	corner_tl = ColorRect.new()
-	corner_tl.color = border_color
-	corner_tl.position = pixel_pos
-	corner_tl.size = Vector2(bw, corner_size)
-	corner_tl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	container.add_child(corner_tl)
+	_designation_overlay.add_child(label)
+	_designation_sprites["%d,%d" % [grid_pos.x, grid_pos.y]] = label
 
 func _clear_all_designation_overlays():
 	"""清除所有指令标记覆盖层"""
