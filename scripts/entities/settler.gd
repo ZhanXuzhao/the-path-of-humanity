@@ -97,8 +97,8 @@ var inventory
 var target_world_pos: Vector2 = Vector2.ZERO   # 移动目标（像素坐标）
 var _path: Array[Vector2i] = []                # A*寻路路径（网格坐标，不含起点）
 var _path_target_grid: Vector2i = Vector2i(-1, -1)  # 上次计算路径的目标网格
-var work_accumulator: float = 0.0               # 工作累积计时器
 var work_tick_interval: float = 3.0             # 每次工作刻的间隔（秒）
+var _last_work_tick_time: float = 0.0           # 上次工作刻的现实时间戳（秒）
 var is_working_on_construction: bool = false    # 是否正在建造建筑
 
 # 状态切换冷却（至少间隔1秒）
@@ -440,7 +440,7 @@ func _move_towards(delta):
 						_tick_haul_construct()
 				_:
 					set_state(SettlerState.WORKING, true)
-					work_accumulator = 0.0
+					_last_work_tick_time = Time.get_ticks_msec() / 1000.0
 		else:
 			set_state(SettlerState.IDLE, true)
 
@@ -463,10 +463,12 @@ func _execute_work(delta):
 	# 根据时间加速倍率同步提升工作速度
 	var gm = get_node("/root/GameManager")
 	var speed_mult = gm.time_speed if gm else 1.0
-	work_accumulator += delta * work_speed * speed_mult
 	
-	if work_accumulator >= work_tick_interval:
-		work_accumulator -= work_tick_interval
+	# 基于现实时间检测工作刻，不受 delta 累积误差影响
+	var now = Time.get_ticks_msec() / 1000.0
+	var adjusted_interval = work_tick_interval / (work_speed * speed_mult)
+	if now - _last_work_tick_time >= adjusted_interval:
+		_last_work_tick_time = now
 		_do_work_tick(task_type)
 
 func _do_work_tick(task_type: String):
@@ -510,7 +512,7 @@ func _tick_harvest():
 	
 	# 采集到背包（优先放入个人背包）
 	inventory.add_item(item_id, amount)
-	
+	LogUtil.info(self, "采集到 %d 个 %s" % [amount, item_id])
 	# 检查是否超重——超重时去存放，但每次存放更多物品以减少往返次数
 	if is_overweight():
 		complete_task()
@@ -1587,7 +1589,7 @@ func assign_task(task_data: Dictionary) -> bool:
 	else:
 		# 没有目标位置则直接开始工作
 		set_state(SettlerState.WORKING, true)  # 强制切换，防止冷却导致任务卡住
-		work_accumulator = 0.0
+		_last_work_tick_time = Time.get_ticks_msec() / 1000.0
 	
 	task_assigned.emit(task_data.get("id", ""))
 	return true

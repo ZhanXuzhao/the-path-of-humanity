@@ -24,6 +24,11 @@ func _should_log(settler = null, force: bool = false) -> bool:
 		return settler.is_selected
 	return false
 
+func _get_time_str() -> String:
+	"""返回现实时间字符串，格式 HH:MM:SS"""
+	var dt = Time.get_datetime_dict_from_system()
+	return "%02d:%02d:%02d" % [dt.hour, dt.minute, dt.second]
+
 func _format_message(settler, level: Level, message: String) -> String:
 	var prefix = ""
 	match level:
@@ -32,14 +37,15 @@ func _format_message(settler, level: Level, message: String) -> String:
 		Level.WARN:  prefix = "[W]"
 		Level.ERROR: prefix = "[E]"
 	
+	var time_str = _get_time_str()
 	var name_str = ""
 	if settler != null and "settler_name" in settler:
 		name_str = settler.settler_name
 	
 	if name_str != "":
-		return "%s [%s] %s" % [prefix, name_str, message]
+		return "%s [%s] [%s] %s" % [prefix, time_str, name_str, message]
 	else:
-		return "%s %s" % [prefix, message]
+		return "%s [%s] %s" % [prefix, time_str, message]
 
 # @param settler:  定居者对象，非 null 且选中时才会打印；传 null 且 force=false 则静默
 # @param message:  日志文本
