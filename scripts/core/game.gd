@@ -867,7 +867,7 @@ func _input(event):
 			_gm.pause_game()
 	
 	# Q 键切换采集标记模式（自动）
-	if event.is_action_pressed("Q") or (event is InputEventKey and event.keycode == KEY_Q and event.pressed):
+	if event is InputEventKey and event.keycode == KEY_Q and event.pressed:
 		if designation_mode and designation_work_type == -2:
 			exit_designation_mode()
 		else:
@@ -880,7 +880,7 @@ func _input(event):
 		return
 	
 	# C 键切换清除模式
-	if event.is_action_pressed("C") or (event is InputEventKey and event.keycode == KEY_C and event.pressed):
+	if event is InputEventKey and event.keycode == KEY_C and event.pressed:
 		if clear_mode:
 			exit_clear_mode()
 		else:
