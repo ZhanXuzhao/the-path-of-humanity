@@ -122,11 +122,7 @@ func _process(delta):
 		if stacks.is_empty():
 			_deselect_ground_item()
 	
-	# 定居者自主行为（进食、睡眠等）——每2秒检查一次避免频繁打断
-	_autonomy_timer += delta
-	if _autonomy_timer >= 2.0:
-		_autonomy_timer = 0.0
-		_update_settler_autonomy()
+	# 定居者自主行为已合并到 _update_settlers 中（每帧检查）
 	
 	# 分配任务给空闲定居者
 	_assign_ai_tasks()
@@ -446,39 +442,7 @@ func _on_building_completed(pos: Vector2i):
 				_select_building(bld)
 
 # ==================== 定居者自主AI系统 ====================
-
-func _update_settler_autonomy():
-	"""更新定居者自主行为（进食、睡眠等基本需求）"""
-	var is_night = not _gm.is_daytime()
-	
-	for s in settlers:
-		if not is_instance_valid(s):
-			continue
-		
-		# 跳过已经在执行非工作状态（进食/睡眠）的定居者
-		if s.state == Settler.SettlerState.SLEEPING or s.state == Settler.SettlerState.EATING:
-			continue
-		
-		# 正在工作中的角色不打断——让它们先完成当前任务
-		# （否则建造取料途中被打断会导致任务丢失，形成死循环）
-		if s.state == Settler.SettlerState.WORKING or s.state == Settler.SettlerState.MOVING:
-			continue
-		
-		# 1. 饥饿处理（饱食度 < 25 且空闲）
-		if s.needs.get("hunger", 100) < 25 and s.state == Settler.SettlerState.IDLE:
-			s.try_eat()
-			continue
-		
-		# 2. 夜晚处理（天黑且空闲→去睡觉）
-		if is_night and s.needs.get("rest", 100) < 70 and s.state == Settler.SettlerState.IDLE:
-			var home = s.find_nearest_residential()
-			if not home.is_empty():
-				s.try_sleep(home.pos, home.world_pos)
-				continue
-			# 没有住所也尝试原地休息
-			if s.needs.get("rest", 100) < 30:
-				s.try_sleep(Vector2i.ZERO, s.position)
-				continue
+# 自主行为已合并到 _update_settlers 中
 
 func _input(event):
 	if event.is_action_pressed("ui_cancel"):
@@ -748,16 +712,45 @@ func get_settler_by_id(id: String):
 # ==================== 定居者AI系统 ====================
 
 func _update_settlers(delta):
-	"""更新所有定居者的需求和基本状态"""
+	"""更新所有定居者的需求、基本状态和自主行为（进食/睡眠）"""
 	var delta_hours = _gm.time_speed * delta * (24.0 / _gm.day_length)
-	for s in settlers:
-		if is_instance_valid(s):
-			s.update_needs(delta_hours)
+	var is_night = not _gm.is_daytime()
 	
-	# 超重空闲定居者自动搬运
 	for s in settlers:
-		if is_instance_valid(s) and s.state == Settler.SettlerState.IDLE and s.is_overweight():
+		if not is_instance_valid(s):
+			continue
+		
+		# 更新需求
+		s.update_needs(delta_hours)
+		
+		# ---- 自主行为：仅在 IDLE 时触发 ----
+		if s.state != Settler.SettlerState.IDLE:
+			continue
+		
+		# 1. 饥饿处理（饱食度 < 25）
+		if s.needs.get("hunger", 100) < 25:
+			s.try_eat()
+			continue
+		
+		# 2. 超重自动搬运
+		if s.is_overweight():
 			s._auto_store_overweight()
+			continue
+		
+		# 3. 夜晚/凌晨处理（天黑或0-6点且需要睡眠）
+		var should_sleep = false
+		if is_night and s.needs.get("rest", 100) < 70:
+			should_sleep = true
+		elif not is_night and _gm.game_time < 6.0 and s.needs.get("rest", 100) < 95:
+			should_sleep = true
+		
+		if should_sleep:
+			var home = s.find_nearest_residential()
+			if not home.is_empty():
+				s.try_sleep(home.pos, home.world_pos)
+				continue
+			# 没有住所也尝试原地休息
+			s.try_sleep(Vector2i.ZERO, s.position)
 	
 	# 清理已失效的资源采集占用标记
 	_cleanup_harvest_claims()

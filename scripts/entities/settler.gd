@@ -187,20 +187,7 @@ func _process(delta):
 					_move_away_from_water(_game)
 					return
 			
-			# 自主行为：进食优先
-			if needs.get("hunger", 100) < 25:
-				try_eat()
-				return
-			
-			# 自主行为：0点-6点为固定睡眠时间（无紧急事件时）
-			var _gm = get_node("/root/GameManager")
-			if _gm and _gm.game_time < 6.0 and needs.get("rest", 100) < 95:
-				var home = find_nearest_residential()
-				if not home.is_empty():
-					try_sleep(home.pos, home.world_pos)
-					return
-				# 没有住所也尝试原地休息
-				try_sleep(Vector2i.ZERO, position)
+			# 自主行为已移至 Game._update_settlers 统一管理
 		SettlerState.MOVING:
 			_move_towards(delta)
 		SettlerState.WORKING:
