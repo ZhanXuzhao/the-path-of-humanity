@@ -500,6 +500,12 @@ func get_world_center_pixel() -> Vector2:
 		center_chunk_y * CHUNK_SIZE * tile_size + CHUNK_SIZE * tile_size / 2.0
 	)
 
+func is_in_world_bounds(grid_pos: Vector2i) -> bool:
+	"""检查网格坐标是否在当前世界边界内（支持动态扩张后的负坐标）"""
+	var chunk_pos = global_to_chunk(grid_pos)
+	return chunk_pos.x >= _min_chunk_x and chunk_pos.x <= _max_chunk_x \
+		and chunk_pos.y >= _min_chunk_y and chunk_pos.y <= _max_chunk_y
+
 func _pos_key(pos: Vector2i) -> String:
 	return "%d,%d" % [pos.x, pos.y]
 

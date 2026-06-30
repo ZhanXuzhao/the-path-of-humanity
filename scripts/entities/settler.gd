@@ -187,8 +187,8 @@ func _process(delta):
 			var _game = get_node_or_null("/root/Game")
 			if _game and _game.world:
 				var _grid = Vector2i(
-					int(position.x / _game.world.tile_size),
-					int(position.y / _game.world.tile_size)
+					floori(position.x / _game.world.tile_size),
+					floori(position.y / _game.world.tile_size)
 				)
 				if not _game.world.is_walkable(_grid):
 					_move_away_from_water(_game)
@@ -425,8 +425,8 @@ func _move_towards(delta):
 	
 	var tile_ts = game.world.tile_size
 	var current_grid = Vector2i(
-		int(position.x / tile_ts),
-		int(position.y / tile_ts)
+		floori(position.x / tile_ts),
+		floori(position.y / tile_ts)
 	)
 	
 	# 检测角色是否进入了新区块，若是则生成周围区块（实现世界地图向外扩张）
@@ -448,8 +448,8 @@ func _move_towards(delta):
 	
 	# 计算目标网格
 	var target_grid = Vector2i(
-		int(target_world_pos.x / tile_ts),
-		int(target_world_pos.y / tile_ts)
+		floori(target_world_pos.x / tile_ts),
+		floori(target_world_pos.y / tile_ts)
 	)
 	
 	# 如果路径无效或目标变了，重新计算A*路径
@@ -837,8 +837,8 @@ func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 		return false
 	
 	var cur_grid = Vector2i(
-		int(position.x / game.world.tile_size),
-		int(position.y / game.world.tile_size)
+		floori(position.x / game.world.tile_size),
+		floori(position.y / game.world.tile_size)
 	)
 	
 	# 收集所有候选来源（存储建筑+地面物品），按距离排序
@@ -866,8 +866,8 @@ func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 		
 		# 2. 地面物品
 		var grid_center = Vector2i(
-			int(position.x / game.world.tile_size),
-			int(position.y / game.world.tile_size)
+			floori(position.x / game.world.tile_size),
+			floori(position.y / game.world.tile_size)
 		)
 		var ground_pos = game.world.find_nearest_ground_item(grid_center, mat_id, 10)
 		if ground_pos.x >= 0:
@@ -900,8 +900,8 @@ func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 		
 		# 检查路径是否可达
 		var target_grid = Vector2i(
-			int(target_wp.x / game.world.tile_size),
-			int(target_wp.y / game.world.tile_size)
+			floori(target_wp.x / game.world.tile_size),
+			floori(target_wp.y / game.world.tile_size)
 		)
 		if cur_grid != target_grid:
 			var test_path = game.world.find_path(cur_grid, target_grid, 100)
@@ -1218,8 +1218,8 @@ func _drop_inventory_to_ground():
 	if game == null or game.world == null:
 		return
 	var grid_pos = Vector2i(
-		int(position.x / game.world.tile_size),
-		int(position.y / game.world.tile_size)
+		floori(position.x / game.world.tile_size),
+		floori(position.y / game.world.tile_size)
 	)
 	for item_id in inventory.items:
 		var amt = inventory.items[item_id]
@@ -1291,8 +1291,8 @@ func _move_away_from_water(game_node) -> bool:
 	"""当站在水面上时，尝试向最近的可行走方向移动"""
 	var tile_ts = game_node.world.tile_size
 	var center_grid = Vector2i(
-		int(position.x / tile_ts),
-		int(position.y / tile_ts)
+		floori(position.x / tile_ts),
+		floori(position.y / tile_ts)
 	)
 	# 搜索周围6格范围内第一个可行走的格子
 	var directions = [
@@ -1760,8 +1760,8 @@ func assign_task(task_data: Dictionary) -> bool:
 					return false  # 目标不可达，拒绝接受任务
 			else:
 				var target_grid = Vector2i(
-					int(target_pixel.x / ts),
-					int(target_pixel.y / ts)
+					floori(target_pixel.x / ts),
+					floori(target_pixel.y / ts)
 				)
 				if not game.world.is_walkable(target_grid):
 					LogUtil.info(self, "目标格 %s 不可行走，无法执行任务" % target_grid)
@@ -1815,8 +1815,8 @@ func die():
 	var game = get_node_or_null("/root/Game")
 	if game and game.world and inventory:
 		var grid_pos = Vector2i(
-			int(position.x / game.world.tile_size),
-			int(position.y / game.world.tile_size)
+			floori(position.x / game.world.tile_size),
+			floori(position.y / game.world.tile_size)
 		)
 		for item_id in inventory.items:
 			var amt = inventory.items[item_id]

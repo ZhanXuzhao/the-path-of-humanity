@@ -78,8 +78,8 @@ signal designated_resources_changed()
 
 # 框选拖拽状态
 var _is_designation_dragging: bool = false
-var _drag_start_grid: Vector2i = Vector2i(-1, -1)
-var _drag_end_grid: Vector2i = Vector2i(-1, -1)
+var _drag_start_grid: Vector2i = Vector2i(-999999, -999999)
+var _drag_end_grid: Vector2i = Vector2i(-999999, -999999)
 var _drag_overlay: Node2D = null  # 框选覆盖层（高z_index，显示在最上面）
 
 # 清理过期采集占用的定时器（每30帧清理一次）
@@ -536,7 +536,7 @@ func _update_designation_drag_visual():
 	if not _drag_overlay:
 		return
 	
-	if not _is_designation_dragging or _drag_start_grid.x < 0 or _drag_end_grid.x < 0:
+	if not _is_designation_dragging or _drag_start_grid.x < -99999 or _drag_end_grid.x < -99999:
 		_drag_overlay.visible = false
 		return
 	
@@ -944,8 +944,8 @@ func _input(event):
 						# 框选：标记矩形内所有匹配资源
 						_designate_resources_in_rect(_drag_start_grid, end_grid)
 					
-					_drag_start_grid = Vector2i(-1, -1)
-					_drag_end_grid = Vector2i(-1, -1)
+					_drag_start_grid = Vector2i(-999999, -999999)
+					_drag_end_grid = Vector2i(-999999, -999999)
 			return
 	
 	# 清除模式的左键处理
@@ -987,8 +987,8 @@ func _input(event):
 						# 框选：清除矩形内所有标记
 						_remove_designations_in_rect(_drag_start_grid, end_grid)
 					
-					_drag_start_grid = Vector2i(-1, -1)
-					_drag_end_grid = Vector2i(-1, -1)
+					_drag_start_grid = Vector2i(-999999, -999999)
+					_drag_end_grid = Vector2i(-999999, -999999)
 			return
 	
 	if event.is_action_pressed("left_click") and build_mode:
@@ -1460,8 +1460,8 @@ func _scan_nearby_resources(idle_settlers: Array) -> Array:
 		return result
 	
 	var center_chunk = world.global_to_chunk(Vector2i(
-		int(idle_settlers[0].position.x / world.tile_size),
-		int(idle_settlers[0].position.y / world.tile_size)
+		floori(idle_settlers[0].position.x / world.tile_size),
+		floori(idle_settlers[0].position.y / world.tile_size)
 	))
 	
 	for cx in range(center_chunk.x - search_radius, center_chunk.x + search_radius + 1):

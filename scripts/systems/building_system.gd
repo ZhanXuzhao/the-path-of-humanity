@@ -121,8 +121,8 @@ func can_place_building(building_id: String, pos: Vector2i) -> Dictionary:
 		for y in size.y:
 			var check_pos = pos + Vector2i(x, y)
 			
-			# 检查是否在地图范围内
-			if check_pos.x < 0 or check_pos.y < 0:
+			# 检查是否在地图范围内（支持动态扩张后的负坐标）
+			if world and not world.is_in_world_bounds(check_pos):
 				return {"can_place": false, "reason": "超出地图边界"}
 			
 			# 检查是否可行走
