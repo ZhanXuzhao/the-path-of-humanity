@@ -65,18 +65,22 @@ var _claimed_harvest_resources: Dictionary = {}
 var designation_mode: bool = false
 var designation_work_type: int = -1  # WorkManager.WorkType
 
+# 清除模式——玩家可框选/点选清除已标记的资源
+var clear_mode: bool = false
+
 # 已标记的资源 {"x,y": work_type}
 # 只有被标记的资源才会被定居者采集
 var designated_resources: Dictionary = {}
+
+signal designation_mode_changed(active: bool, work_type: int)
+signal clear_mode_changed(active: bool)
+signal designated_resources_changed()
 
 # 框选拖拽状态
 var _is_designation_dragging: bool = false
 var _drag_start_grid: Vector2i = Vector2i(-1, -1)
 var _drag_end_grid: Vector2i = Vector2i(-1, -1)
 var _drag_overlay: Node2D = null  # 框选覆盖层（高z_index，显示在最上面）
-
-signal designation_mode_changed(active: bool, work_type: int)
-signal designated_resources_changed()
 
 # 清理过期采集占用的定时器（每30帧清理一次）
 func _ready():
@@ -289,6 +293,8 @@ func enter_designation_mode(work_type: int):
 	"""进入标记模式，玩家可以标记指定类型的资源"""
 	if build_mode:
 		exit_build_mode()
+	if clear_mode:
+		exit_clear_mode()
 	
 	designation_mode = true
 	designation_work_type = work_type
@@ -307,6 +313,29 @@ func exit_designation_mode():
 	if world_renderer and world_renderer.has_method("_clear_designation_preview"):
 		world_renderer._clear_designation_preview()
 	designation_mode_changed.emit(false, -1)
+
+func enter_clear_mode():
+	"""进入清除模式，玩家可以框选/点选清除已标记的资源"""
+	if build_mode:
+		exit_build_mode()
+	if designation_mode:
+		exit_designation_mode()
+	
+	clear_mode = true
+	_is_designation_dragging = false
+	_init_drag_overlay()
+	
+	clear_mode_changed.emit(true)
+
+func exit_clear_mode():
+	"""退出清除模式"""
+	clear_mode = false
+	_is_designation_dragging = false
+	if _drag_overlay:
+		_drag_overlay.queue_redraw()
+	if world_renderer and world_renderer.has_method("_clear_designation_preview"):
+		world_renderer._clear_designation_preview()
+	clear_mode_changed.emit(false)
 
 func toggle_resource_designation(grid_pos: Vector2i) -> bool:
 	"""切换指定网格位置的资源标记状态，返回标记后的状态（true=已标记）"""
