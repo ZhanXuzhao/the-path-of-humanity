@@ -259,10 +259,7 @@ func _find_walkable_near(from_grid: Vector2i, max_radius: int) -> Vector2i:
 
 func _center_camera_on_world():
 	"""根据世界大小将相机移动到世界中心"""
-	var center_pixel = Vector2(
-		world.WORLD_CHUNKS_X * world.CHUNK_SIZE * world.tile_size / 2.0,
-		world.WORLD_CHUNKS_Y * world.CHUNK_SIZE * world.tile_size / 2.0
-	)
+	var center_pixel = world.get_world_center_pixel()
 	if camera:
 		camera.position = center_pixel
 

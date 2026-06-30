@@ -115,17 +115,26 @@ var tile_size: int = 32
 var rng := RandomNumberGenerator.new()
 var world_seed: int = 0  # 地图随机种子，新游戏时随机生成
 
+# 动态世界边界跟踪（支持世界向任意方向扩张）
+var _min_chunk_x: int = 0
+var _max_chunk_x: int = 0
+var _min_chunk_y: int = 0
+var _max_chunk_y: int = 0
+
 # 可配置参数（初始化时从 GameConfig 加载）
 var resource_multiplier: float = 5.0     # 资源初始点数倍率
 var default_harvest_amount: float = 5.0  # 每次采集获得的资源量
 
 func _ready():
 	rng.randomize()
-	# 从 GameConfig 加载配置
-	# _load_world_settings()
 	var game_config = get_node("/root/GameConfig")
 	resource_multiplier = game_config.resource_amount_multiplier
 	default_harvest_amount = game_config.harvest_amount
+	# 初始化世界边界
+	_max_chunk_x = WORLD_CHUNKS_X - 1
+	_max_chunk_y = WORLD_CHUNKS_Y - 1
+	_min_chunk_x = 0
+	_min_chunk_y = 0
 
 # func _load_world_settings():
 # 	"""从 GameConfig 加载世界配置参数"""
@@ -143,6 +152,7 @@ func ensure_chunk_generated(chunk_pos: Vector2i):
 	if chunk.is_generated:
 		return
 	_generate_chunk(chunk)
+	_update_world_bounds(chunk_pos)
 
 func ensure_surrounding_chunks_generated(center_chunk: Vector2i):
 	"""生成中心区块及其周围8个区块（已生成的忽略）"""
@@ -153,6 +163,8 @@ func ensure_surrounding_chunks_generated(center_chunk: Vector2i):
 			if chunk.is_generated:
 				continue
 			_generate_chunk(chunk)
+			# 更新世界边界记录，确保新增区块被纳入世界范围
+			_update_world_bounds(chunk_pos)
 
 func _generate_chunk(chunk: ChunkData):
 	# 使用多层噪声生成地形，产生自然连续的地貌
@@ -479,6 +491,15 @@ func find_path(from_pos: Vector2i, to_pos: Vector2i, max_steps: int = 500) -> Ar
 	# 无路可走
 	return []
 
+func get_world_center_pixel() -> Vector2:
+	"""返回世界中心像素坐标（考虑动态扩张后的边界）"""
+	var center_chunk_x = (_min_chunk_x + _max_chunk_x) / 2.0
+	var center_chunk_y = (_min_chunk_y + _max_chunk_y) / 2.0
+	return Vector2(
+		center_chunk_x * CHUNK_SIZE * tile_size + CHUNK_SIZE * tile_size / 2.0,
+		center_chunk_y * CHUNK_SIZE * tile_size + CHUNK_SIZE * tile_size / 2.0
+	)
+
 func _pos_key(pos: Vector2i) -> String:
 	return "%d,%d" % [pos.x, pos.y]
 
@@ -634,13 +655,30 @@ func to_dict() -> Dictionary:
 		"world_chunks_y": WORLD_CHUNKS_Y,
 	}
 
+func _update_world_bounds(chunk_pos: Vector2i):
+	"""根据新区块坐标扩展世界边界记录"""
+	var changed = false
+	if chunk_pos.x < _min_chunk_x:
+		_min_chunk_x = chunk_pos.x
+		changed = true
+	if chunk_pos.x > _max_chunk_x:
+		_max_chunk_x = chunk_pos.x
+		changed = true
+	if chunk_pos.y < _min_chunk_y:
+		_min_chunk_y = chunk_pos.y
+		changed = true
+	if chunk_pos.y > _max_chunk_y:
+		_max_chunk_y = chunk_pos.y
+		changed = true
+	
+	if changed:
+		WORLD_CHUNKS_X = _max_chunk_x - _min_chunk_x + 1
+		WORLD_CHUNKS_Y = _max_chunk_y - _min_chunk_y + 1
+
 func from_dict(data: Dictionary):
 	chunks.clear()
 	ground_items.clear()
 	world_seed = data.get("world_seed", 0)
-	# 恢复世界尺寸（确保读档后世界大小与存档一致）
-	WORLD_CHUNKS_X = data.get("world_chunks_x", WORLD_CHUNKS_X)
-	WORLD_CHUNKS_Y = data.get("world_chunks_y", WORLD_CHUNKS_Y)
 	
 	# 恢复地面物品
 	if data.has("ground_items"):
@@ -653,11 +691,11 @@ func from_dict(data: Dictionary):
 				var stack := GroundItemStack.new(sd.id, sd.amount)
 				stacks.append(stack)
 			ground_items[pos] = stacks
+	
+	# 先恢复所有区块，然后重新计算世界边界
+	var loaded_chunks: Array[Vector2i] = []
 	for c_data in data.get("chunks", []):
 		var cpos := Vector2i(c_data.pos_x, c_data.pos_y)
-		# 跳过世界边界外的区块（旧存档可能有多余区块）
-		if cpos.x < 0 or cpos.x >= WORLD_CHUNKS_X or cpos.y < 0 or cpos.y >= WORLD_CHUNKS_Y:
-			continue
 		var chunk := ChunkData.new(cpos)
 		chunk.tiles = c_data.tiles
 		
@@ -672,3 +710,26 @@ func from_dict(data: Dictionary):
 		
 		chunk.is_generated = c_data.generated
 		chunks[cpos] = chunk
+		loaded_chunks.append(cpos)
+	
+	# 根据实际加载的区块重新计算世界边界（覆盖存档中的固定值）
+	if not loaded_chunks.is_empty():
+		_min_chunk_x = loaded_chunks[0].x
+		_max_chunk_x = loaded_chunks[0].x
+		_min_chunk_y = loaded_chunks[0].y
+		_max_chunk_y = loaded_chunks[0].y
+		for cp in loaded_chunks:
+			_min_chunk_x = mini(_min_chunk_x, cp.x)
+			_max_chunk_x = maxi(_max_chunk_x, cp.x)
+			_min_chunk_y = mini(_min_chunk_y, cp.y)
+			_max_chunk_y = maxi(_max_chunk_y, cp.y)
+		WORLD_CHUNKS_X = _max_chunk_x - _min_chunk_x + 1
+		WORLD_CHUNKS_Y = _max_chunk_y - _min_chunk_y + 1
+	else:
+		# 没有任何区块时使用存档中保存的尺寸（兼容旧存档）
+		WORLD_CHUNKS_X = data.get("world_chunks_x", WORLD_CHUNKS_X)
+		WORLD_CHUNKS_Y = data.get("world_chunks_y", WORLD_CHUNKS_Y)
+		_max_chunk_x = WORLD_CHUNKS_X - 1
+		_max_chunk_y = WORLD_CHUNKS_Y - 1
+		_min_chunk_x = 0
+		_min_chunk_y = 0
