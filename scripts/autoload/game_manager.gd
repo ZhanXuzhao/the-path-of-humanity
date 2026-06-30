@@ -51,8 +51,9 @@ var stats = {
 func _ready():
 	process_mode = PROCESS_MODE_ALWAYS
 	# 从 GameConfig 获取配置值
-	day_length = GameConfig.day_length
-	speed_levels = GameConfig.speed_levels.duplicate()
+	var game_config = get_node("/root/GameConfig")
+	day_length = game_config.day_length
+	speed_levels = game_config.speed_levels.duplicate()
 	_setup_autosave()
 
 func _setup_autosave():

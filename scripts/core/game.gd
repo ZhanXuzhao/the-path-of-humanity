@@ -228,9 +228,9 @@ func _spawn_initial_settlers():
 	var used_names: Array = []
 	var name_list: Array = []
 	for i in 3:
-		var name = Settler.generate_unique_name(used_names)
-		name_list.append(name)
-		used_names.append(name)
+		var settler_name = Settler.generate_unique_name(used_names)
+		name_list.append(settler_name)
+		used_names.append(settler_name)
 	
 	for i in 3:
 		var settler = Settler.new()
@@ -1195,7 +1195,7 @@ func get_settler_by_id(id: String):
 func _update_settlers(delta):
 	"""更新所有定居者的需求、基本状态和自主行为（进食/睡眠）"""
 	var delta_hours = _gm.time_speed * delta * (24.0 / _gm.day_length)
-	var is_night = not _gm.is_daytime()
+	var _is_night = not _gm.is_daytime()
 	
 	for s in settlers:
 		if not is_instance_valid(s):

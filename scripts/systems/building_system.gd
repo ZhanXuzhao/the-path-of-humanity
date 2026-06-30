@@ -83,7 +83,8 @@ class BuildingInstance:
 				inventory = Inventory.new()
 				# 从 GameConfig 读取容量，实现可配置
 				if id == "storage_rack":
-					inventory.capacity = GameConfig.storage_rack_capacity
+					var game_config = Engine.get_main_loop().root.get_node("/root/GameConfig")
+					inventory.capacity = game_config.storage_rack_capacity
 				else:
 					inventory.capacity = data.storage_capacity
 

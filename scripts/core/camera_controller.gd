@@ -17,8 +17,9 @@ var _focus_tween: Tween = null
 
 func _ready():
 	# 从 GameConfig 读取配置的滚动参数
-	_scroll_speed = GameConfig.scroll_speed
-	_edge_scroll_margin = GameConfig.edge_scroll_margin
+	var game_config = get_node("/root/GameConfig")
+	_scroll_speed = game_config.scroll_speed
+	_edge_scroll_margin = game_config.edge_scroll_margin
 	# 鼠标中键拖动
 	set_process_input(true)
 

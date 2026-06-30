@@ -533,7 +533,7 @@ func _update_facing_to_target():
 		facing_direction = dir.normalized()
 
 # -------- 工作系统 --------
-func _execute_work(delta):
+func _execute_work(_delta):
 	if current_task == null:
 		set_state(SettlerState.IDLE, true)  # 强制切换，防止无任务时卡在WORKING
 		return
@@ -586,7 +586,7 @@ func _tick_harvest():
 		complete_task()
 		return
 	
-	var max_amount = GameConfig.harvest_count
+	var max_amount = _settler_setting("harvest_count", 5)
 	
 	# 使用任务中的 target_pos（资源格子位置）作为采集目标
 	# 角色实际站在资源格子旁边的可行走格子上

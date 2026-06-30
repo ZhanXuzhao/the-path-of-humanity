@@ -94,18 +94,19 @@ func _init_default_priorities():
 
 # 配置文件键名到工作类型的映射
 
-static func _load_defaults_from_config() -> Dictionary:
+func _load_defaults_from_config() -> Dictionary:
 	"""从 GameConfig 读取默认工作优先级"""
+	var game_config = get_node("/root/GameConfig")
 	return {
-		WorkType.MINING: GameConfig.mining_priority,
-		WorkType.WOODCUTTING: GameConfig.woodcutting_priority,
-		WorkType.CONSTRUCTION: GameConfig.construction_priority,
-		WorkType.CRAFTING: GameConfig.crafting_priority,
-		WorkType.COOKING: GameConfig.cooking_priority,
-		WorkType.FARMING: GameConfig.farming_priority,
-		WorkType.HAULING: GameConfig.hauling_priority,
-		WorkType.RESEARCH: GameConfig.research_priority,
-		WorkType.COMBAT: GameConfig.combat_priority,
+		WorkType.MINING: game_config.mining_priority,
+		WorkType.WOODCUTTING: game_config.woodcutting_priority,
+		WorkType.CONSTRUCTION: game_config.construction_priority,
+		WorkType.CRAFTING: game_config.crafting_priority,
+		WorkType.COOKING: game_config.cooking_priority,
+		WorkType.FARMING: game_config.farming_priority,
+		WorkType.HAULING: game_config.hauling_priority,
+		WorkType.RESEARCH: game_config.research_priority,
+		WorkType.COMBAT: game_config.combat_priority,
 	}
 
 # -------- 优先级管理 --------

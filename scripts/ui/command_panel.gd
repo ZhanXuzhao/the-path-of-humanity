@@ -45,10 +45,10 @@ func _ready():
 	
 	visible = true
 
-func _create_cmd_button(icon: String, name: String, work_type: int, desc: String):
+func _create_cmd_button(icon: String, cmd_name: String, work_type: int, desc: String):
 	"""统一创建标记/取消按钮"""
 	var btn = Button.new()
-	btn.text = "%s %s" % [icon, name]
+	btn.text = "%s %s" % [icon, cmd_name]
 	btn.tooltip_text = desc
 	btn.toggle_mode = true
 	btn.custom_minimum_size = Vector2(100, 36)

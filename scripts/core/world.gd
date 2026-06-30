@@ -13,8 +13,8 @@ signal ground_items_changed(grid_pos: Vector2i)
 const CHUNK_SIZE := 16
 
 # 世界大小（区块数），可通过 game_settings.cfg 配置
-var WORLD_CHUNKS_X := 3
-var WORLD_CHUNKS_Y := 3
+var WORLD_CHUNKS_X := GameConfig.world_chunks_x
+var WORLD_CHUNKS_Y := GameConfig.world_chunks_y
 
 # 地形类型枚举
 enum TileType {
@@ -121,14 +121,15 @@ var default_harvest_amount: float = 5.0  # 每次采集获得的资源量
 func _ready():
 	rng.randomize()
 	# 从 GameConfig 加载配置
-	_load_world_settings()
-	resource_multiplier = GameConfig.resource_amount_multiplier
-	default_harvest_amount = GameConfig.harvest_amount
+	# _load_world_settings()
+	var game_config = get_node("/root/GameConfig")
+	resource_multiplier = game_config.resource_amount_multiplier
+	default_harvest_amount = game_config.harvest_amount
 
-func _load_world_settings():
-	"""从 GameConfig 加载世界配置参数"""
-	WORLD_CHUNKS_X = GameConfig.world_chunks_x
-	WORLD_CHUNKS_Y = GameConfig.world_chunks_y
+# func _load_world_settings():
+# 	"""从 GameConfig 加载世界配置参数"""
+# 	WORLD_CHUNKS_X = GameConfig.world_chunks_x
+# 	WORLD_CHUNKS_Y = GameConfig.world_chunks_y
 
 # -------- 区块生成 --------
 func get_chunk(chunk_pos: Vector2i) -> ChunkData:
