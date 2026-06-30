@@ -354,7 +354,17 @@ func harvest_resource(pos: Vector2i, amount: float = -1.0) -> Dictionary:
 # -------- 路径查找 --------
 func is_walkable(pos: Vector2i) -> bool:
 	var tile = get_tile_at(pos)
-	return tile != TileType.WATER and tile != TileType.DEEP_WATER and tile != TileType.MOUNTAIN
+	if tile == TileType.WATER or tile == TileType.DEEP_WATER or tile == TileType.MOUNTAIN:
+		return false
+	
+	# 检查是否有不可通行的建筑（墙）
+	var building_id = get_building_at(pos)
+	if building_id != "":
+		var bld_data = ItemDefinitions.get_building(building_id)
+		if bld_data and bld_data.id != "" and not bld_data.is_passable:
+			return false
+	
+	return true
 
 func find_path(from_pos: Vector2i, to_pos: Vector2i, max_steps: int = 500) -> Array[Vector2i]:
 	"""A*寻路，返回从 from_pos 到 to_pos 的网格路径（不含起点），

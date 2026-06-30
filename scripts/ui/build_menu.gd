@@ -71,7 +71,12 @@ const BUILDING_EMOJI = {
 	"house": "🏠",
 	"campfire": "🔥",
 	"road": "🛤️",
-	"wall": "🧱",
+	"wood_wall": "🪵",
+	"wood_door": "🚪",
+	"stone_wall": "🧱",
+	"stone_door": "🚪",
+	"iron_wall": "🪨",
+	"iron_door": "🚪",
 	"wooden_bed": "🛏️",
 	"research_table": "🔬",
 }

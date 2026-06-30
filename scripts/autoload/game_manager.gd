@@ -239,11 +239,33 @@ func _drop_legacy_resources_to_ground(old_resources: Dictionary):
 
 # ==================== 存档系统 ====================
 
+# 存档版本号 — 不兼容的版本存档将被删除
+const SAVE_VERSION := 4
+# 游戏版本号，仅供显示
+const GAME_VERSION := "0.2.0"
+
 # 加载存档时暂存的数据，供 Game 场景恢复
 var _loaded_save_data: Dictionary = {}
 
 func has_save_file() -> bool:
 	return FileAccess.file_exists("user://savegame.dat")
+
+func delete_save():
+	"""删除存档文件"""
+	if has_save_file():
+		DirAccess.remove_absolute("user://savegame.dat")
+
+func is_save_valid() -> bool:
+	"""检查存档是否有效（版本匹配）"""
+	var file = FileAccess.open("user://savegame.dat", FileAccess.READ)
+	if not file:
+		return false
+	var data = file.get_var()
+	file.close()
+	if typeof(data) != TYPE_DICTIONARY:
+		return false
+	var save_version = data.get("save_version", 0)
+	return save_version == SAVE_VERSION
 
 func save_game(silent: bool = false) -> bool:
 	"""保存游戏（收集所有系统数据）"""
@@ -254,7 +276,8 @@ func save_game(silent: bool = false) -> bool:
 		return false
 	
 	var save_data = {
-		"version": 3,  # v3: 添加 designated_resources 标记数据
+		"save_version": SAVE_VERSION,
+		"game_version": GAME_VERSION,
 		"game_time": game_time,
 		"current_day": current_day,
 		"time_speed": time_speed,
@@ -271,6 +294,7 @@ func save_game(silent: bool = false) -> bool:
 	var file = FileAccess.open("user://savegame.dat", FileAccess.WRITE)
 	if file:
 		file.store_var(save_data)
+		file.close()
 		if not silent:
 			show_notification("游戏已保存", NotificationType.SUCCESS)
 		return true
@@ -280,7 +304,9 @@ func save_game(silent: bool = false) -> bool:
 		return false
 
 func load_game(silent: bool = false) -> bool:
-	"""读取存档（恢复 GameManager 状态，暂存系统数据）"""
+	"""读取存档（恢复 GameManager 状态，暂存系统数据）
+	如果存档版本不兼容则自动删除，返回 false。
+	"""
 	var file = FileAccess.open("user://savegame.dat", FileAccess.READ)
 	if not file:
 		if not silent:
@@ -289,11 +315,24 @@ func load_game(silent: bool = false) -> bool:
 	
 	var data = file.get_var()
 	if typeof(data) != TYPE_DICTIONARY:
+		file.close()
+		delete_save()
 		if not silent:
-			show_notification("存档数据损坏", NotificationType.ERROR)
+			show_notification("存档数据损坏，已删除", NotificationType.ERROR)
+		return false
+	
+	# 检查存档版本兼容性
+	var save_version = data.get("save_version", 0)
+	if save_version != SAVE_VERSION:
+		file.close()
+		delete_save()
+		LogUtil.w("存档版本不兼容（存档v%d，当前v%d），已删除" % [save_version, SAVE_VERSION])
+		if not silent:
+			show_notification("存档版本不兼容，已删除，将开始新游戏", NotificationType.WARNING)
 		return false
 	
 	# 恢复 GameManager 状态
+	file.close()
 	game_time = data.get("game_time", 6.0)
 	current_day = data.get("current_day", 1)
 	time_speed = data.get("time_speed", 1.0)
