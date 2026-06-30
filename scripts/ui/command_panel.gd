@@ -16,6 +16,7 @@ var commands: Array[Dictionary] = [
 	{"name": "伐木", "work_type": WorkManager.WorkType.WOODCUTTING, "icon": "🪓", "desc": "标记树木资源"},
 	{"name": "农业", "work_type": WorkManager.WorkType.FARMING, "icon": "🌾", "desc": "标记浆果丛资源"},
 	{"name": "搬运", "work_type": WorkManager.WorkType.HAULING, "icon": "📦", "desc": "标记地面物品为搬运目标"},
+	{"name": "狩猎", "work_type": WorkManager.WorkType.HUNTING, "icon": "🏹", "desc": "标记野生动物为狩猎目标"},
 ]
 
 @onready var button_container: VBoxContainer = $MarginContainer/VBox/ButtonContainer

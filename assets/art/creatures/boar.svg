@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="24" viewBox="0 0 32 24">
+  <!-- body -->
+  <ellipse cx="16" cy="15" rx="10" ry="6" fill="#6a4a2a"/>
+  <ellipse cx="16" cy="14" rx="9" ry="5" fill="#8a6a3a"/>
+  <!-- head -->
+  <ellipse cx="26" cy="14" rx="5" ry="4" fill="#7a5a2a"/>
+  <!-- snout -->
+  <ellipse cx="30" cy="16" rx="3" ry="2" fill="#6a4a2a"/>
+  <circle cx="31" cy="15.5" r="0.8" fill="#3a2a1a"/>
+  <circle cx="31" cy="16.5" r="0.8" fill="#3a2a1a"/>
+  <!-- ear -->
+  <polygon points="23,10 25,6 27,10" fill="#5a3a1a"/>
+  <!-- eye -->
+  <circle cx="27" cy="12" r="1.2" fill="#1a0a00"/>
+  <circle cx="27" cy="11.5" r="0.4" fill="#ffffff"/>
+  <!-- legs -->
+  <rect x="9" y="19" width="3" height="5" rx="1" fill="#5a3a1a"/>
+  <rect x="14" y="19" width="3" height="5" rx="1" fill="#5a3a1a"/>
+  <rect x="19" y="19" width="3" height="5" rx="1" fill="#5a3a1a"/>
+  <rect x="23" y="19" width="3" height="5" rx="1" fill="#5a3a1a"/>
+  <!-- tail -->
+  <path d="M6,12 Q3,8 5,6" fill="none" stroke="#5a3a1a" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- tusks -->
+  <polygon points="28,18 30,20 27,18" fill="#d4c4a0"/>
+  <polygon points="26,18 28,20 25,18" fill="#d4c4a0"/>
+</svg>

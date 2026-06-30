@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="6" viewBox="0 0 16 6">
+  <!-- arrow shaft -->
+  <rect x="2" y="2" width="12" height="2" fill="#8a6a3a"/>
+  <!-- arrow head -->
+  <polygon points="14,0 16,3 14,6" fill="#aaaaaa"/>
+  <!-- fletching -->
+  <polygon points="2,0 0,3 2,6" fill="#cc4444"/>
+</svg>

@@ -24,6 +24,14 @@ var mouse_grid_pos: Vector2i
 # 定居者管理
 var settlers = []
 
+# 野猪管理
+var boars: Array = []
+
+# 野猪生成计时器
+var _boar_spawn_timer: float = 0.0
+const BOAR_SPAWN_INTERVAL: float = 30.0  # 每30现实秒尝试生成一头野猪
+const MAX_BOARS: int = 5  # 地图上最多5头野猪
+
 # 选中定居者
 var selected_settler = null
 signal settler_selected(settler)
@@ -50,6 +58,11 @@ var selected_ground_item_pos: Vector2i = Vector2i(-1, -1)
 signal ground_item_selected(pos: Vector2i, stacks)
 signal ground_item_deselected()
 
+# 选中野猪
+var selected_boar = null
+signal boar_selected(boar)
+signal boar_deselected()
+
 # 建筑建造重试冷却（防止反复给同一缺物资建筑分配任务）
 var _construction_retry_cooldown: Dictionary = {}  # "x,y" -> frame_number
 
@@ -71,6 +84,9 @@ var clear_mode: bool = false
 # 已标记的资源 {"x,y": work_type}
 # 只有被标记的资源才会被定居者采集
 var designated_resources: Dictionary = {}
+
+# 已标记的野猪 {boar_instance_id: true} — 狩猎目标
+var designated_boars: Dictionary = {}
 
 signal designation_mode_changed(active: bool, work_type: int)
 signal clear_mode_changed(active: bool)
@@ -112,6 +128,7 @@ func _ready():
 		_gm.start_game()
 		_generate_initial_area()
 		_spawn_initial_settlers()
+		_spawn_initial_boars()
 		_center_camera_on_world()
 		
 		# 新游戏提示：使用指令面板标记资源
@@ -162,6 +179,15 @@ func _process(delta):
 		)
 		_update_designation_drag_visual()
 
+	# 野猪生成（每2秒检查一次）
+	_boar_spawn_timer += delta
+	if _boar_spawn_timer >= 2.0:
+		_boar_spawn_timer = 0.0
+		_try_spawn_boar()
+	
+	# 更新野猪AI
+	_update_boars(delta)
+	
 	# 定居者AI定时更新（每1秒执行一次）
 	_autonomy_timer += delta
 	if _autonomy_timer >= 1.0:
@@ -179,6 +205,10 @@ func _process(delta):
 		# 检查选中的定居者是否还存活
 		if selected_settler != null and not is_instance_valid(selected_settler):
 			_deselect_settler()
+		
+		# 检查选中的野猪是否还存活
+		if selected_boar != null and not is_instance_valid(selected_boar):
+			_deselect_boar()
 		
 		# 检查选中的资源节点是否还存在（可能已被采集完）
 		if selected_resource_pos.x >= 0:
@@ -244,6 +274,42 @@ func _spawn_initial_settlers():
 			work_manager.init_settler(settler.settler_id)
 		_gm.show_notification("新成员加入了聚居地: %s" % settler.settler_name, 
 			3)
+	
+	# 新手教程：在出生点附近掉落弓箭，方便狩猎
+	world.drop_item_on_ground(spawn_center_grid + Vector2i(1, 0), "bow", 1)
+	world.drop_item_on_ground(spawn_center_grid + Vector2i(0, 1), "arrow", 30)
+
+func _spawn_initial_boars():
+	"""在地图上随机位置生成初始野猪（数量由 GameConfig 配置）"""
+	var count = get_node("/root/GameConfig").initial_boar_count
+	if count <= 0:
+		return
+	
+	# 在世界范围内随机寻找可行走位置生成
+	var world_tiles_x = world.WORLD_CHUNKS_X * world.CHUNK_SIZE
+	var world_tiles_y = world.WORLD_CHUNKS_Y * world.CHUNK_SIZE
+	var spawned = 0
+	var attempts = 0
+	var max_attempts = count * 20  # 防止死循环
+	
+	while spawned < count and attempts < max_attempts:
+		attempts += 1
+		var rand_grid = Vector2i(
+			randi_range(1, world_tiles_x - 2),
+			randi_range(1, world_tiles_y - 2)
+		)
+		if not world.is_walkable(rand_grid):
+			continue
+		
+		var boar = load("res://scripts/entities/boar.gd").new()
+		boar.position = Vector2(
+			rand_grid.x * world.tile_size + world.tile_size / 2.0,
+			rand_grid.y * world.tile_size + world.tile_size / 2.0
+		)
+		add_child(boar)
+		boars.append(boar)
+		boar.died.connect(_on_boar_died.bind(boar))
+		spawned += 1
 
 func _find_walkable_near(from_grid: Vector2i, max_radius: int) -> Vector2i:
 	"""从 from_grid 开始螺旋搜索，返回半径 max_radius 内第一个可行走网格"""
@@ -375,6 +441,10 @@ func toggle_resource_designation(grid_pos: Vector2i) -> bool:
 	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
 	var is_auto = (designation_work_type == -2)
 	
+	# 狩猎模式：标记/取消标记野猪
+	if designation_work_type == WorkManager.WorkType.HUNTING:
+		return _toggle_boar_designation_at(grid_pos)
+	
 	if designated_resources.has(key):
 		if is_auto:
 			# 自动模式：无论什么类型，再次点击即取消
@@ -421,9 +491,66 @@ func get_designated_work_type(grid_pos: Vector2i) -> int:
 	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
 	return designated_resources.get(key, -1)
 
+# -------- 野猪标记（狩猎） --------
+func _toggle_boar_designation_at(grid_pos: Vector2i) -> bool:
+	"""切换指定网格位置的野猪标记状态（使用网格中心像素距离检测）"""
+	var tile_center = Vector2(
+		grid_pos.x * world.tile_size + world.tile_size / 2.0,
+		grid_pos.y * world.tile_size + world.tile_size / 2.0
+	)
+	var click_dist = world.tile_size * 0.6  # 与点击选择相同的容差
+	
+	for b in boars:
+		if not is_instance_valid(b) or b.state == b.BoarState.DEAD:
+			continue
+		var dist = b.position.distance_to(tile_center)
+		if dist < click_dist:
+			var inst_id = b.get_instance_id()
+			if designated_boars.has(inst_id):
+				designated_boars.erase(inst_id)
+				b.is_designated = false
+				designated_resources_changed.emit()
+				return false
+			else:
+				designated_boars[inst_id] = true
+				b.is_designated = true
+				designated_resources_changed.emit()
+				return true
+	return false
+
+func _toggle_boar_designation_at_pos(global_pos: Vector2) -> bool:
+	"""使用鼠标像素位置直接查找并标记野猪（更精确，不依赖网格对齐）"""
+	var click_dist = world.tile_size * 0.6
+	
+	for b in boars:
+		if not is_instance_valid(b) or b.state == b.BoarState.DEAD:
+			continue
+		var dist = b.position.distance_to(global_pos)
+		if dist < click_dist:
+			var inst_id = b.get_instance_id()
+			if designated_boars.has(inst_id):
+				designated_boars.erase(inst_id)
+				b.is_designated = false
+				designated_resources_changed.emit()
+				return true
+			else:
+				designated_boars[inst_id] = true
+				b.is_designated = true
+				designated_resources_changed.emit()
+				return true
+	return false
+
+func is_boar_designated(boar_instance_id: int) -> bool:
+	return designated_boars.has(boar_instance_id)
+
 func clear_all_designations():
-	"""清除所有标记"""
+	"""清除所有标记（包括资源标记和野猪标记）"""
 	designated_resources.clear()
+	# 清除所有野猪标记视觉
+	for b in boars:
+		if is_instance_valid(b):
+			b.is_designated = false
+	designated_boars.clear()
 	designated_resources_changed.emit()
 
 func clear_designations_by_type(work_type: int):
@@ -656,6 +783,9 @@ func _select_settler(settler, focus_camera: bool = false):
 	# 取消之前的选中
 	if selected_settler != null and is_instance_valid(selected_settler):
 		selected_settler.set_selected(false)
+	# 选中定居者时取消野猪选中
+	if selected_boar != null:
+		_deselect_boar()
 	# 选中新定居者
 	selected_settler = settler
 	settler.set_selected(true)
@@ -670,6 +800,46 @@ func _deselect_settler():
 		selected_settler.set_selected(false)
 	selected_settler = null
 	settler_deselected.emit()
+
+# -------- 野猪选择 --------
+func _find_boar_at_pos(global_pos: Vector2):
+	"""查找指定位置附近的野猪，返回野猪或 null"""
+	var closest = null
+	var closest_dist = world.tile_size * 0.6  # 约19像素
+	
+	for b in boars:
+		if not is_instance_valid(b) or b.state == b.BoarState.DEAD:
+			continue
+		var dist = b.position.distance_to(global_pos)
+		if dist < closest_dist:
+			closest_dist = dist
+			closest = b
+	
+	return closest
+
+func _select_boar(boar):
+	"""选中野猪"""
+	if selected_boar == boar:
+		return
+	# 取消之前的选中
+	_deselect_boar()
+	# 选中新野猪
+	selected_boar = boar
+	boar.set_selected(true)
+	boar_selected.emit(boar)
+	# 同时取消其他选中
+	_deselect_settler()
+	_deselect_construction()
+	_deselect_building()
+	_deselect_resource()
+	_deselect_ground_item()
+
+func _deselect_boar():
+	"""取消选中野猪"""
+	if selected_boar != null and is_instance_valid(selected_boar):
+		selected_boar.set_selected(false)
+	selected_boar = null
+	boar_deselected.emit()
 
 func _switch_to_next_settler():
 	"""Tab切换：按定居者列表顺序切换到下一个定居者，镜头居中聚焦"""
@@ -735,6 +905,8 @@ func _select_building(bld):
 	"""选中存储建筑"""
 	if selected_building_instance == bld:
 		return
+	if selected_boar != null:
+		_deselect_boar()
 	selected_building_instance = bld
 	building_selected.emit(bld)
 
@@ -747,6 +919,8 @@ func _select_construction(bld):
 	"""选中在建建筑，显示进度面板"""
 	if selected_construction_building == bld:
 		return
+	if selected_boar != null:
+		_deselect_boar()
 	selected_construction_building = bld
 	construction_selected.emit(bld)
 
@@ -761,6 +935,8 @@ func _select_resource(pos: Vector2i, deposit):
 	"""选中资源节点"""
 	if selected_resource_pos == pos:
 		return
+	if selected_boar != null:
+		_deselect_boar()
 	selected_resource_pos = pos
 	selected_resource_deposit = deposit
 	resource_selected.emit(pos, deposit)
@@ -777,6 +953,8 @@ func _select_ground_item(pos: Vector2i, stacks):
 	"""选中地面物品"""
 	if selected_ground_item_pos == pos:
 		return
+	if selected_boar != null:
+		_deselect_boar()
 	selected_ground_item_pos = pos
 	ground_item_selected.emit(pos, stacks)
 
@@ -901,6 +1079,13 @@ func _input(event):
 		if build_mode:
 			exit_build_mode()
 			return
+		# 右键取消所有选中
+		if selected_boar != null:
+			_deselect_boar()
+			return
+		if selected_settler != null:
+			_deselect_settler()
+			return
 	
 	# 点击UI控件时不处理世界点击逻辑
 	if event.is_action_pressed("left_click") and _is_mouse_over_ui():
@@ -938,8 +1123,11 @@ func _input(event):
 					
 					# 判断是点选还是框选
 					if _drag_start_grid == end_grid:
-						# 点选：切换单个资源的标记状态
-						toggle_resource_designation(_drag_start_grid)
+						# 点选：先尝试切换野猪标记（使用鼠标实际像素位置）
+						if designation_work_type == WorkManager.WorkType.HUNTING:
+							_toggle_boar_designation_at_pos(global_pos)
+						else:
+							toggle_resource_designation(_drag_start_grid)
 					else:
 						# 框选：标记矩形内所有匹配资源
 						_designate_resources_in_rect(_drag_start_grid, end_grid)
@@ -1005,10 +1193,22 @@ func _input(event):
 		
 		# 查找当前位置的所有可选目标
 		var clicked_settler = _find_settler_at_pos(global_pos)
+		var clicked_boar = _find_boar_at_pos(global_pos)
 		var clicked_bld = building_system.get_building_at(grid_pos) if building_system else null
 		
 		# 判断建筑是否可选择（所有建筑均可选）
 		var bld_selectable = clicked_bld != null
+		
+		# 如果有野猪在最上层（优先级高于定居者/建筑用于选中）
+		if clicked_boar != null and not bld_selectable and clicked_settler == null:
+			# 只有野猪
+			_deselect_settler()
+			_deselect_construction()
+			_deselect_building()
+			_deselect_resource()
+			_deselect_ground_item()
+			_select_boar(clicked_boar)
+			return
 		
 		if clicked_settler != null and bld_selectable:
 			# 同时有定居者和建筑 → 轮流选择
@@ -1068,6 +1268,7 @@ func _input(event):
 				_deselect_construction()
 				_deselect_building()
 				_deselect_settler()
+				_deselect_boar()
 				_deselect_resource()
 				_select_ground_item(grid_pos, clicked_ground_stacks)
 			else:
@@ -1078,10 +1279,12 @@ func _input(event):
 					_deselect_construction()
 					_deselect_building()
 					_deselect_settler()
+					_deselect_boar()
 					_deselect_ground_item()
 					_select_resource(grid_pos, clicked_resource)
 				else:
 					# 什么都没选中
+					_deselect_boar()
 					_deselect_construction()
 					_deselect_building()
 					_deselect_settler()
@@ -1238,6 +1441,9 @@ func _update_settlers(delta):
 		# 更新需求
 		s.update_needs(delta_hours)
 		
+		# 自动回血（所有状态都生效）
+		s.apply_passive_heal(delta_hours)
+		
 		# ---- 自主行为：仅在 IDLE 时触发 ----
 		if s.state != Settler.SettlerState.IDLE:
 			continue
@@ -1366,7 +1572,11 @@ func _assign_ai_tasks():
 	var ground_cleanup_tasks = _scan_ground_item_storage_tasks(idle_settlers, haul_tasks)
 	tasks.append_array(ground_cleanup_tasks)
 	
-	# 4. 采集任务 - 在已生成的区块中找最近的资源（不主动生成新区块）
+	# 4. 狩猎任务 - 猎杀被标记的野猪
+	var hunting_tasks = _scan_hunting_targets(idle_settlers)
+	tasks.append_array(hunting_tasks)
+	
+	# 5. 采集任务 - 在已生成的区块中找最近的资源（不主动生成新区块）
 	var harvest_tasks = _scan_nearby_resources(idle_settlers)
 	tasks.append_array(harvest_tasks)
 	
@@ -1449,6 +1659,37 @@ func _assign_ai_tasks():
 		tasks.remove_at(best_idx)
 		settler.assign_task(best_task)
 		LogUtil.d("settler.assign_task(best_task): %s -> %s" % [settler.settler_name, best_task.get("id", "")])
+
+func _scan_hunting_targets(_idle_settlers: Array) -> Array:
+	"""扫描被标记的野猪，生成狩猎任务"""
+	var result: Array = []
+	if designated_boars.is_empty():
+		return result
+	
+	for b in boars:
+		if not is_instance_valid(b) or b.state == b.BoarState.DEAD:
+			# 已死亡的野猪自动取消标记
+			var dead_id = b.get_instance_id() if is_instance_valid(b) else 0
+			if designated_boars.has(dead_id):
+				designated_boars.erase(dead_id)
+			continue
+		
+		var inst_id = b.get_instance_id()
+		if not designated_boars.has(inst_id):
+			continue
+		
+		result.append({
+			"id": "hunt_%d" % inst_id,
+			"type": "HUNTING",
+			"target_pos": Vector2i.ZERO,  # 不需要网格目标
+			"target_world_pos": b.position,
+			"skill": "combat",
+			"work_required": 10.0,
+			"work_type": WorkManager.WorkType.HUNTING,
+			"boar_instance_id": inst_id,
+		})
+	
+	return result
 
 func _scan_nearby_resources(idle_settlers: Array) -> Array:
 	"""扫描定居者周围已生成区块中的可采集资源（不主动生成新区块）"""
@@ -1797,6 +2038,76 @@ func _cleanup_harvest_claims():
 	
 	for key in expired_keys:
 		_claimed_harvest_resources.erase(key)
+
+# ==================== 野猪系统 ====================
+
+func _try_spawn_boar():
+	"""尝试在地图边缘生成一头野猪"""
+	if boars.size() >= MAX_BOARS:
+		return
+	
+	# 随机概率生成（每2秒约40%概率）
+	if randf() > 0.4:
+		return
+	
+	var boar = load("res://scripts/entities/boar.gd").new()
+	if boar.spawn_at_edge(self):
+		add_child(boar)
+		boars.append(boar)
+		boar.died.connect(_on_boar_died.bind(boar))
+
+func _on_boar_died(_grid_pos: Vector2i, boar: Node2D):
+	"""野猪死亡时从列表中移除"""
+	boars.erase(boar)
+
+func _update_boars(_delta):
+	"""更新所有野猪的AI（野猪有独立的_process，这里检查战斗互动）"""
+	# 清理已死亡的野猪标记
+	var dead_marks: Array = []
+	for inst_id in designated_boars:
+		var b = instance_from_id(inst_id) if inst_id else null
+		if b == null or not is_instance_valid(b) or b.state == b.BoarState.DEAD:
+			dead_marks.append(inst_id)
+	for id in dead_marks:
+		designated_boars.erase(id)
+	
+	# 检查定居者附近的野猪——自动防御射击
+	for settler in settlers:
+		if not is_instance_valid(settler):
+			continue
+		# 有狩猎任务的不重复处理（由 _tick_hunting 管理）
+		if settler.current_task and settler.current_task.get("type") == "HUNTING":
+			continue
+		# 只有持有弓和箭的定居者才会自动攻击
+		if not settler.has_ranged_weapon():
+			continue
+		
+		# 只在空闲或移动时攻击
+		if settler.state != Settler.SettlerState.IDLE and settler.state != Settler.SettlerState.MOVING:
+			continue
+		
+		# 寻找射程内的野猪
+		var nearest_boar = null
+		var nearest_dist = INF
+		for boar in boars:
+			if not is_instance_valid(boar) or boar.state == boar.BoarState.DEAD:
+				continue
+			var dist = settler.position.distance_squared_to(boar.position)
+			if dist < nearest_dist and dist <= settler.ARROW_RANGE * settler.ARROW_RANGE:
+				nearest_dist = dist
+				nearest_boar = boar
+		
+		if nearest_boar:
+			# 面向野猪射箭
+			var dir = nearest_boar.position - settler.position
+			settler.facing_direction = dir.normalized()
+			settler.shoot_at(nearest_boar)
+
+func _auto_heal_settlers(delta_hours: float):
+	"""所有定居者自动回血"""
+	for s in settlers:
+		if is_instance_valid(s):
+			s.apply_passive_heal(delta_hours)
 
 func _is_mouse_over_ui() -> bool:
 	"""检查鼠标是否悬浮在任意可见 UI 控件上方（点击UI时不触发世界操作）"""

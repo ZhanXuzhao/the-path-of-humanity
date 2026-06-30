@@ -128,6 +128,10 @@ static func _register_items():
 	_add_item("stone_axe", "石斧", "用石头制作的简易斧头", ItemCategory.TOOL, 1, 2.0, 16, 0.0, 0.0, 8.0)
 	_add_item("stone_pickaxe", "石镐", "用石头制作的简易镐", ItemCategory.TOOL, 1, 2.0, 17, 0.0, 0.0, 8.0)
 
+	# 武器
+	_add_item("bow", "弓", "简易木弓，可发射箭矢", ItemCategory.WEAPON, 1, 1.5, 19, 0.0, 0.0, 5.0)
+	_add_item("arrow", "箭矢", "木制箭矢", ItemCategory.WEAPON, 50, 0.1, 20, 0.0, 0.0, 0.5)
+
 	# 消耗品
 	_add_item("torch", "火把", "提供照明的火把", ItemCategory.CONSUMABLE, 20, 0.3, 18, 0.0, 0.0, 1.0)
 
@@ -177,6 +181,8 @@ static func _register_recipes():
 	_add_recipe("stone_axe", "制作石斧", "", {"wood": 3, "stone": 4}, {"stone_axe": 1}, 5.0, "", "workbench")
 	_add_recipe("stone_pickaxe", "制作石镐", "", {"wood": 3, "stone": 4}, {"stone_pickaxe": 1}, 5.0, "", "workbench")
 	_add_recipe("torch", "制作火把", "", {"wood": 1, "cloth": 1}, {"torch": 3}, 2.0, "", "workbench")
+	_add_recipe("bow", "制作弓", "", {"wood": 5, "cloth": 2}, {"bow": 1}, 5.0, "archery", "workbench")
+	_add_recipe("arrow", "制作箭矢", "", {"wood": 1, "stone": 1}, {"arrow": 5}, 2.0, "archery", "workbench")
 
 	# 熔炉配方
 	_add_recipe("iron_ingot", "熔炼铁锭", "将铁矿石熔炼成铁锭", {"iron_ore": 3, "coal": 1}, {"iron_ingot": 1}, 5.0, "", "furnace")
@@ -198,6 +204,7 @@ static func _register_techs():
 	_add_tech("construction", "建筑构造", "解锁基础建筑", {"wood": 20, "stone": 15}, 45.0, ["primitive_tools"], ["tent", "campfire", "storage_rack", "workbench", "wood_wall", "wood_door"], "基础")
 	_add_tech("metalworking", "金属加工", "掌握熔炼技术", {"stone": 20, "wood": 15}, 60.0, ["construction"], ["furnace", "iron_ingot", "copper_ingot", "iron_mine"], "工业")
 	_add_tech("cooking", "烹饪技术", "学会烹饪食物", {"wood": 10, "berry": 15}, 30.0, ["construction"], ["cooking_stove", "cooked_meat", "vegetable_soup"], "基础")
+	_add_tech("archery", "弓箭", "学会制作和使用弓箭", {"wood": 20, "stone": 10}, 40.0, ["primitive_tools"], ["bow", "arrow"], "军事")
 	_add_tech("woodworking", "木工技术", "高级木材加工", {"wood": 30, "plank": 10}, 45.0, ["construction"], ["sawmill", "plank_sawmill", "house", "wooden_bed"], "工业")
 	_add_tech("masonry", "石工技术", "掌握石材加工", {"stone": 30, "brick": 10}, 45.0, ["construction"], ["kiln", "brick", "stone_wall", "stone_door", "warehouse"], "工业")
 	_add_tech("advanced_metal", "高级冶金", "炼钢技术", {"iron_ingot": 20, "coal": 20}, 90.0, ["metalworking"], ["steel_ingot", "iron_wall", "iron_door"], "工业")

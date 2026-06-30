@@ -506,6 +506,95 @@ func is_in_world_bounds(grid_pos: Vector2i) -> bool:
 	return chunk_pos.x >= _min_chunk_x and chunk_pos.x <= _max_chunk_x \
 		and chunk_pos.y >= _min_chunk_y and chunk_pos.y <= _max_chunk_y
 
+func find_path_generated_only(from_pos: Vector2i, to_pos: Vector2i, max_steps: int = 500) -> Array[Vector2i]:
+	"""A*寻路（仅使用已生成区块，不触发新区块生成）
+	适用于野猪等不应触发地图增长的实体。"""
+	if from_pos == to_pos:
+		return []
+	if not is_walkable(to_pos):
+		return []
+	if not is_in_world_bounds(to_pos):
+		return []
+	
+	var came_from := Dictionary()
+	var g_score := Dictionary()
+	var f_score := Dictionary()
+	
+	var key_from = _pos_key(from_pos)
+	g_score[key_from] = 0.0
+	f_score[key_from] = _astar_heuristic(from_pos, to_pos)
+	
+	var open_set := [from_pos]
+	var open_set_keys := {key_from: true}
+	
+	var steps := 0
+	
+	while open_set.size() > 0 and steps < max_steps:
+		steps += 1
+		
+		var current = open_set[0]
+		var current_key = _pos_key(current)
+		var best_idx = 0
+		var best_f = f_score.get(current_key, INF)
+		for i in range(1, open_set.size()):
+			var k = _pos_key(open_set[i])
+			var f = f_score.get(k, INF)
+			if f < best_f:
+				best_f = f
+				current = open_set[i]
+				current_key = k
+				best_idx = i
+		
+		if current == to_pos:
+			return _reconstruct_path(came_from, current)
+		
+		open_set.remove_at(best_idx)
+		open_set_keys.erase(current_key)
+		
+		var neighbors = [
+			current + Vector2i(0, -1),
+			current + Vector2i(0, 1),
+			current + Vector2i(-1, 0),
+			current + Vector2i(1, 0),
+			current + Vector2i(-1, -1),
+			current + Vector2i(1, -1),
+			current + Vector2i(-1, 1),
+			current + Vector2i(1, 1),
+		]
+		
+		var current_g = g_score.get(current_key, INF)
+		
+		for neighbor in neighbors:
+			# 跳过未生成的区块（不触发生成）
+			var chunk_n = global_to_chunk(neighbor)
+			var chunk = chunks.get(chunk_n)
+			if chunk == null or not chunk.is_generated:
+				continue
+			if not is_in_world_bounds(neighbor):
+				continue
+			if not is_walkable(neighbor):
+				continue
+			
+			var diff = neighbor - current
+			if abs(diff.x) == 1 and abs(diff.y) == 1:
+				if not is_walkable(current + Vector2i(diff.x, 0)) and not is_walkable(current + Vector2i(0, diff.y)):
+					continue
+			
+			var n_key = _pos_key(neighbor)
+			var move_cost = 1.0 if (diff.x == 0 or diff.y == 0) else 1.414
+			var tentative_g = current_g + move_cost
+			
+			if tentative_g < g_score.get(n_key, INF):
+				came_from[n_key] = current
+				g_score[n_key] = tentative_g
+				f_score[n_key] = tentative_g + _astar_heuristic(neighbor, to_pos)
+				
+				if not open_set_keys.has(n_key):
+					open_set.append(neighbor)
+					open_set_keys[n_key] = true
+	
+	return []
+
 func _pos_key(pos: Vector2i) -> String:
 	return "%d,%d" % [pos.x, pos.y]
 

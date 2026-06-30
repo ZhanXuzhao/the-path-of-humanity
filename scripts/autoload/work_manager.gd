@@ -15,6 +15,7 @@ enum WorkType {
 	HAULING,        # 搬运
 	RESEARCH,       # 研究
 	COMBAT,         # 战斗
+	HUNTING,        # 狩猎
 }
 
 # 工作类型对应的中文名
@@ -28,6 +29,7 @@ const WORK_TYPE_NAMES = {
 	WorkType.HAULING: "搬运",
 	WorkType.RESEARCH: "研究",
 	WorkType.COMBAT: "战斗",
+	WorkType.HUNTING: "狩猎",
 }
 
 # 工作类型对应的技能ID（用于查询定居者技能等级）
@@ -41,6 +43,7 @@ const WORK_TYPE_SKILLS = {
 	WorkType.HAULING: "",
 	WorkType.RESEARCH: "research",
 	WorkType.COMBAT: "combat",
+	WorkType.HUNTING: "combat",
 }
 
 # 工作类型对应的任务类型
@@ -54,6 +57,7 @@ const WORK_TYPE_TASKS = {
 	WorkType.HAULING: "STORE",
 	WorkType.RESEARCH: "RESEARCH",
 	WorkType.COMBAT: "COMBAT",
+	WorkType.HUNTING: "HUNTING",
 }
 
 # 资源类型到工作类型的映射（用于采集任务）
@@ -77,6 +81,7 @@ const ALL_WORK_TYPES = [
 	WorkType.HAULING,
 	WorkType.RESEARCH,
 	WorkType.COMBAT,
+	WorkType.HUNTING,
 ]
 
 # 优先级：0=不做, 1=最低, 2=低, 3=中, 4=最高
@@ -107,6 +112,7 @@ func _load_defaults_from_config() -> Dictionary:
 		WorkType.HAULING: game_config.hauling_priority,
 		WorkType.RESEARCH: game_config.research_priority,
 		WorkType.COMBAT: game_config.combat_priority,
+		WorkType.HUNTING: game_config.hunting_priority,
 	}
 
 # -------- 优先级管理 --------
@@ -195,6 +201,8 @@ func _task_to_work_type(task_type: String, resource_type: String = "") -> int:
 			return WorkType.RESEARCH
 		"COMBAT":
 			return WorkType.COMBAT
+		"HUNTING":
+			return WorkType.HUNTING
 		"HARVEST":
 			# 根据资源类型判断
 			if resource_type != "":

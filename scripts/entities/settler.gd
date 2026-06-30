@@ -205,6 +205,8 @@ func _process(delta):
 			_tick_sleep(delta)
 		SettlerState.EATING:
 			_tick_eat(delta)
+		SettlerState.COMBAT:
+			_tick_hunting(delta)
 
 # -------- 选中状态 --------
 func set_selected(selected: bool):
@@ -376,6 +378,7 @@ static func get_work_type_from_task(task_data: Dictionary) -> String:
 		"STORE": return "搬运"
 		"RESEARCH": return "研究"
 		"COMBAT": return "战斗"
+		"HUNTING": return "狩猎"
 		"EAT_FROM_RACK": return "进食"
 		"SLEEP": return "睡眠"
 		_: return ""
@@ -514,6 +517,9 @@ func _move_towards(delta):
 						_tick_haul_construct_fetch()
 					elif haul_phase == "deliver":
 						_tick_haul_construct()
+				"HUNTING":
+					# 到达狩猎区后切换到战斗状态，由 _tick_hunting 处理
+					set_state(SettlerState.COMBAT, true)
 				_:
 					set_state(SettlerState.WORKING, true)
 					_last_work_tick_time = Time.get_ticks_msec() / 1000.0
@@ -1567,6 +1573,51 @@ func _find_food_in_storage() -> Dictionary:
 	
 	return {}
 
+# -------- 狩猎系统 --------
+func _tick_hunting(_delta):
+	"""狩猎状态：追猎被标记的野猪并射箭"""
+	if current_task == null:
+		set_state(SettlerState.IDLE, true)
+		return
+	
+	var boar_inst_id = current_task.get("boar_instance_id", 0)
+	if boar_inst_id == 0:
+		complete_task()
+		return
+	
+	# 通过实例ID查找野猪
+	var boar = instance_from_id(boar_inst_id) if boar_inst_id else null
+	if boar == null or not is_instance_valid(boar) or boar.state == boar.BoarState.DEAD:
+		# 野猪已死亡，清理标记并完成任务
+		var game = get_node_or_null("/root/Game")
+		if game:
+			game.designated_boars.erase(boar_inst_id)
+		complete_task()
+		return
+	
+	# 检查是否有弓箭
+	if not has_ranged_weapon():
+		# 没有弓箭了，放弃狩猎
+		complete_task()
+		return
+	
+	# 检查距离——在射程内则射箭
+	var dist = position.distance_to(boar.position)
+	if dist <= ARROW_RANGE:
+		# 面向野猪
+		var dir = boar.position - position
+		if dir.length_squared() > 0:
+			facing_direction = dir.normalized()
+		# 射箭
+		shoot_at(boar)
+	else:
+		# 距离太远：如果野猪在 1.5 格外才追，避免微移循环
+		var min_chase_dist = ARROW_RANGE * 1.5
+		if dist > min_chase_dist:
+			move_to(boar.position)
+			current_task["target_world_pos"] = boar.position
+		# 若在 1~1.5 倍射程之间，原地等待野猪靠近或下一帧继续判断
+
 # 姓氏池（100个）
 const SURNAMES = [
 	"李", "王", "张", "刘", "陈", "杨", "赵", "黄", "周", "吴",
@@ -1825,6 +1876,65 @@ func die():
 	if game:
 		game.settlers.erase(self)
 	queue_free()
+
+# -------- 战斗系统（远程弓箭） --------
+var _last_arrow_shot_time: float = 0.0
+const ARROW_COOLDOWN: float = 2.0  # 射速2秒每发
+const ARROW_DAMAGE: float = 5.0
+const ARROW_RANGE: float = 3.0 * 32.0  # 3格 = 96像素
+const ARROW_MELEE_DAMAGE: float = 2.0
+const ARROW_MELEE_COOLDOWN: float = 2.0
+
+func has_bow() -> bool:
+	"""检查是否持有弓"""
+	return inventory.has_item("bow", 1)
+
+func has_arrow() -> bool:
+	"""检查是否有箭矢"""
+	return inventory.has_item("arrow", 1)
+
+func shoot_at(target_node: Node2D) -> bool:
+	"""向目标发射箭矢，返回是否成功发射"""
+	if not has_bow() or not has_arrow():
+		return false
+	
+	var now = Time.get_ticks_msec() / 1000.0
+	if now - _last_arrow_shot_time < ARROW_COOLDOWN:
+		return false
+	
+	# 检查距离（3格射程）
+	var dist = position.distance_to(target_node.position)
+	if dist > ARROW_RANGE:
+		return false
+	
+	# 消耗箭矢
+	inventory.remove_item("arrow", 1)
+	_last_arrow_shot_time = now
+	
+	# 创建箭矢投射物
+	var game = get_node_or_null("/root/Game")
+	if game:
+		var arrow = load("res://scripts/entities/arrow_projectile.gd").new()
+		arrow.init(position, target_node, ARROW_DAMAGE)
+		arrow.shooter = self
+		game.call_deferred("add_child", arrow)
+	
+	# 射箭时面朝目标
+	var dir = target_node.position - position
+	if dir.length_squared() > 0:
+		facing_direction = dir.normalized()
+	
+	return true
+
+func has_ranged_weapon() -> bool:
+	"""是否有远程武器（弓）"""
+	return has_bow() and has_arrow()
+
+# -------- 自动回血 --------
+func apply_passive_heal(delta_hours: float):
+	"""每小时恢复5点HP"""
+	if hp < max_hp:
+		heal(5.0 * delta_hours)
 
 # -------- 序列化 --------
 func to_dict() -> Dictionary:
