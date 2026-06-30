@@ -5,7 +5,7 @@ class_name BuildMenu
 
 const ItemDefinitions = preload("res://resources/item_definitions.gd")
 
-@onready var building_list: VBoxContainer = $ScrollContainer/BuildingList
+@onready var building_list: GridContainer = $ScrollContainer/BuildingList
 @onready var category_tabs: HBoxContainer = $CategoryTabs
 @onready var info_panel: Panel = $InfoPanel
 @onready var info_name: Label = $InfoPanel/Name
@@ -42,6 +42,38 @@ var _category_names = {
 	ItemDefinitions.BuildingCategory.INFRASTRUCTURE: "基础设施",
 	ItemDefinitions.BuildingCategory.RESEARCH: "研究",
 	ItemDefinitions.BuildingCategory.FURNITURE: "家具",
+}
+
+var _category_emoji = {
+	ItemDefinitions.BuildingCategory.STORAGE: "📦",
+	ItemDefinitions.BuildingCategory.PRODUCTION: "⚙️",
+	ItemDefinitions.BuildingCategory.EXTRACTION: "⛏️",
+	ItemDefinitions.BuildingCategory.DEFENSE: "🛡️",
+	ItemDefinitions.BuildingCategory.RESIDENTIAL: "🏠",
+	ItemDefinitions.BuildingCategory.INFRASTRUCTURE: "🛤️",
+	ItemDefinitions.BuildingCategory.RESEARCH: "🔬",
+	ItemDefinitions.BuildingCategory.FURNITURE: "🪑",
+}
+
+# 建筑对应的 Emoji 图标
+const BUILDING_EMOJI = {
+	"woodcutter_hut": "🌲",
+	"stone_quarry": "🪨",
+	"iron_mine": "⛏️",
+	"workbench": "🔧",
+	"furnace": "🔥",
+	"cooking_stove": "🍳",
+	"sawmill": "🪚",
+	"kiln": "🔥",
+	"storage_rack": "📦",
+	"warehouse": "🏢",
+	"tent": "⛺",
+	"house": "🏠",
+	"campfire": "🔥",
+	"road": "🛤️",
+	"wall": "🧱",
+	"wooden_bed": "🛏️",
+	"research_table": "🔬",
 }
 
 func _ready():
@@ -95,7 +127,8 @@ func _populate_categories():
 	for i in range(_categories_list.size()):
 		var cat = _categories_list[i]
 		var btn = Button.new()
-		btn.text = "%d.%s" % [i + 1, _category_names.get(cat, "其他")]
+		var emoji = _category_emoji.get(cat, "📌")
+		btn.text = "%d.%s %s" % [i + 1, emoji, _category_names.get(cat, "其他")]
 		btn.toggle_mode = true
 		btn.pressed.connect(_on_category_selected.bind(cat))
 		category_tabs.add_child(btn)
@@ -124,7 +157,8 @@ func _populate_buildings():
 		if shortcut_index < 9:
 			shortcut_label = "%d. " % (shortcut_index + 1)
 			building_shortcut_map[shortcut_index] = bld_id
-		btn.text = shortcut_label + data.name
+		var emoji = BUILDING_EMOJI.get(bld_id, "📐")
+		btn.text = shortcut_label + emoji + " " + data.name
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.pressed.connect(_on_building_selected.bind(bld_id))
 		building_list.add_child(btn)

@@ -168,6 +168,7 @@ layout_mode = 2
 text = "菜单"
 
 [node name="SettlerInfoPanel" type="Panel" parent="UI/HUD" unique_id=574386277]
+visible = false
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
@@ -219,6 +220,7 @@ layout_mode = 2
 layout_mode = 2
 
 [node name="StoragePanel" type="Panel" parent="UI/HUD" unique_id=1748318168]
+visible = false
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
@@ -298,18 +300,20 @@ layout_mode = 2
 
 [node name="BuildingInfoPanel" type="Panel" parent="UI/HUD" unique_id=1432108525]
 visible = false
-offset_left = 8.0
-offset_top = 400.0
-offset_right = 260.0
-offset_bottom = 580.0
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -500.0
+offset_right = 300.0
+grow_vertical = 0
 theme_override_styles/panel = SubResource("2")
 
 [node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/BuildingInfoPanel" unique_id=521093744]
 layout_mode = 0
 offset_left = 4.0
 offset_top = 4.0
-offset_right = 248.0
-offset_bottom = 176.0
+offset_right = 196.0
+offset_bottom = 296.0
 
 [node name="VBox" type="VBoxContainer" parent="UI/HUD/BuildingInfoPanel/ScrollContainer" unique_id=1928493603]
 layout_mode = 2
@@ -344,10 +348,10 @@ layout_mode = 2
 
 [node name="ResourcePanel" type="Panel" parent="UI/HUD" unique_id=219414468]
 visible = false
-offset_left = 8.0
-offset_top = 400.0
-offset_right = 260.0
-offset_bottom = 520.0
+offset_left = 6.0
+offset_top = 477.0
+offset_right = 258.0
+offset_bottom = 713.0
 theme_override_styles/panel = SubResource("2")
 
 [node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/ResourcePanel" unique_id=1078830668]
@@ -375,37 +379,43 @@ theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
 text = "总量: 0"
 
 [node name="BuildMenu" type="Panel" parent="UI" unique_id=1575822565]
-offset_left = 8.0
-offset_top = 60.0
-offset_right = 300.0
-offset_bottom = 600.0
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -507.0
+offset_right = 880.0
+offset_bottom = -15.0
+grow_vertical = 0
 theme_override_styles/panel = SubResource("1")
 script = ExtResource("8_17ot")
+metadata/_edit_group_ = true
 
 [node name="CategoryTabs" type="HBoxContainer" parent="UI/BuildMenu" unique_id=1313390395]
 layout_mode = 0
 offset_left = 8.0
 offset_top = 8.0
-offset_right = 284.0
+offset_right = 851.0
 offset_bottom = 36.0
 
 [node name="ScrollContainer" type="ScrollContainer" parent="UI/BuildMenu" unique_id=771658116]
 layout_mode = 0
 offset_left = 8.0
 offset_top = 44.0
-offset_right = 284.0
-offset_bottom = 300.0
+offset_right = 851.0
+offset_bottom = 260.0
 
-[node name="BuildingList" type="VBoxContainer" parent="UI/BuildMenu/ScrollContainer" unique_id=619936079]
+[node name="BuildingList" type="GridContainer" parent="UI/BuildMenu/ScrollContainer" unique_id=619936079]
 layout_mode = 2
 size_flags_horizontal = 3
+columns = 3
 
 [node name="InfoPanel" type="Panel" parent="UI/BuildMenu" unique_id=1022902918]
 layout_mode = 0
-offset_left = 8.0
-offset_top = 308.0
-offset_right = 284.0
-offset_bottom = 530.0
+offset_left = 5.0
+offset_top = 267.0
+offset_right = 851.0
+offset_bottom = 489.0
 theme_override_styles/panel = SubResource("2")
 
 [node name="Name" type="Label" parent="UI/BuildMenu/InfoPanel" unique_id=238635072]
@@ -432,15 +442,15 @@ layout_mode = 0
 offset_left = 8.0
 offset_top = 68.0
 offset_right = 268.0
-offset_bottom = 120.0
+offset_bottom = 213.0
 size_flags_horizontal = 3
 
 [node name="TechPanel" type="Panel" parent="UI" unique_id=1011689373]
 visible = false
-offset_left = 320.0
-offset_top = 60.0
-offset_right = 760.0
-offset_bottom = 600.0
+offset_left = 4.0
+offset_top = 169.0
+offset_right = 444.0
+offset_bottom = 709.0
 script = ExtResource("9_3h2wo")
 
 [node name="CloseBtn" type="Button" parent="UI/TechPanel" unique_id=659763677]
@@ -489,10 +499,17 @@ layout_mode = 2
 
 [node name="WorkPanel" type="Panel" parent="UI" unique_id=567230329]
 visible = false
-offset_left = 40.0
-offset_top = 60.0
-offset_right = 940.0
-offset_bottom = 660.0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -450.0
+offset_top = -300.0
+offset_right = 450.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("12_0k7l")
 
 [node name="TitleBar" type="HBoxContainer" parent="UI/WorkPanel" unique_id=900230771]
