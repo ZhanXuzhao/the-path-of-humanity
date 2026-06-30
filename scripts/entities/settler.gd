@@ -177,7 +177,6 @@ func _process(delta):
 	
 	match state:
 		SettlerState.IDLE:
-			# 检查是否站在不可行走的地形上（如加载旧存档等导致）
 			var _game = get_node_or_null("/root/Game")
 			if _game and _game.world:
 				var _grid = Vector2i(
@@ -185,8 +184,23 @@ func _process(delta):
 					int(position.y / _game.world.tile_size)
 				)
 				if not _game.world.is_walkable(_grid):
-					# 站在水上，尝试向随机方向移动离开
 					_move_away_from_water(_game)
+					return
+			
+			# 自主行为：进食优先
+			if needs.get("hunger", 100) < 25:
+				try_eat()
+				return
+			
+			# 自主行为：0点-6点为固定睡眠时间（无紧急事件时）
+			var _gm = get_node("/root/GameManager")
+			if _gm and _gm.game_time < 6.0 and needs.get("rest", 100) < 95:
+				var home = find_nearest_residential()
+				if not home.is_empty():
+					try_sleep(home.pos, home.world_pos)
+					return
+				# 没有住所也尝试原地休息
+				try_sleep(Vector2i.ZERO, position)
 		SettlerState.MOVING:
 			_move_towards(delta)
 		SettlerState.WORKING:
