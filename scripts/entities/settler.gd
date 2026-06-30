@@ -1643,6 +1643,7 @@ func to_dict() -> Dictionary:
 
 func from_dict(data: Dictionary):
 	settler_id = data.id
+	settler_name = data.get("name", "")
 	gender = data.get("gender", Gender.MALE)
 	stats = data.stats
 	skills = data.skills
