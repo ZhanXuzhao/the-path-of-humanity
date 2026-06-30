@@ -115,6 +115,9 @@ var is_selected: bool = false
 # 角色下方状态显示的字体缓存
 var _status_font: Font = null
 
+# 被分配到的床铺网格位置（-1表示无床）
+var assigned_bed_pos: Vector2i = Vector2i(-1, -1)
+
 # 年龄和寿命
 var age: float
 var lifespan: float = 80.0
@@ -1340,10 +1343,16 @@ func _tick_sleep(delta):
 			complete_task()
 
 func find_nearest_residential() -> Dictionary:
-	"""查找最近的居住建筑（帐篷/房屋），返回{pos, world_pos}"""
+	"""查找最近的居住建筑（优先使用自己的床，其次帐篷/房屋），返回{pos, world_pos}"""
 	var game = get_node_or_null("/root/Game")
 	if game == null or game.building_system == null:
 		return {}
+	
+	# 1. 优先使用自己分配到的床
+	if assigned_bed_pos.x >= 0:
+		var bed_bld = game.building_system.get_building_at(assigned_bed_pos)
+		if bed_bld != null and bed_bld.is_completed and bed_bld.building_id == "wooden_bed":
+			return {"pos": bed_bld.grid_pos, "world_pos": _bld_world_center(bed_bld)}
 	
 	var residential_ids = ["tent", "house"]
 	var best = null
@@ -1697,6 +1706,8 @@ func to_dict() -> Dictionary:
 		"position": {"x": position.x, "y": position.y},
 		"state": state,
 		"inventory": inventory.to_dict(),
+		"assigned_bed_pos_x": assigned_bed_pos.x,
+		"assigned_bed_pos_y": assigned_bed_pos.y,
 	}
 
 func from_dict(data: Dictionary):
@@ -1712,6 +1723,10 @@ func from_dict(data: Dictionary):
 	position = Vector2(data.get("position", {}).get("x", 0.0), data.get("position", {}).get("y", 0.0))
 	state = data.get("state", SettlerState.IDLE)
 	inventory.from_dict(data.inventory)
+	assigned_bed_pos = Vector2i(
+		data.get("assigned_bed_pos_x", -1),
+		data.get("assigned_bed_pos_y", -1)
+	)
 	# 反序列化后更新角色贴图和缩放
 	if settler_sprite:
 		settler_sprite.texture = _pick_character_texture()

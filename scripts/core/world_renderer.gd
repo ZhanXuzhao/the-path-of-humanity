@@ -32,6 +32,9 @@ var ground_item_sprites: Dictionary = {}  # Vector2i -> Sprite2D
 
 # 建造进度条
 var construction_overlays: Dictionary = {}  # Vector2i(建筑主格) -> Node2D(进度条容器)
+
+# 床铺分配姓名标签 {建筑主格: Label}
+var _bed_name_labels: Dictionary = {}
 var PROGRESS_BAR_HEIGHT: float = 6.0
 
 # 选中框
@@ -212,6 +215,10 @@ func _render_building(pos: Vector2i, building_id: String):
 	if bld_instance != null and not bld_instance.is_completed:
 		sprite.modulate = Color(1, 1, 1, 0.45)
 		_create_construction_overlay(bld_instance.grid_pos, data, bld_instance.construction_progress)
+	
+	# 如果已完成且是床铺，显示分配的定居者姓名标签
+	if bld_instance != null and bld_instance.is_completed and bld_instance.building_id == "wooden_bed":
+		_update_bed_name_label(bld_instance)
 
 func _on_tile_changed(pos: Vector2i, tile_type: int):
 	"""瓦片变化时更新渲染"""
@@ -227,8 +234,9 @@ func _on_building_placed(building_id: String, pos: Vector2i):
 	_render_building(pos, building_id)
 
 func _on_building_removed(building_id: String, pos: Vector2i):
-	"""建筑移除时清除精灵和进度条"""
+	"""建筑移除时清除精灵、进度条和床铺姓名标签"""
 	_remove_construction_overlay(pos)
+	_remove_bed_name_label(pos)
 	var data = _ID.get_building(building_id)
 	var size = data.size if data else Vector2i.ONE
 	for x in size.x:
@@ -653,7 +661,7 @@ func _on_ground_items_changed(grid_pos: Vector2i):
 
 # -------- 信号处理 --------
 func _on_building_completed(pos: Vector2i):
-	"""建筑完成时：移除进度条、恢复不透明"""
+	"""建筑完成时：移除进度条、恢复不透明，如果是床则更新姓名标签"""
 	_remove_construction_overlay(pos)
 	
 	# 恢复该建筑所有格子的精灵为不透明
@@ -666,6 +674,47 @@ func _on_building_completed(pos: Vector2i):
 				var grid_pos = bld.grid_pos + Vector2i(x, y)
 				if building_sprites.has(grid_pos):
 					building_sprites[grid_pos].modulate = Color(1, 1, 1, 1)
+		
+		# 如果是床，显示分配的定居者姓名
+		if bld.building_id == "wooden_bed":
+			_update_bed_name_label(bld)
+
+func _update_bed_name_label(bld):
+	"""在床铺下方显示分配的定居者姓名"""
+	var bld_pos = bld.grid_pos
+	
+	# 先移除旧标签
+	if _bed_name_labels.has(bld_pos):
+		if is_instance_valid(_bed_name_labels[bld_pos]):
+			_bed_name_labels[bld_pos].queue_free()
+		_bed_name_labels.erase(bld_pos)
+	
+	if bld.assigned_settler_name == "":
+		return
+	
+	# 创建姓名标签
+	var label = Label.new()
+	label.text = bld.assigned_settler_name
+	label.add_theme_color_override("font_color", Color(0.8, 0.9, 1.0))
+	label.add_theme_constant_override("minimum_font_size", 10)
+	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	
+	var size = bld.get_size()
+	var center_x = bld_pos.x * world.tile_size + size.x * world.tile_size / 2.0
+	var label_y = bld_pos.y * world.tile_size + size.y * world.tile_size + 2.0
+	label.position = Vector2(center_x - 50.0, label_y)  # 预留100px宽度居中
+	label.size = Vector2(100, 16)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.z_index = 15  # 在建筑和进度条之上
+	add_child(label)
+	_bed_name_labels[bld_pos] = label
+
+func _remove_bed_name_label(bld_pos: Vector2i):
+	"""移除床铺姓名标签"""
+	if _bed_name_labels.has(bld_pos):
+		if is_instance_valid(_bed_name_labels[bld_pos]):
+			_bed_name_labels[bld_pos].queue_free()
+		_bed_name_labels.erase(bld_pos)
 
 func _on_construction_progress_updated(pos: Vector2i, progress: float, work_cost: float):
 	"""建造进度更新时刷新进度条"""
@@ -687,6 +736,12 @@ func clear_all():
 	for key in construction_overlays:
 		construction_overlays[key].overlay.queue_free()
 	construction_overlays.clear()
+	
+	# 清除床铺姓名标签
+	for key in _bed_name_labels:
+		if is_instance_valid(_bed_name_labels[key]):
+			_bed_name_labels[key].queue_free()
+	_bed_name_labels.clear()
 	
 	# 清除选中框
 	_selected_building_pos = Vector2i(-1, -1)

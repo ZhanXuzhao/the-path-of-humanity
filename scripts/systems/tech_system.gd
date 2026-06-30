@@ -106,11 +106,11 @@ func _complete_research(project: ResearchProject):
 func is_tech_researched(tech_id: String) -> bool:
 	return researched_techs.has(tech_id)
 
-func is_building_unlocked(building_id: String) -> bool:
-	return unlocked_buildings.has(building_id)
+func is_building_unlocked(_building_id: String) -> bool:
+	return true  # 无需研究，所有建筑直接可用
 
-func is_recipe_unlocked(recipe_id: String) -> bool:
-	return unlocked_recipes.has(recipe_id)
+func is_recipe_unlocked(_recipe_id: String) -> bool:
+	return true  # 无需研究，所有配方直接可用
 
 func can_research(tech_id: String) -> Dictionary:
 	"""检查是否可以研究某项科技"""

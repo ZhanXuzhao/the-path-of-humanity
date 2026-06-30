@@ -25,6 +25,8 @@ class BuildingInstance:
 	var assigned_settlers: Array[String] = []  # settler IDs
 	var deposited_materials: Dictionary = {}  # 已搬运到工地的建筑材料 {item_id: amount}
 	var display_name: String = ""  # 显示名称（带编号，如"储物架 1"）
+	var assigned_settler_id: String = ""  # 分配给谁的床（木床专用）
+	var assigned_settler_name: String = ""  # 分配对象的姓名缓存
 	
 	func get_data():
 		return ItemDefinitions.get_building(building_id)
@@ -92,6 +94,9 @@ var world = null
 
 # 存储建筑编号计数器
 var _storage_rack_counter: int = 0
+
+# 已完成床铺索引 {grid_pos: BuildingInstance}，用于快速查找有床位的建筑
+var _completed_bed_index: Dictionary = {}
 
 # 已完成存储建筑索引（按 grid_pos 索引，方便快速查找和移除）
 var _completed_storage_index: Dictionary = {}  # Vector2i -> BuildingInstance
@@ -186,6 +191,10 @@ func add_construction_progress(pos: Vector2i, amount: float) -> bool:
 		# 如果是存储建筑，加入索引
 		if data.storage_capacity > 0:
 			_completed_storage_index[bld.grid_pos] = bld
+		# 如果是床铺建筑，加入床铺索引并自动分配
+		if bld.building_id == "wooden_bed":
+			_completed_bed_index[bld.grid_pos] = bld
+			_assign_bed_to_settler(bld)
 		building_completed.emit(bld.grid_pos)
 		return true
 	return false
@@ -193,6 +202,64 @@ func add_construction_progress(pos: Vector2i, amount: float) -> bool:
 func is_completed(pos: Vector2i) -> bool:
 	var bld = get_building_at(pos)
 	return bld != null and bld.is_completed
+
+# -------- 床铺分配 --------
+func _assign_bed_to_settler(bed_bld):
+	"""自动将此床分配给一个没有床的定居者"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.settlers.is_empty():
+		return
+	
+	# 获取所有已有床的定居者 ID
+	var settled_ids: Dictionary = {}
+	for pos in _completed_bed_index:
+		var other_bed = _completed_bed_index[pos]
+		if other_bed != bed_bld and other_bed.assigned_settler_id != "":
+			settled_ids[other_bed.assigned_settler_id] = true
+	
+	# 找第一个没有床的定居者
+	for s in game.settlers:
+		if not is_instance_valid(s):
+			continue
+		if settled_ids.has(s.settler_id):
+			continue  # 已有床
+		# 分配此床给该定居者
+		bed_bld.assigned_settler_id = s.settler_id
+		bed_bld.assigned_settler_name = s.settler_name
+		# 通知定居者他有床了（可选，用于后续AI优先使用自己的床）
+		s.assigned_bed_pos = bed_bld.grid_pos
+		# 提示
+		var gm = get_node("/root/GameManager")
+		if gm:
+			gm.show_notification("%s 被分配到了木床" % s.settler_name, gm.NotificationType.INFO)
+		return
+	
+	# 所有定居者都有床了，不做分配
+	print("所有定居者已有床铺，木床暂未分配")
+
+func get_beds_without_assignment() -> Array:
+	"""获取所有未分配的床"""
+	var result: Array = []
+	for pos in _completed_bed_index:
+		var bld = _completed_bed_index[pos]
+		if bld.assigned_settler_id == "":
+			result.append(bld)
+	return result
+
+func get_bed_for_settler(settler_id: String):
+	"""获取指定定居者被分配到的床"""
+	for pos in _completed_bed_index:
+		var bld = _completed_bed_index[pos]
+		if bld.assigned_settler_id == settler_id:
+			return bld
+	return null
+
+func get_all_beds() -> Array:
+	"""获取所有已完成的床"""
+	var result: Array = []
+	for pos in _completed_bed_index:
+		result.append(_completed_bed_index[pos])
+	return result
 
 # -------- 建筑运行 --------
 func process_buildings(delta: float):
@@ -336,6 +403,16 @@ func remove_building(pos: Vector2i) -> bool:
 	# 从存储建筑索引中移除
 	_completed_storage_index.erase(bld.grid_pos)
 	
+	# 从床铺索引中移除，并释放定居者的床分配
+	if _completed_bed_index.has(bld.grid_pos):
+		_completed_bed_index.erase(bld.grid_pos)
+		if bld.assigned_settler_id != "":
+			var game = get_node_or_null("/root/Game")
+			if game:
+				var settler = game.get_settler_by_id(bld.assigned_settler_id)
+				if settler and is_instance_valid(settler):
+					settler.assigned_bed_pos = Vector2i(-1, -1)
+	
 	# 清除所有占用格子
 	for x in size.x:
 		for y in size.y:
@@ -364,7 +441,9 @@ func to_dict() -> Dictionary:
 				"completed": bld.is_completed,
 				"prod_timer": bld.production_timer,
 				"inventory": bld.inventory.to_dict() if bld.inventory else null,
-				"deposited_materials": bld.deposited_materials.duplicate()
+				"deposited_materials": bld.deposited_materials.duplicate(),
+				"assigned_settler_id": bld.assigned_settler_id,
+				"assigned_settler_name": bld.assigned_settler_name
 			}
 	return data
 
@@ -382,6 +461,10 @@ func from_dict(data: Dictionary):
 		bld.production_timer = b_data.prod_timer
 		if b_data.has("deposited_materials"):
 			bld.deposited_materials = b_data.deposited_materials.duplicate()
+		if b_data.has("assigned_settler_id"):
+			bld.assigned_settler_id = b_data.assigned_settler_id
+			bld.assigned_settler_name = b_data.get("assigned_settler_name", "")
+		
 		if b_data.inventory != null and bld.inventory != null:
 			bld.inventory.from_dict(b_data.inventory)
 		
@@ -391,8 +474,11 @@ func from_dict(data: Dictionary):
 			for y in size.y:
 				buildings[pos + Vector2i(x, y)] = bld
 		
-		# 重建存储建筑索引
+		# 重建索引
 		if bld.is_completed:
 			var bld_data = bld.get_data()
-			if bld_data and bld_data.storage_capacity > 0:
-				_completed_storage_index[bld.grid_pos] = bld
+			if bld_data:
+				if bld_data.storage_capacity > 0:
+					_completed_storage_index[bld.grid_pos] = bld
+				if bld.building_id == "wooden_bed":
+					_completed_bed_index[bld.grid_pos] = bld

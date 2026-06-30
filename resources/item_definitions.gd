@@ -157,6 +157,9 @@ static func _register_buildings():
 	_add_building("road", "道路", "提高移动速度", BuildingCategory.INFRASTRUCTURE, Vector2i(1, 1), 40, 3.0, {"stone": 2}, {}, {}, 0.0, 0, 13)
 	_add_building("wall", "墙壁", "防御工事", BuildingCategory.DEFENSE, Vector2i(1, 1), 300, 10.0, {"stone": 5, "wood": 2}, {}, {}, 0.0, 0, 14)
 
+	# 家具类
+	_add_building("wooden_bed", "木床", "一张舒适的木板床，可供一名定居者睡眠", BuildingCategory.FURNITURE, Vector2i(2, 1), 80, 20.0, {"wood": 10}, {}, {}, 0.0, 0, 16)
+
 	# 研究类
 	_add_building("research_table", "研究台", "进行科技研究", BuildingCategory.RESEARCH, Vector2i(2, 2), 100, 30.0, {"wood": 20, "plank": 10}, {}, {}, 0.0, 0, 15)
 
@@ -188,7 +191,7 @@ static func _register_techs():
 	_add_tech("construction", "建筑构造", "解锁基础建筑", {"wood": 20, "stone": 15}, 45.0, ["primitive_tools"], ["tent", "campfire", "storage_rack", "workbench"], "基础")
 	_add_tech("metalworking", "金属加工", "掌握熔炼技术", {"stone": 20, "wood": 15}, 60.0, ["construction"], ["furnace", "iron_ingot", "copper_ingot", "iron_mine"], "工业")
 	_add_tech("cooking", "烹饪技术", "学会烹饪食物", {"wood": 10, "berry": 15}, 30.0, ["construction"], ["cooking_stove", "cooked_meat", "vegetable_soup"], "基础")
-	_add_tech("woodworking", "木工技术", "高级木材加工", {"wood": 30, "plank": 10}, 45.0, ["construction"], ["sawmill", "plank_sawmill", "house"], "工业")
+	_add_tech("woodworking", "木工技术", "高级木材加工", {"wood": 30, "plank": 10}, 45.0, ["construction"], ["sawmill", "plank_sawmill", "house", "wooden_bed"], "工业")
 	_add_tech("masonry", "石工技术", "掌握石材加工", {"stone": 30, "brick": 10}, 45.0, ["construction"], ["kiln", "brick", "wall", "warehouse"], "工业")
 	_add_tech("advanced_metal", "高级冶金", "炼钢技术", {"iron_ingot": 20, "coal": 20}, 90.0, ["metalworking"], ["steel_ingot"], "工业")
 	_add_tech("science", "科学研究", "开展科学研究", {"wood": 20, "stone": 15}, 60.0, ["construction"], ["research_table"], "科学")
