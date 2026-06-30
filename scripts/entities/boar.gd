@@ -39,6 +39,7 @@ var _wait_timer: float = 0.0
 
 # 精灵
 var _sprite: Sprite2D
+var _base_sprite_scale: float = 1.0
 
 # 选中状态
 var is_selected: bool = false
@@ -68,6 +69,7 @@ func _setup_sprite():
 		_sprite.texture = tex
 		var tex_size = tex.get_size()
 		var scale_factor = TILE_SIZE / max(tex_size.x, tex_size.y)
+		_base_sprite_scale = scale_factor
 		_sprite.scale = Vector2(scale_factor, scale_factor)
 	_sprite.z_index = 2
 	add_child(_sprite)
@@ -159,6 +161,10 @@ func _process(delta):
 		energy = max(0.0, energy - 2.0 * delta_hours)
 	
 	# ----- AI 决策 -----
+	# 每帧根据水平朝向翻转精灵（放在match之前，避免被早期return跳过）
+	if _sprite:
+		_sprite.scale.x = -_base_sprite_scale if facing_direction.x < 0 else _base_sprite_scale
+	
 	match state:
 		BoarState.IDLE:
 			_wait_timer -= delta
@@ -171,15 +177,15 @@ func _process(delta):
 					_pick_wander_target()
 		
 		BoarState.WANDERING:
-			if _move_towards(delta, game):
-				return
+			if not _move_towards(delta, game):
+				return  # 还在移动中
 			# 到达目标，进入IDLE一会
 			state = BoarState.IDLE
 			_wait_timer = randf_range(1.0, 4.0)
 		
 		BoarState.MOVING_TO_FOOD:
-			if _move_towards(delta, game):
-				return
+			if not _move_towards(delta, game):
+				return  # 还在移动中
 			# 到达食物位置
 			if hunger < 60.0:
 				_eat_food()
@@ -197,6 +203,8 @@ func _process(delta):
 		BoarState.SLEEPING:
 			energy = min(100.0, energy + 30.0 * delta_hours)
 			if energy >= 90.0 or (not is_night and energy > 50.0):
+				if _sprite:
+					_sprite.rotation = 0.0
 				state = BoarState.IDLE
 				_wait_timer = randf_range(1.0, 3.0)
 		
@@ -418,7 +426,7 @@ func _grid_to_world(grid: Vector2i) -> Vector2:
 		grid.y * TILE_SIZE + TILE_SIZE / 2.0
 	)
 
-var facing_direction: Vector2 = Vector2.LEFT
+var facing_direction: Vector2 = Vector2.RIGHT
 
 func _move_towards(delta, game) -> bool:
 	"""向目标移动，返回是否已到达"""
