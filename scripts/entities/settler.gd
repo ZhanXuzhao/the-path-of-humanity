@@ -228,28 +228,31 @@ func _draw_status_below():
 	
 	var font_size = 11
 	
-	# ===== HP 条 =====
+	# 条状共用尺寸
 	var bar_width = TILE_SIZE * 0.8
 	var bar_height = 3.0
 	var bar_x = -bar_width / 2.0
-	var bar_y = TILE_SIZE / 2.0 + 2.0  # 精灵底部下方
 	
-	# 背景
-	draw_rect(Rect2(bar_x, bar_y, bar_width, bar_height), Color(0.15, 0.15, 0.15, 0.8))
-	
-	# HP填充
-	var hp_ratio = hp / max_hp if max_hp > 0 else 0.0
-	var hp_color = Color(0.3, 1.0, 0.3, 0.9)  # 绿色
-	if hp_ratio < 0.3:
-		hp_color = Color(1.0, 0.3, 0.3, 0.9)  # 红色
-	elif hp_ratio < 0.6:
-		hp_color = Color(1.0, 0.8, 0.2, 0.9)  # 黄色
-	if hp_ratio > 0.0:
-		draw_rect(Rect2(bar_x, bar_y, bar_width * hp_ratio, bar_height), hp_color)
+	# ===== HP 条（仅受伤时显示） =====
+	if hp < max_hp:
+		var bar_y = -TILE_SIZE / 2.0 - bar_height - 2.0  # 精灵上方
+		
+		# 背景
+		draw_rect(Rect2(bar_x, bar_y, bar_width, bar_height), Color(0.15, 0.15, 0.15, 0.8))
+		
+		# HP填充
+		var hp_ratio = hp / max_hp if max_hp > 0 else 0.0
+		var hp_color = Color(0.3, 1.0, 0.3, 0.9)  # 绿色
+		if hp_ratio < 0.3:
+			hp_color = Color(1.0, 0.3, 0.3, 0.9)  # 红色
+		elif hp_ratio < 0.6:
+			hp_color = Color(1.0, 0.8, 0.2, 0.9)  # 黄色
+		if hp_ratio > 0.0:
+			draw_rect(Rect2(bar_x, bar_y, bar_width * hp_ratio, bar_height), hp_color)
 	
 	# ===== 状态文字 =====
 	var state_text = get_state_display(state, current_task if current_task else {})
-	var text_y = bar_y + bar_height + 1.0
+	var text_y = TILE_SIZE / 2.0 + 2.0  # 精灵底部下方
 	var text_size = _status_font.get_string_size(state_text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
 	var text_pos = Vector2(-text_size.x / 2.0, text_y + text_size.y)
 	
