@@ -1800,25 +1800,25 @@ func assign_task(task_data: Dictionary) -> bool:
 		var game = get_node_or_null("/root/Game")
 		if game and game.world:
 			var ts = game.world.tile_size
-			# 采集任务：站在资源旁边的可行走格子上，隔一格采集
-			if task_data.get("type") == "HARVEST":
-				var resource_grid = task_data.get("target_pos", Vector2i.ZERO)
-				var stand_grid = _find_adjacent_walkable(resource_grid, game.world)
+			# 采集/建造任务：站在目标旁边的可行走格子上
+			if task_data.get("type") in ["HARVEST", "CONSTRUCT"]:
+				var target_grid = task_data.get("target_pos", Vector2i.ZERO)
+				var stand_grid = _find_adjacent_walkable(target_grid, game.world)
 				if stand_grid != Vector2i(-1, -1):
 					target_pixel = Vector2(
 						stand_grid.x * ts + ts / 2.0,
 						stand_grid.y * ts + ts / 2.0
 					)
-				elif not game.world.is_walkable(resource_grid):
-					LogUtil.debug(self, "资源格 %s 不可行走，无法采集" % resource_grid)
-					return false  # 资源格本身也不可行走，无法采集
+				elif not game.world.is_walkable(target_grid):
+					LogUtil.info(self, "目标格 %s 不可行走，无法执行任务" % target_grid)
+					return false  # 目标不可达，拒绝接受任务
 			else:
 				var target_grid = Vector2i(
 					int(target_pixel.x / ts),
 					int(target_pixel.y / ts)
 				)
 				if not game.world.is_walkable(target_grid):
-					LogUtil.debug(self, "目标格 %s 不可行走，无法执行任务" % target_grid)
+					LogUtil.info(self, "目标格 %s 不可行走，无法执行任务" % target_grid)
 					return false  # 目标不可达，拒绝接受任务
 	
 	current_task = task_data
