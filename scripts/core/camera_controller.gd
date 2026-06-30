@@ -38,8 +38,8 @@ func _input(event):
 		position -= delta * (1.0 / zoom.x)
 		drag_start = event.position
 	
-	# 滚轮缩放
-	if event is InputEventMouseButton:
+	# 滚轮缩放（鼠标在UI面板上时不触发）
+	if event is InputEventMouseButton and not _is_mouse_over_ui():
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			zoom_level = max(MIN_ZOOM, zoom_level - 0.2)
 			zoom = Vector2(zoom_level, zoom_level)
@@ -85,3 +85,22 @@ func focus_on(target_pos: Vector2, duration: float = 0.3):
 	_focus_tween.set_ease(Tween.EASE_OUT)
 	_focus_tween.set_trans(Tween.TRANS_CUBIC)
 	_focus_tween.tween_property(self, "position", target_pos, duration)
+
+func _is_mouse_over_ui() -> bool:
+	"""检查鼠标是否悬浮在任意可见 UI 控件上方"""
+	var mouse_pos = get_viewport().get_mouse_position()
+	var ui_layer = get_node_or_null("/root/Game/UI")
+	if not ui_layer:
+		return false
+	return _check_control_at_pos(ui_layer, mouse_pos)
+
+func _check_control_at_pos(node: Node, pos: Vector2) -> bool:
+	"""递归检查鼠标位置是否在某个可见 Control 的矩形区域内"""
+	for child in node.get_children():
+		if child is Control and child.is_visible_in_tree():
+			if child.get_global_rect().has_point(pos):
+				return true
+		if child.get_child_count() > 0:
+			if _check_control_at_pos(child, pos):
+				return true
+	return false

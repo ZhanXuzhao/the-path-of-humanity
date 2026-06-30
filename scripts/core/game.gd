@@ -505,6 +505,10 @@ func _input(event):
 		exit_build_mode()
 		return
 	
+	# 点击UI控件时不处理世界点击逻辑
+	if event.is_action_pressed("left_click") and _is_mouse_over_ui():
+		return
+	
 	if event.is_action_pressed("left_click") and build_mode:
 		_try_place_building()
 		return
@@ -1244,3 +1248,22 @@ func _cleanup_harvest_claims():
 	
 	for key in expired_keys:
 		_claimed_harvest_resources.erase(key)
+
+func _is_mouse_over_ui() -> bool:
+	"""检查鼠标是否悬浮在任意可见 UI 控件上方（点击UI时不触发世界操作）"""
+	var mouse_pos = get_viewport().get_mouse_position()
+	var ui_layer = get_node_or_null("UI")
+	if not ui_layer:
+		return false
+	return _check_control_at_pos(ui_layer, mouse_pos)
+
+func _check_control_at_pos(node: Node, pos: Vector2) -> bool:
+	"""递归检查鼠标位置是否在某个可见 Control 的矩形区域内"""
+	for child in node.get_children():
+		if child is Control and child.is_visible_in_tree():
+			if child.get_global_rect().has_point(pos):
+				return true
+		if child.get_child_count() > 0:
+			if _check_control_at_pos(child, pos):
+				return true
+	return false
