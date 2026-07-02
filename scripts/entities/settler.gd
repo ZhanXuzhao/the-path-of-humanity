@@ -1095,6 +1095,10 @@ func _tick_craft():
 			
 			# 检查是否完成
 			if job.progress >= recipe.work_time:
+				# 消耗输入材料
+				for in_id in recipe.inputs:
+					var in_amt = recipe.inputs[in_id]
+					inventory.remove_item(in_id, in_amt)
 				# 产出物品放入定居者背包
 				for out_id in recipe.outputs:
 					var out_amt = recipe.outputs[out_id]
