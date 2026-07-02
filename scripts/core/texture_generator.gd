@@ -65,6 +65,10 @@ static func _load_crops() -> Dictionary:
 	crops["wheat_seedling"] = _load_svg(RESOURCES_PATH + "wheat_seedling.svg")
 	# 小麦成熟
 	crops["wheat_mature"] = _load_svg(RESOURCES_PATH + "wheat_mature.svg")
+	# 杨树幼苗
+	crops["poplar_seedling"] = _load_svg(RESOURCES_PATH + "poplar_seedling.svg")
+	# 杨树成熟
+	crops["poplar_mature"] = _load_svg(RESOURCES_PATH + "poplar_mature.svg")
 
 	return crops
 
@@ -95,6 +99,7 @@ static func _load_buildings() -> Dictionary:
 	bld["road"]             = _load_svg(BUILDINGS_PATH + "road.svg")
 	bld["wooden_bed"]       = _load_svg(BUILDINGS_PATH + "wooden_bed.svg")
 	bld["wood_watchtower"]  = _load_svg(BUILDINGS_PATH + "wood_watchtower.svg")
+	bld["mill"]             = _load_svg(BUILDINGS_PATH + "mill.svg")
 	
 	return bld
 

@@ -126,6 +126,102 @@ func get_available_recipes(building_id: String, researched_techs: Array) -> Arra
 	
 	return available
 
+# -------- 连锁制作（自动补齐中间材料） --------
+func add_with_prerequisites(recipe_id: String, building_pos: Vector2i,
+		visited: Dictionary = {}) -> bool:
+	"""添加制作任务，自动补齐缺失的中间材料"""
+	if visited.is_empty():
+		visited = {}
+	if visited.has(recipe_id):
+		return false
+	visited[recipe_id] = true
+
+	var recipe = ItemDefinitions.get_recipe(recipe_id)
+	if recipe == null or recipe.id == "":
+		return false
+
+	for item_id in recipe.inputs:
+		var needed = recipe.inputs[item_id]
+		var available = _count_item_globally(item_id)
+
+		if available < needed:
+			var deficit = needed - available
+			var producers = _find_recipes_producing(item_id)
+			for producer in producers:
+				if visited.has(producer.id):
+					continue
+				var produced_per_run = producer.outputs.get(item_id, 0)
+				if produced_per_run <= 0:
+					continue
+
+				var runs = int(ceil(float(deficit) / produced_per_run))
+
+				var target_bld = _find_best_building_for_recipe(producer.id)
+				if target_bld == null:
+					continue
+
+				add_with_prerequisites(producer.id, target_bld.grid_pos, visited)
+
+				for i in range(runs):
+					add_to_queue(producer.id, target_bld.grid_pos)
+
+				break
+
+	add_to_queue(recipe_id, building_pos)
+	return true
+
+func _count_item_globally(item_id: String) -> int:
+	"""统计全地图某物品总数（存储建筑 + 地面 + 定居者背包）"""
+	var total = 0
+	var game = _get_game()
+	if game == null:
+		return 0
+
+	if game.building_system:
+		total += game.building_system.count_item_in_storage(item_id)
+
+	if game.world:
+		total += game.world.count_ground_item(item_id)
+
+	for s in game.settlers:
+		if is_instance_valid(s) and s.inventory:
+			total += s.inventory.get_item_count(item_id)
+
+	return total
+
+func _find_recipes_producing(item_id: String) -> Array:
+	"""查找所有能产出指定物品的配方"""
+	var result: Array = []
+	for r in ItemDefinitions.recipes.values():
+		if r.outputs.has(item_id) and r.outputs[item_id] > 0:
+			result.append(r)
+	return result
+
+func _find_best_building_for_recipe(recipe_id: String):
+	"""为指定配方找到最合适的已完成建筑（队列最短的）"""
+	var recipe = ItemDefinitions.get_recipe(recipe_id)
+	if recipe == null or recipe.id == "":
+		return null
+	var game = _get_game()
+	if game == null or game.building_system == null:
+		return null
+	var all_blds = game.building_system.get_buildings_by_type(recipe.crafted_at)
+	var best = null
+	var best_queue_len = 999999
+	for bld in all_blds:
+		if not bld.is_completed:
+			continue
+		var queue_len = 0
+		if crafting_queues.has(bld.grid_pos):
+			queue_len = crafting_queues[bld.grid_pos].size()
+		if queue_len < best_queue_len:
+			best_queue_len = queue_len
+			best = bld
+	return best
+
+func _get_game():
+	return Engine.get_main_loop().root.get_node_or_null("/root/Game")
+
 # -------- 序列化 --------
 func to_dict() -> Dictionary:
 	var data = {}

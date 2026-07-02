@@ -80,6 +80,7 @@ const BUILDING_EMOJI = {
 	"wood_watchtower": "🗼",
 	"wooden_bed": "🛏️",
 	"research_table": "🔬",
+	"mill": "🌾",
 }
 
 func _ready():

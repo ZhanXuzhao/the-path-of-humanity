@@ -55,6 +55,14 @@ func _register_crops():
 	wheat.emoji = "🌾"
 	available_crops[wheat.id] = wheat
 
+	var poplar = CropDef.new()
+	poplar.id = "poplar"
+	poplar.name = "杨树"
+	poplar.grow_time_hours = 40.0
+	poplar.harvest_item = "wood"
+	poplar.emoji = "🌳"
+	available_crops[poplar.id] = poplar
+
 func get_crop_def(crop_id: String) -> CropDef:
 	return available_crops.get(crop_id, null)
 

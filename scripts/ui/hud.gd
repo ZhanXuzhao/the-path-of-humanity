@@ -917,7 +917,7 @@ func _show_building_recipes(bld):
 		var bld_pos = bld.grid_pos
 		add_btn.pressed.connect(func():
 			if game and game.crafting_system:
-				game.crafting_system.add_to_queue(recipe_id, bld_pos)
+				game.crafting_system.add_with_prerequisites(recipe_id, bld_pos)
 				var gm = get_node("/root/GameManager")
 				if gm:
 					gm.show_notification("已添加制作: %s" % recipe.name, gm.NotificationType.INFO)

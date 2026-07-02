@@ -128,6 +128,7 @@ static func _register_items():
 	_add_item("vegetable_soup", "蔬菜汤", "营养丰富的蔬菜汤", ItemCategory.FOOD, 10, 0.5, 15, 25.0, 0.0, 5.0)
 	_add_item("rice", "水稻", "种植收获的水稻，可食用", ItemCategory.FOOD, 50, 0.2, 5, 8.0, 0.0, 1.0)
 	_add_item("wheat", "小麦", "种植收获的小麦，可磨粉或食用", ItemCategory.FOOD, 50, 0.2, 21, 7.0, 0.0, 1.0)
+	_add_item("flour", "面粉", "小麦磨成的面粉，可烤制成面包", ItemCategory.FOOD, 50, 0.2, 22, 5.0, 0.0, 1.5)
 
 	# 工具和设备
 	_add_item("stone_axe", "石斧", "用石头制作的简易斧头", ItemCategory.TOOL, 1, 2.0, 16, 0.0, 0.0, 8.0)
@@ -153,6 +154,7 @@ static func _register_buildings():
 	_add_building("cooking_stove", "灶台", "烹饪食物", BuildingCategory.PRODUCTION, Vector2i(1, 1), 60, 15.0, {"stone": 10, "wood": 5}, {}, {}, 0.0, 0, 5)
 	_add_building("sawmill", "锯木厂", "将原木加工成木板", BuildingCategory.PRODUCTION, Vector2i(2, 2), 120, 35.0, {"wood": 30, "stone": 15}, {}, {}, 0.0, 0, 6)
 	_add_building("kiln", "窑炉", "烧制砖块", BuildingCategory.PRODUCTION, Vector2i(2, 1), 130, 30.0, {"stone": 30, "wood": 10}, {}, {}, 0.0, 0, 7)
+	_add_building("mill", "磨坊", "将小麦磨成面粉", BuildingCategory.PRODUCTION, Vector2i(2, 1), 100, 25.0, {"stone": 20, "wood": 15}, {}, {}, 0.0, 0, 22)
 
 	# 存储类
 	_add_building("storage_rack", "储物架", "存储物品", BuildingCategory.STORAGE, Vector2i(1, 1), 50, 10.0, {"wood": 10}, {}, {}, 0.0, 1000, 8)
@@ -205,12 +207,18 @@ static func _register_recipes():
 	# 窑炉配方
 	_add_recipe("brick", "烧制砖块", "将石头烧制成砖块", {"stone": 2, "coal": 1}, {"brick": 2}, 4.0, "", "kiln")
 
+	# 磨坊配方
+	_add_recipe("mill_flour", "磨面粉", "将小麦磨成面粉", {"wheat": 3}, {"flour": 2}, 4.0, "", "mill")
+
+	# 灶台配方（面包）
+	_add_recipe("bake_bread", "烤面包", "用面粉烤制面包", {"flour": 2}, {"bread": 1}, 5.0, "", "cooking_stove")
+
 # -------- 注册科技 --------
 static func _register_techs():
 	_add_tech("primitive_tools", "原始工具", "掌握基本的工具制作", {"wood": 10, "stone": 10}, 30.0, [], ["stone_axe", "stone_pickaxe", "torch"], "基础")
 	_add_tech("construction", "建筑构造", "解锁基础建筑", {"wood": 20, "stone": 15}, 45.0, ["primitive_tools"], ["tent", "campfire", "storage_rack", "workbench", "wood_wall", "wood_door"], "基础")
 	_add_tech("metalworking", "金属加工", "掌握熔炼技术", {"stone": 20, "wood": 15}, 60.0, ["construction"], ["furnace", "iron_ingot", "copper_ingot", "iron_mine"], "工业")
-	_add_tech("cooking", "烹饪技术", "学会烹饪食物", {"wood": 10, "berry": 15}, 30.0, ["construction"], ["cooking_stove", "cooked_meat", "vegetable_soup"], "基础")
+	_add_tech("cooking", "烹饪技术", "学会烹饪食物和磨制面粉", {"wood": 10, "berry": 15}, 30.0, ["construction"], ["cooking_stove", "cooked_meat", "vegetable_soup", "mill", "mill_flour", "bake_bread"], "基础")
 	_add_tech("archery", "弓箭", "学会制作和使用弓箭", {"wood": 20, "stone": 10}, 40.0, ["primitive_tools"], ["bow", "arrow", "wood_watchtower"], "军事")
 	_add_tech("woodworking", "木工技术", "高级木材加工", {"wood": 30, "plank": 10}, 45.0, ["construction"], ["sawmill", "plank_sawmill", "house", "wooden_bed"], "工业")
 	_add_tech("masonry", "石工技术", "掌握石材加工", {"stone": 30, "brick": 10}, 45.0, ["construction"], ["kiln", "brick", "stone_wall", "stone_door", "warehouse"], "工业")
