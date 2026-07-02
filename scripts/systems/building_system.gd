@@ -470,6 +470,7 @@ func _destroy_building(bld):
 				world.remove_building_at(grid_pos)
 	
 	building_destroyed.emit(bld_id, bld_pos)
+	building_removed.emit(bld_id, bld_pos)  # 通知渲染器清理精灵
 	
 	# 通知游戏管理器
 	var gm = get_node("/root/GameManager")
