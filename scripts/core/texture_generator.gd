@@ -61,6 +61,10 @@ static func _load_crops() -> Dictionary:
 	crops["rice_seedling"] = _load_svg(RESOURCES_PATH + "rice_seedling.svg")
 	# 水稻成熟
 	crops["rice_mature"] = _load_svg(RESOURCES_PATH + "rice_mature.svg")
+	# 小麦幼苗
+	crops["wheat_seedling"] = _load_svg(RESOURCES_PATH + "wheat_seedling.svg")
+	# 小麦成熟
+	crops["wheat_mature"] = _load_svg(RESOURCES_PATH + "wheat_mature.svg")
 
 	return crops
 

@@ -47,6 +47,14 @@ func _register_crops():
 	rice.emoji = "🌾"
 	available_crops[rice.id] = rice
 
+	var wheat = CropDef.new()
+	wheat.id = "wheat"
+	wheat.name = "小麦"
+	wheat.grow_time_hours = 28.0
+	wheat.harvest_item = "wheat"
+	wheat.emoji = "🌾"
+	available_crops[wheat.id] = wheat
+
 func get_crop_def(crop_id: String) -> CropDef:
 	return available_crops.get(crop_id, null)
 
