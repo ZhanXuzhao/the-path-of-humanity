@@ -89,12 +89,14 @@ func select_settler(settler, focus_camera: bool = false):
 		return
 	if selected_settler != null and is_instance_valid(selected_settler):
 		selected_settler.set_selected(false)
-	if selected_boar != null:
-		deselect_boar()
-	if selected_enemy != null:
-		deselect_enemy()
-	if selected_tile_pos.x >= 0:
-		deselect_tile()
+	deselect_boar()
+	deselect_enemy()
+	deselect_building()
+	deselect_construction()
+	deselect_resource()
+	deselect_ground_item()
+	deselect_tile()
+	deselect_farm_plot()
 	selected_settler = settler
 	settler.set_selected(true)
 	settler_selected.emit(settler)
@@ -136,6 +138,7 @@ func select_boar(boar):
 	deselect_resource()
 	deselect_ground_item()
 	deselect_tile()
+	deselect_farm_plot()
 
 func deselect_boar():
 	if selected_boar != null and is_instance_valid(selected_boar):
@@ -192,8 +195,14 @@ func try_select_building_at(grid_pos: Vector2i):
 func select_building(bld):
 	if selected_building_instance == bld:
 		return
-	if selected_boar != null:
-		deselect_boar()
+	deselect_settler()
+	deselect_boar()
+	deselect_enemy()
+	deselect_construction()
+	deselect_resource()
+	deselect_ground_item()
+	deselect_tile()
+	deselect_farm_plot()
 	selected_building_instance = bld
 	building_selected.emit(bld)
 
@@ -204,8 +213,14 @@ func deselect_building():
 func select_construction(bld):
 	if selected_construction_building == bld:
 		return
-	if selected_boar != null:
-		deselect_boar()
+	deselect_settler()
+	deselect_boar()
+	deselect_enemy()
+	deselect_building()
+	deselect_resource()
+	deselect_ground_item()
+	deselect_tile()
+	deselect_farm_plot()
 	selected_construction_building = bld
 	construction_selected.emit(bld)
 
@@ -218,8 +233,14 @@ func deselect_construction():
 func select_resource(pos: Vector2i, deposit):
 	if selected_resource_pos == pos:
 		return
-	if selected_boar != null:
-		deselect_boar()
+	deselect_settler()
+	deselect_boar()
+	deselect_enemy()
+	deselect_building()
+	deselect_construction()
+	deselect_ground_item()
+	deselect_tile()
+	deselect_farm_plot()
 	selected_resource_pos = pos
 	selected_resource_deposit = deposit
 	resource_selected.emit(pos, deposit)
@@ -234,8 +255,14 @@ func deselect_resource():
 func select_ground_item(pos: Vector2i, stacks):
 	if selected_ground_item_pos == pos:
 		return
-	if selected_boar != null:
-		deselect_boar()
+	deselect_settler()
+	deselect_boar()
+	deselect_enemy()
+	deselect_building()
+	deselect_construction()
+	deselect_resource()
+	deselect_tile()
+	deselect_farm_plot()
 	selected_ground_item_pos = pos
 	ground_item_selected.emit(pos, stacks)
 
@@ -248,6 +275,14 @@ func deselect_ground_item():
 func select_tile(pos: Vector2i, tile_type: int):
 	if selected_tile_pos == pos:
 		return
+	deselect_settler()
+	deselect_boar()
+	deselect_enemy()
+	deselect_building()
+	deselect_construction()
+	deselect_resource()
+	deselect_ground_item()
+	deselect_farm_plot()
 	selected_tile_pos = pos
 	tile_selected.emit(pos, tile_type)
 
@@ -335,6 +370,7 @@ func select_enemy(enemy):
 	deselect_resource()
 	deselect_ground_item()
 	deselect_tile()
+	deselect_farm_plot()
 
 func deselect_enemy():
 	if selected_enemy != null and is_instance_valid(selected_enemy):
