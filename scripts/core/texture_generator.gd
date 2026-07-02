@@ -18,6 +18,7 @@ static func generate_all() -> Dictionary:
 	textures["buildings"] = _load_buildings()
 	textures["character"] = _load_character()
 	textures["ground_item"] = _load_ground_item()
+	textures["crops"] = _load_crops()
 	return textures
 
 # -------- 地形瓦片 (从 SVG 加载) --------
@@ -51,6 +52,17 @@ static func _load_resources() -> Dictionary:
 	res[World.ResourceNodeType.BERRY_BUSH]    = _load_svg(RESOURCES_PATH + "berry_bush.svg")
 	
 	return res
+
+# -------- 作物纹理 (从 SVG 加载) --------
+static func _load_crops() -> Dictionary:
+	var crops = {}
+
+	# 水稻幼苗（刚种下）
+	crops["rice_seedling"] = _load_svg(RESOURCES_PATH + "rice_seedling.svg")
+	# 水稻成熟
+	crops["rice_mature"] = _load_svg(RESOURCES_PATH + "rice_mature.svg")
+
+	return crops
 
 # -------- 建筑 (从 SVG 加载) --------
 static func _load_buildings() -> Dictionary:

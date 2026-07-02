@@ -4,6 +4,7 @@ extends CanvasLayer
 class_name HUD
 
 const ItemDefinitions = preload("res://resources/item_definitions.gd")
+const _FS = preload("res://scripts/systems/farming_system.gd")
 
 @onready var time_label: Label = $TopBar/TimeLabel
 @onready var day_label: Label = $TopBar/DayLabel
@@ -150,6 +151,9 @@ func _ready():
 	# 更新人口显示
 	_update_population()
 
+	# 创建农田信息面板（动态创建）
+	call_deferred("_init_farm_plot_panel")
+
 # 定居者信息面板相关变量
 var _tracked_settler = null
 var _tracked_boar = null
@@ -184,6 +188,8 @@ func _connect_selection_signals():
 		game.selection_system.enemy_deselected.connect(_on_enemy_deselected)
 		game.selection_system.tile_selected.connect(_on_tile_selected)
 		game.selection_system.tile_deselected.connect(_on_tile_deselected)
+		game.selection_system.farm_plot_selected.connect(_on_farm_plot_selected)
+		game.selection_system.farm_plot_deselected.connect(_on_farm_plot_deselected)
 
 func _hide_all_info_panels():
 	"""隐藏所有左下角信息面板，确保同时只显示一个"""
@@ -195,6 +201,8 @@ func _hide_all_info_panels():
 	construction_panel.visible = false
 	resource_panel.visible = false
 	tile_info_panel.visible = false
+	if _farm_plot_info_panel:
+		_farm_plot_info_panel.visible = false
 
 func _on_settler_selected(settler):
 	"""选中定居者时显示信息面板"""
@@ -444,6 +452,143 @@ func _update_tile_info_panel(pos: Vector2i, tile_type: int):
 	var type_name = type_names.get(tile_type, "未知地形")
 	tile_type_label.text = "地形: " + type_name
 	tile_coord_label.text = "坐标: (%d, %d)" % [pos.x, pos.y]
+
+# -------- 农田地块信息面板（动态创建）--------
+var _farm_plot_info_panel: Panel = null
+var _farm_plot_name_label: Label = null
+var _farm_plot_state_label: Label = null
+var _farm_plot_progress_bar: ProgressBar = null
+var _farm_plot_progress_label: Label = null
+var _farm_plot_count_label: Label = null
+var _tracked_farm_plot = null
+var _tracked_farm_plot_group_size: int = 0
+
+func _init_farm_plot_panel():
+	if _farm_plot_info_panel != null:
+		return
+
+	_farm_plot_info_panel = Panel.new()
+	_farm_plot_info_panel.name = "FarmPlotInfoPanel"
+	_farm_plot_info_panel.visible = false
+	_farm_plot_info_panel.position = Vector2(8, 420)
+	_farm_plot_info_panel.size = Vector2(170, 110)
+	_farm_plot_info_panel.add_theme_stylebox_override("panel", _make_info_panel_stylebox())
+	add_child(_farm_plot_info_panel)
+
+	var vbox = VBoxContainer.new()
+	vbox.position = Vector2(8, 8)
+	vbox.size = Vector2(154, 94)
+	vbox.add_theme_constant_override("separation", 4)
+	_farm_plot_info_panel.add_child(vbox)
+
+	_farm_plot_name_label = Label.new()
+	_farm_plot_name_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))
+	_farm_plot_name_label.add_theme_constant_override("minimum_font_size", 13)
+	vbox.add_child(_farm_plot_name_label)
+
+	_farm_plot_state_label = Label.new()
+	_farm_plot_state_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.6))
+	_farm_plot_state_label.add_theme_constant_override("minimum_font_size", 12)
+	vbox.add_child(_farm_plot_state_label)
+
+	var progress_hbox = HBoxContainer.new()
+	vbox.add_child(progress_hbox)
+
+	_farm_plot_progress_bar = ProgressBar.new()
+	_farm_plot_progress_bar.max_value = 1.0
+	_farm_plot_progress_bar.value = 0.0
+	_farm_plot_progress_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_farm_plot_progress_bar.show_percentage = false
+	_farm_plot_progress_bar.add_theme_constant_override("minimum_font_size", 11)
+	_farm_plot_progress_bar.add_theme_stylebox_override("fill", _make_stylebox(Color(0.3, 1.0, 0.3, 0.8)))
+	progress_hbox.add_child(_farm_plot_progress_bar)
+
+	_farm_plot_progress_label = Label.new()
+	_farm_plot_progress_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+	_farm_plot_progress_label.add_theme_constant_override("minimum_font_size", 11)
+	_farm_plot_progress_label.custom_minimum_size = Vector2(40, 0)
+	progress_hbox.add_child(_farm_plot_progress_label)
+
+	_farm_plot_count_label = Label.new()
+	_farm_plot_count_label.add_theme_color_override("font_color", Color(0.6, 0.8, 1.0))
+	_farm_plot_count_label.add_theme_constant_override("minimum_font_size", 11)
+	vbox.add_child(_farm_plot_count_label)
+
+func _make_info_panel_stylebox() -> StyleBoxFlat:
+	var sb = StyleBoxFlat.new()
+	sb.bg_color = Color(0.12, 0.12, 0.15, 0.9)
+	sb.corner_radius_top_left = 4
+	sb.corner_radius_top_right = 4
+	sb.corner_radius_bottom_right = 4
+	sb.corner_radius_bottom_left = 4
+	sb.border_width_left = 1
+	sb.border_width_top = 1
+	sb.border_width_right = 1
+	sb.border_width_bottom = 1
+	sb.border_color = Color(0.3, 0.3, 0.35, 0.8)
+	return sb
+
+func _on_farm_plot_selected(_pos: Vector2i, plot):
+	_hide_all_info_panels()
+	_tracked_farm_plot = plot
+
+	# 获取选中组大小
+	var game = get_node_or_null("/root/Game")
+	if game and game.selection_system:
+		_tracked_farm_plot_group_size = game.selection_system.selected_farm_plots_group.size()
+	else:
+		_tracked_farm_plot_group_size = 1
+
+	if _farm_plot_info_panel == null:
+		_init_farm_plot_panel()
+	_farm_plot_info_panel.visible = true
+	_update_farm_plot_panel(plot)
+
+func _on_farm_plot_deselected():
+	_farm_plot_info_panel.visible = false
+	_tracked_farm_plot = null
+	_tracked_farm_plot_group_size = 0
+
+func _update_farm_plot_panel(plot):
+	if plot == null:
+		return
+
+	var game = get_node_or_null("/root/Game")
+	var farming_system = get_node_or_null("/root/Game/Systems/FarmingSystem") if game else null
+	var crop_def = farming_system.get_crop_def(plot.crop_id) if farming_system else null
+	var crop_name = crop_def.name if crop_def else plot.crop_id
+	var emoji = crop_def.emoji if crop_def else "🌾"
+
+	_farm_plot_name_label.text = "%s %s" % [emoji, crop_name]
+
+	match plot.state:
+		_FS.PlotState.EMPTY:
+			_farm_plot_state_label.text = "状态: 刚种下"
+			_farm_plot_state_label.add_theme_color_override("font_color", Color(0.6, 0.9, 0.6))
+			_farm_plot_progress_bar.value = 0.0
+			_farm_plot_progress_label.text = "0%"
+			_farm_plot_progress_bar.add_theme_stylebox_override("fill", _make_stylebox(Color(0.6, 0.9, 0.6, 0.6)))
+		_FS.PlotState.PLANTED:
+			_farm_plot_state_label.text = "状态: 生长中"
+			_farm_plot_state_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.3))
+			_farm_plot_progress_bar.value = plot.growth_progress
+			_farm_plot_progress_label.text = "%d%%" % (plot.growth_progress * 100.0)
+			if plot.growth_progress < 0.5:
+				_farm_plot_progress_bar.add_theme_stylebox_override("fill", _make_stylebox(Color(0.3, 1.0, 0.3, 0.8)))
+			else:
+				_farm_plot_progress_bar.add_theme_stylebox_override("fill", _make_stylebox(Color(1.0, 0.8, 0.2, 0.8)))
+		_FS.PlotState.READY:
+			_farm_plot_state_label.text = "状态: 可收获 ✓"
+			_farm_plot_state_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))
+			_farm_plot_progress_bar.value = 1.0
+			_farm_plot_progress_label.text = "100%"
+			_farm_plot_progress_bar.add_theme_stylebox_override("fill", _make_stylebox(Color(0.3, 1.0, 0.3, 0.8)))
+
+	if _tracked_farm_plot_group_size > 1:
+		_farm_plot_count_label.text = "已选中 %d 块相邻田" % _tracked_farm_plot_group_size
+		_farm_plot_count_label.visible = true
+	else:
+		_farm_plot_count_label.visible = false
 
 # -------- 地面物品信息面板（复用存储面板）--------
 func _on_ground_item_selected(_pos: Vector2i, stacks):
@@ -963,6 +1108,15 @@ func _process(delta):
 	if Engine.get_physics_frames() % 60 == 0:
 		_update_population()
 	
+	# 选中农田时实时更新信息面板
+	if _farm_plot_info_panel and _farm_plot_info_panel.visible and _tracked_farm_plot != null:
+		var plot = _tracked_farm_plot
+		var game = get_node_or_null("/root/Game")
+		if game and game.selection_system:
+			_tracked_farm_plot_group_size = game.selection_system.selected_farm_plots_group.size()
+		if plot.state == _FS.PlotState.PLANTED or plot.state == _FS.PlotState.EMPTY:
+			_update_farm_plot_panel(plot)
+
 	# 定时刷新资源显示（来自置物架+地面）
 	_resource_refresh_timer += delta
 	if _resource_refresh_timer >= 2.0:

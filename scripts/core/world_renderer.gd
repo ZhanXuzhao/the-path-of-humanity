@@ -26,6 +26,9 @@ var settler_texture: Texture2D
 # 地面物品纹理
 var ground_item_texture: Texture2D
 
+# 作物纹理映射（按 crop_id + state）
+var _farm_crop_textures: Dictionary = {}
+
 # 当前可见的精灵节点
 var tile_sprites: Dictionary = {}  # Vector2i -> Sprite2D
 var resource_sprites: Dictionary = {}  # Vector2i -> Sprite2D
@@ -61,6 +64,10 @@ var _designation_overlay: Node2D  # 标记覆盖层
 var _designation_sprites: Dictionary = {}  # "x,y" -> Node2D (每个标记位置的图标容器)
 var _designation_preview_sprites: Dictionary = {}  # "x,y" -> Node2D (拖拽预览图标)
 
+# 农田选中叠加层
+var _farm_plot_selection_overlay: Node2D = null
+var _farm_plot_info_label: Label = null
+
 # 农田地块精灵
 var _farm_plot_sprites: Dictionary = {}  # "x,y" -> Sprite2D
 
@@ -82,6 +89,7 @@ func _ready():
 	building_textures = all_textures["buildings"]
 	settler_texture = all_textures["character"]["player_young_man"]
 	ground_item_texture = all_textures.get("ground_item", null)
+	_farm_crop_textures = all_textures.get("crops", {})
 	
 	# 连接信号
 	world.tile_changed.connect(_on_tile_changed)
@@ -131,6 +139,12 @@ func _ready():
 	_designation_overlay.z_index = 52
 	_designation_overlay.name = "DesignationOverlay"
 	add_child(_designation_overlay)
+
+	# 创建农田选中叠加层
+	_farm_plot_selection_overlay = Node2D.new()
+	_farm_plot_selection_overlay.z_index = 53
+	_farm_plot_selection_overlay.name = "FarmPlotSelectionOverlay"
+	add_child(_farm_plot_selection_overlay)
 	
 	# 连接指令标记变化信号（延迟一帧确保 Game._ready() 已创建 DesignationSystem）
 	call_deferred("_connect_designation_signals")
@@ -887,6 +901,8 @@ func _connect_selection_signals():
 		game.selection_system.resource_deselected.connect(_on_resource_deselected)
 		game.selection_system.ground_item_selected.connect(_on_ground_item_selected)
 		game.selection_system.ground_item_deselected.connect(_on_ground_item_deselected)
+		game.selection_system.farm_plot_selected.connect(_on_farm_plot_selected)
+		game.selection_system.farm_plot_deselected.connect(_on_farm_plot_deselected)
 
 func _on_designated_resources_changed():
 	"""指令标记变化时，增量更新标记覆盖层"""
@@ -1097,29 +1113,46 @@ func _update_farm_plot_sprite(grid_pos: Vector2i):
 	sprite.position = pixel_pos
 	sprite.z_index = 5
 
-	var color: Color
 	match plot.state:
 		_FS.PlotState.EMPTY:
-			color = Color(0.6, 0.4, 0.2, 0.4)
+			var color = Color(0.6, 0.4, 0.2, 0.4)
+			var img = Image.create(world.tile_size, world.tile_size, false, Image.FORMAT_RGBA8)
+			img.fill(color)
+			var border_color = Color(color.r * 1.2, color.g * 1.2, color.b * 1.2, 0.8)
+			for x in world.tile_size:
+				img.set_pixel(x, 0, border_color)
+				img.set_pixel(x, world.tile_size - 1, border_color)
+			for y in world.tile_size:
+				img.set_pixel(0, y, border_color)
+				img.set_pixel(world.tile_size - 1, y, border_color)
+			sprite.texture = ImageTexture.create_from_image(img)
+			sprite.scale = Vector2(1, 1)
 		_FS.PlotState.PLANTED:
-			color = Color(0.3, 0.8, 0.3, 0.5)
+			var tex = _farm_crop_textures.get(plot.crop_id + "_seedling")
+			if tex:
+				sprite.texture = tex
+				sprite.scale = Vector2(world.tile_size / 32.0, world.tile_size / 32.0)
+			else:
+				var img = Image.create(world.tile_size, world.tile_size, false, Image.FORMAT_RGBA8)
+				img.fill(Color(0.3, 0.8, 0.3, 0.5))
+				sprite.texture = ImageTexture.create_from_image(img)
+				sprite.scale = Vector2(1, 1)
 		_FS.PlotState.READY:
-			color = Color(1.0, 0.8, 0.2, 0.6)
+			var tex = _farm_crop_textures.get(plot.crop_id + "_mature")
+			if tex:
+				sprite.texture = tex
+				sprite.scale = Vector2(world.tile_size / 32.0, world.tile_size / 32.0)
+			else:
+				var img = Image.create(world.tile_size, world.tile_size, false, Image.FORMAT_RGBA8)
+				img.fill(Color(1.0, 0.8, 0.2, 0.6))
+				sprite.texture = ImageTexture.create_from_image(img)
+				sprite.scale = Vector2(1, 1)
 		_:
-			color = Color(1, 1, 1, 0.3)
+			var img = Image.create(world.tile_size, world.tile_size, false, Image.FORMAT_RGBA8)
+			img.fill(Color(1, 1, 1, 0.3))
+			sprite.texture = ImageTexture.create_from_image(img)
+			sprite.scale = Vector2(1, 1)
 
-	var img = Image.create(world.tile_size, world.tile_size, false, Image.FORMAT_RGBA8)
-	img.fill(color)
-	var border_color = Color(color.r * 1.2, color.g * 1.2, color.b * 1.2, 0.8)
-	for x in world.tile_size:
-		img.set_pixel(x, 0, border_color)
-		img.set_pixel(x, world.tile_size - 1, border_color)
-	for y in world.tile_size:
-		img.set_pixel(0, y, border_color)
-		img.set_pixel(world.tile_size - 1, y, border_color)
-
-	sprite.texture = ImageTexture.create_from_image(img)
-	sprite.scale = Vector2(1, 1)
 	add_child(sprite)
 	_farm_plot_sprites[key] = sprite
 
@@ -1129,3 +1162,172 @@ func _render_existing_farm_plots():
 		return
 	for plot in farming_system.get_all_plots():
 		_update_farm_plot_sprite(plot.grid_pos)
+
+# ==================== 农田选择叠加层 ====================
+
+func _on_farm_plot_selected(grid_pos: Vector2i, plot):
+	var game = get_node_or_null("/root/Game")
+	if game and game.selection_system and game.selection_system.selected_farm_plots_group.size() > 1:
+		_build_farm_plot_group_selection_overlay(game.selection_system.selected_farm_plots_group, plot)
+	else:
+		_build_farm_plot_selection_overlay(grid_pos, plot)
+
+func _on_farm_plot_deselected():
+	_clear_farm_plot_selection_overlay()
+
+func _clear_farm_plot_selection_overlay():
+	if not _farm_plot_selection_overlay:
+		return
+	for child in _farm_plot_selection_overlay.get_children():
+		child.queue_free()
+	_farm_plot_info_label = null
+
+func _build_farm_plot_selection_overlay(grid_pos: Vector2i, plot):
+	_clear_farm_plot_selection_overlay()
+
+	if grid_pos.x < 0 or plot == null:
+		return
+
+	var pixel_pos = Vector2(
+		grid_pos.x * world.tile_size,
+		grid_pos.y * world.tile_size
+	)
+	var tile_size_px = world.tile_size
+
+	# 绿色半透明填充
+	var fill = ColorRect.new()
+	fill.color = Color(0.3, 1.0, 0.3, 0.12)
+	fill.position = pixel_pos
+	fill.size = Vector2(tile_size_px, tile_size_px)
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_farm_plot_selection_overlay.add_child(fill)
+
+	# 绿色边框
+	var bw = 2.0
+	var border_color = Color(0.3, 1.0, 0.3, 0.85)
+	var top = ColorRect.new()
+	top.color = border_color
+	top.position = pixel_pos
+	top.size = Vector2(tile_size_px, bw)
+	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_farm_plot_selection_overlay.add_child(top)
+	var bottom = ColorRect.new()
+	bottom.color = border_color
+	bottom.position = pixel_pos + Vector2(0, tile_size_px - bw)
+	bottom.size = Vector2(tile_size_px, bw)
+	bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_farm_plot_selection_overlay.add_child(bottom)
+	var left = ColorRect.new()
+	left.color = border_color
+	left.position = pixel_pos
+	left.size = Vector2(bw, tile_size_px)
+	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_farm_plot_selection_overlay.add_child(left)
+	var right = ColorRect.new()
+	right.color = border_color
+	right.position = pixel_pos + Vector2(tile_size_px - bw, 0)
+	right.size = Vector2(bw, tile_size_px)
+	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_farm_plot_selection_overlay.add_child(right)
+
+	# 信息标签
+	var game = get_node_or_null("/root/Game")
+	var farming_system = get_node_or_null("/root/Game/Systems/FarmingSystem") if game else null
+	var crop_def = farming_system.get_crop_def(plot.crop_id) if farming_system else null
+	var crop_name = crop_def.name if crop_def else plot.crop_id
+
+	var state_text = ""
+	var progress_text = ""
+	match plot.state:
+		_FS.PlotState.EMPTY:
+			state_text = "刚种下"
+			progress_text = "0%"
+		_FS.PlotState.PLANTED:
+			state_text = "生长中"
+			progress_text = "%d%%" % (plot.growth_progress * 100.0)
+		_FS.PlotState.READY:
+			state_text = "可收获"
+			progress_text = "100%"
+
+	_farm_plot_info_label = Label.new()
+	_farm_plot_info_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))
+	_farm_plot_info_label.add_theme_constant_override("minimum_font_size", 11)
+	_farm_plot_info_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	var label_pos = pixel_pos + Vector2(tile_size_px / 2.0, -18.0)
+	_farm_plot_info_label.position = label_pos
+	_farm_plot_info_label.size = Vector2(120, 20)
+	_farm_plot_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var emoji = crop_def.emoji if crop_def else "🌾"
+	_farm_plot_info_label.text = "%s %s | %s" % [emoji, crop_name, state_text]
+	if plot.state == _FS.PlotState.PLANTED:
+		_farm_plot_info_label.text += " %s" % progress_text
+	_farm_plot_selection_overlay.add_child(_farm_plot_info_label)
+
+func _build_farm_plot_group_selection_overlay(plots: Array, primary_plot):
+	_clear_farm_plot_selection_overlay()
+	if plots.is_empty():
+		return
+
+	var tile_size_px = world.tile_size
+	var bw = 1.0
+	var fill_color = Color(0.3, 1.0, 0.3, 0.08)
+	var border_color = Color(0.3, 1.0, 0.3, 0.6)
+
+	for p in plots:
+		if p == null:
+			continue
+		var pos = p.grid_pos
+		var pixel_pos = Vector2(pos.x * tile_size_px, pos.y * tile_size_px)
+
+		var fill = ColorRect.new()
+		fill.color = fill_color
+		fill.position = pixel_pos
+		fill.size = Vector2(tile_size_px, tile_size_px)
+		fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_farm_plot_selection_overlay.add_child(fill)
+
+		var top = ColorRect.new()
+		top.color = border_color
+		top.position = pixel_pos
+		top.size = Vector2(tile_size_px, bw)
+		top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_farm_plot_selection_overlay.add_child(top)
+		var bottom = ColorRect.new()
+		bottom.color = border_color
+		bottom.position = pixel_pos + Vector2(0, tile_size_px - bw)
+		bottom.size = Vector2(tile_size_px, bw)
+		bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_farm_plot_selection_overlay.add_child(bottom)
+		var left = ColorRect.new()
+		left.color = border_color
+		left.position = pixel_pos
+		left.size = Vector2(bw, tile_size_px)
+		left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_farm_plot_selection_overlay.add_child(left)
+		var right = ColorRect.new()
+		right.color = border_color
+		right.position = pixel_pos + Vector2(tile_size_px - bw, 0)
+		right.size = Vector2(bw, tile_size_px)
+		right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_farm_plot_selection_overlay.add_child(right)
+
+	# 信息标签（在主地块上方显示）
+	var first_pos = primary_plot.grid_pos if primary_plot else plots[0].grid_pos
+	var pixel_pos = Vector2(first_pos.x * tile_size_px, first_pos.y * tile_size_px)
+
+	var game = get_node_or_null("/root/Game")
+	var farming_system = get_node_or_null("/root/Game/Systems/FarmingSystem") if game else null
+	var crop_def = farming_system.get_crop_def(primary_plot.crop_id) if farming_system and primary_plot else null
+	var crop_name = crop_def.name if crop_def else (primary_plot.crop_id if primary_plot else "")
+	var emoji = crop_def.emoji if crop_def else "🌾"
+
+	_farm_plot_info_label = Label.new()
+	_farm_plot_info_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))
+	_farm_plot_info_label.add_theme_constant_override("minimum_font_size", 11)
+	_farm_plot_info_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	var label_pos = pixel_pos + Vector2(tile_size_px / 2.0, -18.0)
+	_farm_plot_info_label.position = label_pos
+	_farm_plot_info_label.size = Vector2(160, 20)
+	_farm_plot_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_farm_plot_info_label.text = "%s %s × %d" % [emoji, crop_name, plots.size()]
+	_farm_plot_selection_overlay.add_child(_farm_plot_info_label)

@@ -256,6 +256,57 @@ func deselect_tile():
 		selected_tile_pos = Vector2i(-1, -1)
 		tile_deselected.emit()
 
+# -------- 农田地块选择 --------
+var selected_farm_plot_pos: Vector2i = Vector2i(-1, -1)
+var selected_farm_plot = null  # FarmPlot
+var selected_farm_plots_group: Array = []  # 多选（双击全选相邻同作物地块）
+
+signal farm_plot_selected(grid_pos: Vector2i, plot)
+signal farm_plot_deselected()
+signal farm_plots_group_selected(plots: Array)
+
+func select_farm_plot(grid_pos: Vector2i, plot):
+	if selected_farm_plot_pos == grid_pos:
+		return
+	deselect_enemy()
+	deselect_boar()
+	deselect_settler()
+	deselect_construction()
+	deselect_building()
+	deselect_resource()
+	deselect_ground_item()
+	deselect_tile()
+
+	selected_farm_plot_pos = grid_pos
+	selected_farm_plot = plot
+	selected_farm_plots_group = [plot]
+	farm_plot_selected.emit(grid_pos, plot)
+
+func select_farm_plots_group(plots: Array):
+	if plots.is_empty():
+		return
+	deselect_enemy()
+	deselect_boar()
+	deselect_settler()
+	deselect_construction()
+	deselect_building()
+	deselect_resource()
+	deselect_ground_item()
+	deselect_tile()
+
+	selected_farm_plot_pos = plots[0].grid_pos
+	selected_farm_plot = plots[0]
+	selected_farm_plots_group = plots
+	farm_plots_group_selected.emit(plots)
+	farm_plot_selected.emit(plots[0].grid_pos, plots[0])
+
+func deselect_farm_plot():
+	if selected_farm_plot_pos.x >= 0:
+		selected_farm_plot_pos = Vector2i(-1, -1)
+		selected_farm_plot = null
+		selected_farm_plots_group = []
+		farm_plot_deselected.emit()
+
 # -------- 敌人选择 --------
 func find_enemy_at_pos(global_pos: Vector2):
 	var closest = null

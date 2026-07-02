@@ -154,6 +154,41 @@ func get_all_plots() -> Array:
 		result.append(plots[key])
 	return result
 
+func get_connected_plots(from_pos: Vector2i) -> Array:
+	var result: Array = []
+	var visited: Dictionary = {}
+	var queue: Array = [from_pos]
+
+	var from_plot = get_plot(from_pos)
+	if from_plot == null:
+		return result
+
+	var target_crop = from_plot.crop_id
+
+	while queue.size() > 0:
+		var pos = queue.pop_front()
+		var key = "%d,%d" % [pos.x, pos.y]
+		if visited.has(key):
+			continue
+		visited[key] = true
+
+		var plot = get_plot(pos)
+		if plot == null or plot.crop_id != target_crop:
+			continue
+
+		result.append(plot)
+
+		for dx in [-1, 0, 1]:
+			for dy in [-1, 0, 1]:
+				if dx == 0 and dy == 0:
+					continue
+				var neighbor = Vector2i(pos.x + dx, pos.y + dy)
+				var nkey = "%d,%d" % [neighbor.x, neighbor.y]
+				if not visited.has(nkey):
+					queue.append(neighbor)
+
+	return result
+
 func to_dict() -> Dictionary:
 	var data = {}
 	for key in plots:

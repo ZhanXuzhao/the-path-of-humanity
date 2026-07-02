@@ -30,6 +30,17 @@ var plant_mode: bool = false
 var selected_crop: String = ""
 var plant_preview: Sprite2D = null
 
+# 种植框选拖拽状态
+var _is_plant_dragging: bool = false
+var _plant_drag_start_grid: Vector2i = Vector2i(-999999, -999999)
+var _plant_drag_end_grid: Vector2i = Vector2i(-999999, -999999)
+var _plant_drag_overlay: Node2D = null
+
+# 农田双击选择跟踪
+var _last_farm_click_time: float = 0.0
+var _last_farm_click_pos: Vector2i = Vector2i(-999, -999)
+const FARM_DOUBLE_CLICK_TIME: float = 0.35
+
 # 定居者管理
 var settlers = []
 
@@ -107,6 +118,7 @@ func _process(delta):
 	# 种植模式预览
 	if plant_mode:
 		_update_plant_preview()
+		_update_plant_drag_visual()
 	
 	# 只有游戏进行中才执行AI和系统更新
 	if _gm.state != 1:
@@ -371,6 +383,7 @@ func _try_place_building():
 func enter_plant_mode(crop_id: String):
 	plant_mode = true
 	selected_crop = crop_id
+	_is_plant_dragging = false
 
 	if build_mode:
 		exit_build_mode()
@@ -391,11 +404,16 @@ func enter_plant_mode(crop_id: String):
 	plant_preview.visible = true
 	plant_preview.modulate = Color(0, 1, 0, 0.5)
 
+	_init_plant_drag_overlay()
+
 func exit_plant_mode():
 	plant_mode = false
 	selected_crop = ""
+	_is_plant_dragging = false
 	if plant_preview:
 		plant_preview.visible = false
+	if _plant_drag_overlay:
+		_plant_drag_overlay.queue_redraw()
 
 	var plant_panel = get_node_or_null("UI/PlantPanel")
 	if plant_panel:
@@ -457,6 +475,77 @@ func _try_place_farm():
 			var name_str = crop_def.name if crop_def else selected_crop
 			_gm.show_notification("已设置 %s 农田" % name_str, _gm.NotificationType.SUCCESS)
 
+func _init_plant_drag_overlay():
+	if _plant_drag_overlay != null:
+		return
+	_plant_drag_overlay = Node2D.new()
+	_plant_drag_overlay.name = "PlantDragOverlay"
+	_plant_drag_overlay.z_index = 200
+	_plant_drag_overlay.set_script(preload("res://scripts/core/drag_overlay.gd"))
+	add_child(_plant_drag_overlay)
+	move_child(_plant_drag_overlay, get_child_count() - 1)
+
+func _update_plant_drag_visual():
+	if not _plant_drag_overlay:
+		return
+
+	if not _is_plant_dragging or _plant_drag_start_grid.x < -99999:
+		_plant_drag_overlay.visible = false
+		return
+
+	var mouse_pos = get_global_mouse_position()
+	_plant_drag_end_grid = Vector2i(
+		floori(mouse_pos.x / world.tile_size),
+		floori(mouse_pos.y / world.tile_size)
+	)
+
+	_plant_drag_overlay.visible = true
+
+	var min_x = mini(_plant_drag_start_grid.x, _plant_drag_end_grid.x)
+	var max_x = maxi(_plant_drag_start_grid.x, _plant_drag_end_grid.x)
+	var min_y = mini(_plant_drag_start_grid.y, _plant_drag_end_grid.y)
+	var max_y = maxi(_plant_drag_start_grid.y, _plant_drag_end_grid.y)
+
+	var pixel_pos = Vector2(min_x * world.tile_size, min_y * world.tile_size)
+	var pixel_size = Vector2(
+		(max_x - min_x + 1) * world.tile_size,
+		(max_y - min_y + 1) * world.tile_size
+	)
+
+	_plant_drag_overlay.set("drag_rect_pos", pixel_pos)
+	_plant_drag_overlay.set("drag_rect_size", pixel_size)
+	_plant_drag_overlay.set("is_plant_mode", true)
+	_plant_drag_overlay.queue_redraw()
+
+func _place_farms_in_rect(from_grid: Vector2i, to_grid: Vector2i):
+	if not plant_mode or selected_crop == "":
+		return
+
+	var min_x = mini(from_grid.x, to_grid.x)
+	var max_x = maxi(from_grid.x, to_grid.x)
+	var min_y = mini(from_grid.y, to_grid.y)
+	var max_y = maxi(from_grid.y, to_grid.y)
+
+	var placed = 0
+	var blocked = 0
+
+	for x in range(min_x, max_x + 1):
+		for y in range(min_y, max_y + 1):
+			var pos = Vector2i(x, y)
+			if _can_place_farm(pos):
+				if farming_system and farming_system.add_plot(pos, selected_crop):
+					placed += 1
+			else:
+				blocked += 1
+
+	var crop_def = farming_system.get_crop_def(selected_crop) if farming_system else null
+	var name_str = crop_def.name if crop_def else selected_crop
+
+	if placed > 0:
+		_gm.show_notification("已设置 %d 块 %s 农田" % [placed, name_str], _gm.NotificationType.SUCCESS)
+	if blocked > 0:
+		_gm.show_notification("%d 个位置无法种植" % blocked, _gm.NotificationType.WARNING)
+
 # ==================== 定居者自主AI系统 ====================
 
 func _input(event):
@@ -483,6 +572,9 @@ func _input(event):
 		
 		if selection_system.selected_tile_pos.x >= 0:
 			selection_system.deselect_tile()
+			return
+		if selection_system.selected_farm_plot_pos.x >= 0:
+			selection_system.deselect_farm_plot()
 			return
 		if designation_system.demolition_mode:
 			designation_system.exit_demolition_mode()
@@ -583,6 +675,9 @@ func _input(event):
 			return
 		if selection_system.selected_tile_pos.x >= 0:
 			selection_system.deselect_tile()
+			return
+		if selection_system.selected_farm_plot_pos.x >= 0:
+			selection_system.deselect_farm_plot()
 			return
 	
 	# 点击UI控件时不处理世界点击逻辑
@@ -689,8 +784,40 @@ func _input(event):
 			designation_system._toggle_demolition_at_pos(global_pos)
 			return
 	
-	if event.is_action_pressed("left_click") and plant_mode:
-		_try_place_farm()
+	# 种植模式的左键框选处理
+	if event is InputEventMouseButton and plant_mode:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed:
+				var global_pos = get_global_mouse_position()
+				_plant_drag_start_grid = Vector2i(
+					floori(global_pos.x / world.tile_size),
+					floori(global_pos.y / world.tile_size)
+				)
+				_plant_drag_end_grid = _plant_drag_start_grid
+				_is_plant_dragging = true
+				_update_plant_drag_visual()
+			else:
+				if _is_plant_dragging:
+					_is_plant_dragging = false
+
+					var global_pos = get_global_mouse_position()
+					var end_grid = Vector2i(
+						floori(global_pos.x / world.tile_size),
+						floori(global_pos.y / world.tile_size)
+					)
+
+					if _plant_drag_start_grid == end_grid:
+						mouse_grid_pos = _plant_drag_start_grid
+						_try_place_farm()
+					else:
+						_place_farms_in_rect(_plant_drag_start_grid, end_grid)
+
+					if _plant_drag_overlay:
+						_plant_drag_overlay.visible = false
+						_plant_drag_overlay.queue_redraw()
+
+					_plant_drag_start_grid = Vector2i(-999999, -999999)
+					_plant_drag_end_grid = Vector2i(-999999, -999999)
 		return
 
 	if event.is_action_pressed("left_click") and build_mode:
@@ -803,7 +930,31 @@ func _input(event):
 					selection_system.deselect_tile()
 					selection_system.select_resource(grid_pos, clicked_resource)
 				else:
-					if clicked_enemy != null:
+					# 检查农田地块
+					var clicked_plot = farming_system.get_plot(grid_pos) if farming_system else null
+					if clicked_plot != null:
+						selection_system.deselect_enemy()
+						selection_system.deselect_boar()
+						selection_system.deselect_construction()
+						selection_system.deselect_building()
+						selection_system.deselect_settler()
+						selection_system.deselect_resource()
+						selection_system.deselect_ground_item()
+						selection_system.deselect_tile()
+
+						# 双击检测：相同位置短时间内再次点击 → 选中相邻同作物
+						var now = Time.get_ticks_msec() / 1000.0
+						if grid_pos == _last_farm_click_pos and now - _last_farm_click_time < FARM_DOUBLE_CLICK_TIME:
+							var connected = farming_system.get_connected_plots(grid_pos)
+							if connected.size() > 1:
+								selection_system.select_farm_plots_group(connected)
+							else:
+								selection_system.select_farm_plot(grid_pos, clicked_plot)
+						else:
+							selection_system.select_farm_plot(grid_pos, clicked_plot)
+						_last_farm_click_time = now
+						_last_farm_click_pos = grid_pos
+					elif clicked_enemy != null:
 						selection_system.deselect_boar()
 						selection_system.deselect_construction()
 						selection_system.deselect_building()
