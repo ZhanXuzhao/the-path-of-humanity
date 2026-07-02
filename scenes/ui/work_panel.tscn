@@ -26,11 +26,17 @@ corner_radius_bottom_left = 4
 
 [node name="WorkPanel" type="Panel"]
 visible = false
-anchors_preset = 0
-offset_left = 40.0
-offset_top = 60.0
-offset_right = 940.0
-offset_bottom = 660.0
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -430.0
+offset_top = -300.0
+offset_right = 430.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_styles/panel = SubResource(1)
 script = ExtResource("1_x4c7")
 

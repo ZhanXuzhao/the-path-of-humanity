@@ -636,41 +636,55 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -791.5
+offset_left = -500.0
 offset_top = -300.0
-offset_right = 791.5
+offset_right = 500.0
 offset_bottom = 300.0
 grow_horizontal = 2
 grow_vertical = 2
+size_flags_horizontal = 4
 script = ExtResource("12_0k7l")
+
+[node name="CloseBtn" type="Button" parent="UI/WorkPanel" unique_id=2061285974]
+custom_minimum_size = Vector2(30, 30)
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -30.0
+offset_bottom = 31.0
+grow_horizontal = 0
+size_flags_horizontal = 8
+text = "✕"
 
 [node name="TitleBar" type="HBoxContainer" parent="UI/WorkPanel" unique_id=900230771]
 layout_mode = 0
 offset_left = 12.0
 offset_top = 8.0
-offset_right = 1560.5
+offset_right = 126.0
 offset_bottom = 39.0
 
 [node name="Title" type="Label" parent="UI/WorkPanel/TitleBar" unique_id=1206977215]
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 2
 theme_override_colors/font_color = Color(0.3, 0.8, 1, 1)
 text = "工作优先级"
 
-[node name="CloseBtn" type="Button" parent="UI/WorkPanel/TitleBar" unique_id=2061285974]
-custom_minimum_size = Vector2(30, 30)
-layout_mode = 2
-text = "✕"
-
 [node name="ScrollContainer" type="ScrollContainer" parent="UI/WorkPanel" unique_id=1284186716]
-layout_mode = 0
-offset_left = 12.0
-offset_top = 44.0
-offset_right = 1573.5
-offset_bottom = 580.0
+custom_minimum_size = Vector2(0, 500)
+layout_mode = 1
+anchors_preset = 14
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="WorkGrid" type="GridContainer" parent="UI/WorkPanel/ScrollContainer" unique_id=610940900]
+custom_minimum_size = Vector2(500, 500)
 layout_mode = 2
+size_flags_horizontal = 6
+size_flags_vertical = 0
 theme_override_constants/h_separation = 2
 theme_override_constants/v_separation = 2
 columns = 10

@@ -6,7 +6,7 @@ class_name WorkPanel
 const WorkManagerScript = preload("res://scripts/autoload/work_manager.gd")
 
 @onready var work_grid: GridContainer = $ScrollContainer/WorkGrid
-@onready var close_btn: Button = $TitleBar/CloseBtn
+@onready var close_btn: Button = $CloseBtn
 @onready var reset_all_btn: Button = $BottomBar/ResetAllBtn
 
 var _work_manager
@@ -69,6 +69,10 @@ func _rebuild_grid():
 		empty_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
 		work_grid.add_child(empty_label)
 		return
+	
+	# 计算表格所需宽度：1列名字(120) + 每列工作类型标题(72) + 边距
+	var total_columns = 1 + WorkManager.ALL_WORK_TYPES.size()
+	work_grid.columns = total_columns
 	
 	# 第一行：左上角空白 + 工作类型列标题
 	var corner_label = Label.new()
