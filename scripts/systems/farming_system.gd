@@ -63,6 +63,11 @@ func add_plot(grid_pos: Vector2i, crop_id: String) -> bool:
 		return false
 	if _game.building_system and _game.building_system.get_building_at(grid_pos) != null:
 		return false
+	
+	# 清除该格子上的资源（掉落到地面）
+	if _game.world:
+		_game.world.clear_resources_at(grid_pos)
+	
 	var plot = FarmPlot.new(grid_pos, crop_id)
 	plot.state = PlotState.EMPTY
 	plots[key] = plot

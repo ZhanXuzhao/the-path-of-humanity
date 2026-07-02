@@ -157,6 +157,13 @@ func place_building(building_id: String, pos: Vector2i) -> bool:
 	
 	var size = data.size
 	
+	# 清除所有占用格子上的资源（掉落地面）
+	for x in size.x:
+		for y in size.y:
+			var grid_pos = pos + Vector2i(x, y)
+			if world:
+				world.clear_resources_at(grid_pos)
+	
 	# 注册所有占用格子
 	for x in size.x:
 		for y in size.y:

@@ -359,6 +359,28 @@ func get_building_at(pos: Vector2i) -> String:
 	return chunk.buildings.get(local_pos, "")
 
 # -------- 资源交互 --------
+func clear_resources_at(pos: Vector2i) -> bool:
+	"""清除指定位置的资源，将资源物品掉落到地面。返回是否有资源被清除。"""
+	var deposit = get_resource_at(pos)
+	if deposit == null or deposit.amount <= 0:
+		return false
+	
+	var item_id = deposit.get_item_drop()
+	if item_id == "":
+		return false
+	
+	var amount = int(deposit.amount)
+	
+	var chunk_pos = global_to_chunk(pos)
+	var local_pos = global_to_local(pos)
+	chunks[chunk_pos].resources.erase(local_pos)
+	resource_depleted.emit(pos)
+	
+	if amount > 0:
+		drop_item_on_ground(pos, item_id, amount)
+	
+	return true
+
 func harvest_resource(pos: Vector2i, amount: float = -1.0) -> Dictionary:
 	"""采集资源，返回{item_id, amount}，如果资源耗尽返回空
 	参数 amount: 传入 >0 使用指定值，传入 <=0 使用资源点自身的 harvest_amount"""
