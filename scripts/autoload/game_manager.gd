@@ -275,6 +275,7 @@ func load_game(silent: bool = false) -> bool:
 	game_time = data.get("game_time", 6.0)
 	current_day = data.get("current_day", 1)
 	time_speed = data.get("time_speed", 1.0)
+	Engine.time_scale = time_speed
 	stats = data.get("stats", {})
 	state = GameState.PLAYING
 	LogUtil.i("存档已加载：第%d天，时间%.2f time speed: %.2f " % [current_day, game_time, time_speed])
