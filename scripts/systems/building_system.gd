@@ -21,6 +21,7 @@ class BuildingInstance:
 	var is_completed: bool = false
 	var construction_progress: float = 0.0
 	var production_timer: float = 0.0
+	var attack_timer: float = 0.0  # 攻击冷却计时器
 	var inventory = null
 	var assigned_settlers: Array[String] = []  # settler IDs
 	var deposited_materials: Dictionary = {}  # 已搬运到工地的建筑材料 {item_id: amount}
@@ -282,6 +283,48 @@ func process_buildings(delta: float):
 			if bld.production_timer >= data.production_time:
 				bld.production_timer = 0.0
 				_try_produce(bld, data)
+		
+		# 防御建筑——自动攻击
+		if data.attack_range > 0 and data.attack_damage > 0:
+			bld.attack_timer += delta
+			if bld.attack_timer >= data.attack_cooldown:
+				bld.attack_timer = 0.0
+				_try_tower_attack(bld, data)
+
+func _try_tower_attack(bld, data):
+	"""哨塔尝试攻击射程内的敌人（野猪等）"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or world == null:
+		return
+	
+	# 计算塔的中心像素位置
+	var tile_size = world.tile_size
+	var tower_center = Vector2(
+		bld.grid_pos.x * tile_size + tile_size / 2.0,
+		bld.grid_pos.y * tile_size + tile_size / 2.0
+	)
+	
+	var attack_range_pixels = data.attack_range * tile_size
+	var nearest_enemy = null
+	var nearest_dist = INF
+	
+	# 扫描所有野猪
+	for boar in game.boars:
+		if not is_instance_valid(boar) or boar.state == boar.BoarState.DEAD:
+			continue
+		var dist = tower_center.distance_squared_to(boar.position)
+		if dist < nearest_dist and dist <= attack_range_pixels * attack_range_pixels:
+			nearest_dist = dist
+			nearest_enemy = boar
+	
+	if nearest_enemy == null:
+		return
+	
+	# 发射箭矢
+	var arrow = load("res://scripts/entities/arrow_projectile.gd").new()
+	arrow.init(tower_center, nearest_enemy, data.attack_damage)
+	arrow.shooter = null  # 塔不是具体角色
+	game.call_deferred("add_child", arrow)
 
 func _try_produce(bld, data):
 	"""尝试生产物品"""
@@ -440,6 +483,7 @@ func to_dict() -> Dictionary:
 				"progress": bld.construction_progress,
 				"completed": bld.is_completed,
 				"prod_timer": bld.production_timer,
+				"attack_timer": bld.attack_timer,
 				"inventory": bld.inventory.to_dict() if bld.inventory else null,
 				"deposited_materials": bld.deposited_materials.duplicate(),
 				"assigned_settler_id": bld.assigned_settler_id,
@@ -459,6 +503,7 @@ func from_dict(data: Dictionary):
 		bld.construction_progress = b_data.progress
 		bld.is_completed = b_data.completed
 		bld.production_timer = b_data.prod_timer
+		bld.attack_timer = b_data.get("attack_timer", 0.0)
 		if b_data.has("deposited_materials"):
 			bld.deposited_materials = b_data.deposited_materials.duplicate()
 		if b_data.has("assigned_settler_id"):

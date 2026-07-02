@@ -54,6 +54,9 @@ class BuildingData:
 	var storage_capacity: int # 存储容量 (0=不存储)
 	var icon_frame: int
 	var is_passable: bool = true  # 是否可通行（墙不可通行，门可通行）
+	var attack_range: float = 0.0  # 攻击范围(格)，0=不能攻击
+	var attack_damage: float = 0.0
+	var attack_cooldown: float = 0.0  # 攻击间隔(秒)
 
 class RecipeData:
 	var id: String
@@ -167,6 +170,8 @@ static func _register_buildings():
 	_add_building("stone_door", "石门", "坚固的石门", BuildingCategory.DEFENSE, Vector2i(1, 1), 250, 10.0, {"stone": 3}, {}, {}, 0.0, 0, 18, true)
 	_add_building("iron_wall", "铁墙", "坚不可摧的铁墙", BuildingCategory.DEFENSE, Vector2i(1, 1), 600, 20.0, {"iron_ingot": 5}, {}, {}, 0.0, 0, 19, false)
 	_add_building("iron_door", "铁门", "坚固的铁门", BuildingCategory.DEFENSE, Vector2i(1, 1), 400, 15.0, {"iron_ingot": 3}, {}, {}, 0.0, 0, 20, true)
+	# 防御建筑——哨塔（自动攻击）
+	_add_building("wood_watchtower", "木哨塔", "自动射箭攻击进入射程的敌人", BuildingCategory.DEFENSE, Vector2i(1, 1), 1000, 40.0, {"wood": 30}, {}, {}, 0.0, 0, 21, false, 5.0, 10.0, 2.0)
 
 	# 家具类
 	_add_building("wooden_bed", "木床", "一张舒适的木板床，可供一名定居者睡眠", BuildingCategory.FURNITURE, Vector2i(2, 1), 80, 20.0, {"wood": 10}, {}, {}, 0.0, 0, 16)
@@ -204,7 +209,7 @@ static func _register_techs():
 	_add_tech("construction", "建筑构造", "解锁基础建筑", {"wood": 20, "stone": 15}, 45.0, ["primitive_tools"], ["tent", "campfire", "storage_rack", "workbench", "wood_wall", "wood_door"], "基础")
 	_add_tech("metalworking", "金属加工", "掌握熔炼技术", {"stone": 20, "wood": 15}, 60.0, ["construction"], ["furnace", "iron_ingot", "copper_ingot", "iron_mine"], "工业")
 	_add_tech("cooking", "烹饪技术", "学会烹饪食物", {"wood": 10, "berry": 15}, 30.0, ["construction"], ["cooking_stove", "cooked_meat", "vegetable_soup"], "基础")
-	_add_tech("archery", "弓箭", "学会制作和使用弓箭", {"wood": 20, "stone": 10}, 40.0, ["primitive_tools"], ["bow", "arrow"], "军事")
+	_add_tech("archery", "弓箭", "学会制作和使用弓箭", {"wood": 20, "stone": 10}, 40.0, ["primitive_tools"], ["bow", "arrow", "wood_watchtower"], "军事")
 	_add_tech("woodworking", "木工技术", "高级木材加工", {"wood": 30, "plank": 10}, 45.0, ["construction"], ["sawmill", "plank_sawmill", "house", "wooden_bed"], "工业")
 	_add_tech("masonry", "石工技术", "掌握石材加工", {"stone": 30, "brick": 10}, 45.0, ["construction"], ["kiln", "brick", "stone_wall", "stone_door", "warehouse"], "工业")
 	_add_tech("advanced_metal", "高级冶金", "炼钢技术", {"iron_ingot": 20, "coal": 20}, 90.0, ["metalworking"], ["steel_ingot", "iron_wall", "iron_door"], "工业")
@@ -229,7 +234,8 @@ static func _add_item(id: String, item_name: String, desc: String, cat: ItemCate
 static func _add_building(id: String, bld_name: String, desc: String, cat: BuildingCategory,
 		size: Vector2i, hp: int, work_cost: float, materials: Dictionary,
 		produces: Dictionary, consumes: Dictionary, prod_time: float,
-		storage: int, icon: int, is_passable: bool = true):
+		storage: int, icon: int, is_passable: bool = true,
+		attack_range: float = 0.0, attack_damage: float = 0.0, attack_cooldown: float = 0.0):
 	var building := BuildingData.new()
 	building.id = id
 	building.name = bld_name
@@ -245,6 +251,9 @@ static func _add_building(id: String, bld_name: String, desc: String, cat: Build
 	building.storage_capacity = storage
 	building.icon_frame = icon
 	building.is_passable = is_passable
+	building.attack_range = attack_range
+	building.attack_damage = attack_damage
+	building.attack_cooldown = attack_cooldown
 	buildings[id] = building
 
 static func _add_recipe(id: String, recipe_name: String, desc: String,
