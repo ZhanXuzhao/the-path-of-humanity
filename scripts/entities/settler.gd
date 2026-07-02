@@ -622,8 +622,8 @@ func _tick_harvest():
 	var grid_pos: Vector2i = current_task.get("target_pos", Vector2i.ZERO)
 	
 	# 释放该资源的占用标记
-	if game.has_method("release_harvest_resource"):
-		game.release_harvest_resource(grid_pos)
+	if game.task_system:
+		game.task_system.release_harvest_resource(grid_pos)
 	
 	# 采集单个资源点（最多 harvest_count 个）
 	var result = game.world.harvest_resource(grid_pos, max_amount)
@@ -649,8 +649,8 @@ func _tick_harvest():
 	# 重新占用该点（如果仍有剩余资源）
 	var dep = game.world.get_resource_at(grid_pos)
 	if dep != null and dep.amount > 0:
-		if game.has_method("claim_harvest_resource"):
-			game.claim_harvest_resource(grid_pos, settler_id)
+		if game.task_system:
+			game.task_system.claim_harvest_resource(grid_pos, settler_id)
 	else:
 		# 资源已被完全采完，移除采集标记
 		if game.designation_system:
@@ -1543,7 +1543,7 @@ func _tick_demolish():
 	var bld = game.building_system.get_building_at(grid_pos)
 	if bld == null or not bld.is_completed:
 		# 建筑已不存在或已完成拆除
-		game._cleanup_depleted_designations()
+		game.task_system._cleanup_depleted_designations()
 		complete_task()
 		return
 	

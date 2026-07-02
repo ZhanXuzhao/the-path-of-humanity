@@ -562,7 +562,7 @@ func remove_building(pos: Vector2i) -> bool:
 		if bld.assigned_settler_id != "":
 			var game = get_node_or_null("/root/Game")
 			if game:
-				var settler = game.get_settler_by_id(bld.assigned_settler_id)
+				var settler = game.task_system.get_settler_by_id(bld.assigned_settler_id)
 				if settler and is_instance_valid(settler):
 					settler.assigned_bed_pos = Vector2i(-1, -1)
 	
@@ -647,7 +647,7 @@ func demolish_building(pos: Vector2i):
 		if bld.assigned_settler_id != "":
 			var game = get_node_or_null("/root/Game")
 			if game:
-				var settler = game.get_settler_by_id(bld.assigned_settler_id)
+				var settler = game.task_system.get_settler_by_id(bld.assigned_settler_id)
 				if settler and is_instance_valid(settler):
 					settler.assigned_bed_pos = Vector2i(-1, -1)
 	

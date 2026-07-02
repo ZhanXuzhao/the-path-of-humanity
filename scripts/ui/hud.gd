@@ -640,7 +640,7 @@ func _update_building_info_panel(bld, data):
 		var gm = get_node("/root/GameManager")
 		if gm and bld.assigned_settler_id != "":
 			var game = get_node_or_null("/root/Game")
-			var settler = game.get_settler_by_id(bld.assigned_settler_id) if game else null
+			var settler = game.task_system.get_settler_by_id(bld.assigned_settler_id) if game else null
 			if settler and is_instance_valid(settler):
 				var state_text = Settler.get_state_display(settler.state)
 				var state_label = Label.new()
