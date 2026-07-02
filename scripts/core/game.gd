@@ -546,6 +546,23 @@ func _place_farms_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 	if blocked > 0:
 		_gm.show_notification("%d 个位置无法种植" % blocked, _gm.NotificationType.WARNING)
 
+func _clear_farms_in_rect(from_grid: Vector2i, to_grid: Vector2i):
+	var min_x = mini(from_grid.x, to_grid.x)
+	var max_x = maxi(from_grid.x, to_grid.x)
+	var min_y = mini(from_grid.y, to_grid.y)
+	var max_y = maxi(from_grid.y, to_grid.y)
+
+	var removed = 0
+	for x in range(min_x, max_x + 1):
+		for y in range(min_y, max_y + 1):
+			var pos = Vector2i(x, y)
+			if farming_system and farming_system.has_plot(pos):
+				farming_system.remove_plot(pos)
+				removed += 1
+
+	if removed > 0:
+		_gm.show_notification("已取消 %d 块农田" % removed, _gm.NotificationType.SUCCESS)
+
 # ==================== 定居者自主AI系统 ====================
 
 func _input(event):
@@ -763,8 +780,12 @@ func _input(event):
 						if designation_system.designated_demolitions.has(key):
 							designation_system.designated_demolitions.erase(key)
 							designation_system.designated_resources_changed.emit()
+						if farming_system and farming_system.has_plot(designation_system._drag_start_grid):
+							farming_system.remove_plot(designation_system._drag_start_grid)
+							_gm.show_notification("已取消种植", _gm.NotificationType.SUCCESS)
 					else:
 						designation_system._remove_designations_in_rect(designation_system._drag_start_grid, end_grid)
+						_clear_farms_in_rect(designation_system._drag_start_grid, end_grid)
 					
 					if designation_system._drag_overlay:
 						designation_system._drag_overlay.visible = false

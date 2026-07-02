@@ -41,7 +41,7 @@ func _ready():
 		_create_cmd_button(cmd.icon, cmd.name, cmd.work_type, cmd.desc)
 	
 	# 创建取消按钮（风格统一）
-	_create_cmd_button("❌", "取消", CLEAR_WORK_TYPE, "框选或点选清除已标记的资源")
+	_create_cmd_button("❌", "取消", CLEAR_WORK_TYPE, "框选或点选清除已标记的资源或农田")
 	
 	# 连接游戏信号（延迟一帧确保 Game._ready() 已创建 DesignationSystem）
 	call_deferred("_connect_designation_signals")

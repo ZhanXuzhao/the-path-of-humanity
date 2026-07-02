@@ -71,6 +71,8 @@ func _init_drag_overlay():
 func enter_designation_mode(work_type: int):
 	if _game.build_mode:
 		_game.exit_build_mode()
+	if _game.plant_mode:
+		_game.exit_plant_mode()
 	if clear_mode:
 		exit_clear_mode()
 
@@ -97,6 +99,8 @@ func exit_designation_mode():
 func enter_clear_mode():
 	if _game.build_mode:
 		_game.exit_build_mode()
+	if _game.plant_mode:
+		_game.exit_plant_mode()
 	if designation_mode:
 		exit_designation_mode()
 
@@ -123,6 +127,8 @@ func exit_clear_mode():
 func enter_demolition_mode():
 	if _game.build_mode:
 		_game.exit_build_mode()
+	if _game.plant_mode:
+		_game.exit_plant_mode()
 	if designation_mode:
 		exit_designation_mode()
 	if clear_mode:
