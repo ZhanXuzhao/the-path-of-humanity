@@ -1703,11 +1703,12 @@ func _tick_combat(_delta):
 		# 射箭
 		shoot_at(enemy)
 	else:
-		# 距离太远：追击敌人
-		var min_chase_dist = ARROW_RANGE * 1.5
-		if dist > min_chase_dist:
-			move_to(enemy.position)
-			current_task["target_world_pos"] = enemy.position
+		# 距离太远：追击到射程边缘即可，不用贴脸
+		# 计算一个在敌人射程内的目标位置
+		var dir_to_enemy = (enemy.position - position).normalized()
+		var target_pos = enemy.position - dir_to_enemy * (ARROW_RANGE * 0.7)
+		move_to(target_pos)
+		current_task["target_world_pos"] = target_pos
 
 # 姓氏池（100个）
 const SURNAMES = [
