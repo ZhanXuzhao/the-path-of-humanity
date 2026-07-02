@@ -161,7 +161,7 @@ custom_minimum_size = Vector2(70, 40)
 layout_mode = 2
 text = "工作"
 
-[node name="EventBtn" type="Button" parent="UI/HUD/BottomBar"]
+[node name="EventBtn" type="Button" parent="UI/HUD/BottomBar" unique_id=1913057117]
 custom_minimum_size = Vector2(70, 40)
 layout_mode = 2
 text = "事件"
@@ -223,7 +223,7 @@ layout_mode = 2
 [node name="NeedsContainer" type="VBoxContainer" parent="UI/HUD/SettlerInfoPanel/ScrollContainer/VBox" unique_id=947407570]
 layout_mode = 2
 
-[node name="BoarInfoPanel" type="Panel" parent="UI/HUD"]
+[node name="BoarInfoPanel" type="Panel" parent="UI/HUD" unique_id=307953553]
 visible = false
 anchors_preset = 2
 anchor_top = 1.0
@@ -235,7 +235,7 @@ offset_bottom = -10.0
 grow_vertical = 0
 theme_override_styles/panel = SubResource("2")
 
-[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/BoarInfoPanel"]
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/BoarInfoPanel" unique_id=1499379569]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -244,38 +244,38 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 
-[node name="VBox" type="VBoxContainer" parent="UI/HUD/BoarInfoPanel/ScrollContainer"]
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/BoarInfoPanel/ScrollContainer" unique_id=1876459952]
 layout_mode = 2
 
-[node name="NameLabel" type="Label" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox"]
+[node name="NameLabel" type="Label" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox" unique_id=1925026719]
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
 text = "🐗 野猪"
 
-[node name="StateLabel" type="Label" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox"]
+[node name="StateLabel" type="Label" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox" unique_id=1611602865]
 layout_mode = 2
 text = "状态: 游走中"
 
-[node name="HpBarHBox" type="HBoxContainer" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox"]
+[node name="HpBarHBox" type="HBoxContainer" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox" unique_id=2132223036]
 layout_mode = 2
 
-[node name="HPLabel" type="Label" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox/HpBarHBox"]
+[node name="HPLabel" type="Label" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox/HpBarHBox" unique_id=1712183592]
 custom_minimum_size = Vector2(50, 0)
 layout_mode = 2
 text = "生命:"
 
-[node name="HPBar" type="ProgressBar" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox/HpBarHBox"]
+[node name="HPBar" type="ProgressBar" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox/HpBarHBox" unique_id=449428042]
 layout_mode = 2
 size_flags_horizontal = 3
 value = 100.0
 
-[node name="NeedsSep" type="HSeparator" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox"]
+[node name="NeedsSep" type="HSeparator" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox" unique_id=986525083]
 layout_mode = 2
 
-[node name="NeedsContainer" type="VBoxContainer" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox"]
+[node name="NeedsContainer" type="VBoxContainer" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox" unique_id=1092798802]
 layout_mode = 2
 
-[node name="EnemyInfoPanel" type="Panel" parent="UI/HUD"]
+[node name="EnemyInfoPanel" type="Panel" parent="UI/HUD" unique_id=253487421]
 visible = false
 anchors_preset = 2
 anchor_top = 1.0
@@ -287,7 +287,7 @@ offset_bottom = -10.0
 grow_vertical = 0
 theme_override_styles/panel = SubResource("2")
 
-[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/EnemyInfoPanel"]
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/EnemyInfoPanel" unique_id=1606131721]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -296,28 +296,27 @@ offset_top = 4.0
 offset_right = -4.0
 offset_bottom = -4.0
 
-[node name="VBox" type="VBoxContainer" parent="UI/HUD/EnemyInfoPanel/ScrollContainer"]
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/EnemyInfoPanel/ScrollContainer" unique_id=1732624030]
 layout_mode = 2
 
-[node name="NameLabel" type="Label" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox"]
+[node name="NameLabel" type="Label" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox" unique_id=1779834962]
 layout_mode = 2
-theme_override_colors/font_color = Color(1.0, 0.3, 0.3, 1)
-theme_override_constants/minimum_font_size = 14
+theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
 text = "👹 入侵者"
 
-[node name="StateLabel" type="Label" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox"]
+[node name="StateLabel" type="Label" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox" unique_id=1197523466]
 layout_mode = 2
 text = "状态: 前进中"
 
-[node name="HpBarHBox" type="HBoxContainer" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox"]
+[node name="HpBarHBox" type="HBoxContainer" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox" unique_id=858628330]
 layout_mode = 2
 
-[node name="HPLabel" type="Label" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox/HpBarHBox"]
+[node name="HPLabel" type="Label" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox/HpBarHBox" unique_id=848806652]
 custom_minimum_size = Vector2(50, 0)
 layout_mode = 2
 text = "生命:"
 
-[node name="HPBar" type="ProgressBar" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox/HpBarHBox"]
+[node name="HPBar" type="ProgressBar" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox/HpBarHBox" unique_id=664499538]
 layout_mode = 2
 size_flags_horizontal = 3
 value = 100.0
@@ -481,7 +480,7 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
 text = "总量: 0"
 
-[node name="EventPanel" type="Panel" parent="UI/HUD"]
+[node name="EventPanel" type="Panel" parent="UI/HUD" unique_id=15303250]
 visible = false
 anchors_preset = 2
 anchor_top = 1.0
@@ -493,7 +492,7 @@ offset_bottom = -10.0
 grow_vertical = 0
 theme_override_styles/panel = SubResource("2")
 
-[node name="VBox" type="VBoxContainer" parent="UI/HUD/EventPanel"]
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/EventPanel" unique_id=785100828]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -502,13 +501,12 @@ offset_top = 8.0
 offset_right = -8.0
 offset_bottom = -8.0
 
-[node name="TitleLabel" type="Label" parent="UI/HUD/EventPanel/VBox"]
+[node name="TitleLabel" type="Label" parent="UI/HUD/EventPanel/VBox" unique_id=1631683627]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.8, 1.0, 1)
-theme_override_constants/minimum_font_size = 18
+theme_override_colors/font_color = Color(0.3, 0.8, 1, 1)
 text = "🗡️ 事件"
 
-[node name="EventListContainer" type="VBoxContainer" parent="UI/HUD/EventPanel/VBox"]
+[node name="EventListContainer" type="VBoxContainer" parent="UI/HUD/EventPanel/VBox" unique_id=1215122360]
 layout_mode = 2
 size_flags_vertical = 3
 
@@ -633,15 +631,14 @@ offset_bottom = 530.0
 layout_mode = 2
 
 [node name="WorkPanel" type="Panel" parent="UI" unique_id=567230329]
-visible = false
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -450.0
+offset_left = -791.5
 offset_top = -300.0
-offset_right = 450.0
+offset_right = 791.5
 offset_bottom = 300.0
 grow_horizontal = 2
 grow_vertical = 2
@@ -651,8 +648,8 @@ script = ExtResource("12_0k7l")
 layout_mode = 0
 offset_left = 12.0
 offset_top = 8.0
-offset_right = 888.0
-offset_bottom = 36.0
+offset_right = 1560.5
+offset_bottom = 39.0
 
 [node name="Title" type="Label" parent="UI/WorkPanel/TitleBar" unique_id=1206977215]
 layout_mode = 2
@@ -669,7 +666,7 @@ text = "✕"
 layout_mode = 0
 offset_left = 12.0
 offset_top = 44.0
-offset_right = 888.0
+offset_right = 1573.5
 offset_bottom = 580.0
 
 [node name="WorkGrid" type="GridContainer" parent="UI/WorkPanel/ScrollContainer" unique_id=610940900]
@@ -680,10 +677,10 @@ columns = 10
 
 [node name="BottomBar" type="HBoxContainer" parent="UI/WorkPanel" unique_id=1729236418]
 layout_mode = 0
-offset_left = 12.0
-offset_top = 588.0
-offset_right = 888.0
-offset_bottom = 620.0
+offset_left = 3.5
+offset_top = 563.0
+offset_right = 879.5
+offset_bottom = 595.0
 
 [node name="ResetAllBtn" type="Button" parent="UI/WorkPanel/BottomBar" unique_id=1499309424]
 layout_mode = 2

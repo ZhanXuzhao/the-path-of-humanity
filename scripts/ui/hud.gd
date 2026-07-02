@@ -1111,7 +1111,7 @@ func _populate_event_buttons():
 		trigger_btn.text = "触发事件"
 		trigger_btn.custom_minimum_size = Vector2(0, 30)
 		trigger_btn.add_theme_constant_override("minimum_font_size", 12)
-		trigger_btn.pressed.connect(_on_trigger_event.bind(event_id, trigger_btn))
+		trigger_btn.pressed.connect(_on_trigger_event.bind(evt.id, trigger_btn))
 		event_frame.add_child(trigger_btn)
 		
 		# 分隔线
