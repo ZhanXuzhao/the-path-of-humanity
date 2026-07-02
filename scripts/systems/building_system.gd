@@ -578,6 +578,90 @@ func remove_building(pos: Vector2i) -> bool:
 	building_removed.emit(bld.building_id, bld.grid_pos)
 	return true
 
+# -------- 拆除建筑（100%返还建材） --------
+func demolish_building(pos: Vector2i):
+	"""拆除指定位置的建筑，建材100%掉落地面，并掉落库存物品"""
+	var bld = get_building_at(pos)
+	if bld == null:
+		return
+	
+	var data = bld.get_data()
+	var size = data.size if data else Vector2i.ONE
+	var bld_id = bld.building_id
+	var bld_pos = bld.grid_pos
+	
+	# 通知游戏管理器
+	var gm = get_node("/root/GameManager")
+	if gm:
+		var name_str = bld.display_name if bld.display_name != "" else (data.name if data else bld_id)
+		gm.show_notification("建筑已拆除: %s" % name_str, gm.NotificationType.INFO)
+	
+	# 掉落100%建筑材料到地面
+	if data != null and not data.materials.is_empty() and world:
+		var drop_positions: Array[Vector2i] = []
+		for x in size.x:
+			for y in size.y:
+				drop_positions.append(bld.grid_pos + Vector2i(x, y))
+		
+		for mat_id in data.materials:
+			var amount = data.materials[mat_id]
+			if amount <= 0:
+				continue
+			# 分散掉落到每个格子
+			var per_grid = ceil(amount / float(drop_positions.size()))
+			var remaining = amount
+			for gpos in drop_positions:
+				if remaining <= 0:
+					break
+				var drop_amt = mini(per_grid, remaining)
+				world.drop_item_on_ground(gpos, mat_id, drop_amt)
+				remaining -= drop_amt
+	
+	# 掉落库存物品到地面（存储建筑/生产建筑有 inventory）
+	if bld.inventory != null and world:
+		var drop_positions: Array[Vector2i] = []
+		for x in size.x:
+			for y in size.y:
+				drop_positions.append(bld.grid_pos + Vector2i(x, y))
+		
+		for item_id in bld.inventory.items:
+			var amount = bld.inventory.items[item_id]
+			if amount <= 0:
+				continue
+			var per_grid = ceil(amount / float(drop_positions.size()))
+			var remaining = amount
+			for gpos in drop_positions:
+				if remaining <= 0:
+					break
+				var drop_amt = mini(per_grid, remaining)
+				if gpos != bld.grid_pos or drop_amt > 0:  # 避免与建材完全重叠
+					world.drop_item_on_ground(gpos, item_id, drop_amt)
+					remaining -= drop_amt
+	
+	# 从存储建筑索引中移除
+	_completed_storage_index.erase(bld.grid_pos)
+	
+	# 从床铺索引中移除，并释放定居者的床分配
+	if _completed_bed_index.has(bld.grid_pos):
+		_completed_bed_index.erase(bld.grid_pos)
+		if bld.assigned_settler_id != "":
+			var game = get_node_or_null("/root/Game")
+			if game:
+				var settler = game.get_settler_by_id(bld.assigned_settler_id)
+				if settler and is_instance_valid(settler):
+					settler.assigned_bed_pos = Vector2i(-1, -1)
+	
+	# 清除所有占用格子
+	for x in size.x:
+		for y in size.y:
+			var grid_pos = bld.grid_pos + Vector2i(x, y)
+			buildings.erase(grid_pos)
+			if world:
+				world.remove_building_at(grid_pos)
+	
+	building_destroyed.emit(bld_id, bld_pos)
+	building_removed.emit(bld_id, bld_pos)
+
 # -------- 序列化 --------
 func to_dict() -> Dictionary:
 	var data = {}

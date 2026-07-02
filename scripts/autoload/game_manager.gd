@@ -228,6 +228,7 @@ func save_game(silent: bool = false) -> bool:
 		"settlers": _serialize_settlers(game.settlers),
 		"work_priorities": get_node_or_null("/root/WorkManager").to_dict() if get_node_or_null("/root/WorkManager") else {},
 		"designated_resources": game.designated_resources.duplicate(),
+		"designated_demolitions": game.designated_demolitions.duplicate(),
 	}
 	
 	var file = FileAccess.open("user://savegame.dat", FileAccess.WRITE)

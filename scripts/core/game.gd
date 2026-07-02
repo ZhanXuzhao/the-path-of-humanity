@@ -94,6 +94,9 @@ var designation_work_type: int = -1  # WorkManager.WorkType
 # 清除模式——玩家可框选/点选清除已标记的资源
 var clear_mode: bool = false
 
+# 拆除模式——玩家可点击建筑标记为拆除
+var demolition_mode: bool = false
+
 # 已标记的资源 {"x,y": work_type}
 # 只有被标记的资源才会被定居者采集
 var designated_resources: Dictionary = {}
@@ -104,8 +107,12 @@ var designated_boars: Dictionary = {}
 # 已标记的敌对敌人 {enemy_instance_id: true} — 攻击目标
 var designated_enemies: Dictionary = {}
 
+# 已标记的待拆除建筑 {"x,y": true}
+var designated_demolitions: Dictionary = {}
+
 signal designation_mode_changed(active: bool, work_type: int)
 signal clear_mode_changed(active: bool)
+signal demolition_mode_changed(active: bool)
 signal designated_resources_changed()
 
 # 框选拖拽状态
@@ -463,6 +470,69 @@ func exit_clear_mode():
 	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 	clear_mode_changed.emit(false)
 
+# ==================== 拆除标记模式 ====================
+
+func enter_demolition_mode():
+	"""进入拆除模式，玩家可以点击建筑标记为拆除"""
+	if build_mode:
+		exit_build_mode()
+	if designation_mode:
+		exit_designation_mode()
+	if clear_mode:
+		exit_clear_mode()
+	
+	demolition_mode = true
+	_is_designation_dragging = false
+	_init_drag_overlay()
+	
+	# 鼠标变为十字准星
+	Input.set_default_cursor_shape(Input.CURSOR_CROSS)
+	
+	demolition_mode_changed.emit(true)
+
+func exit_demolition_mode():
+	"""退出拆除模式"""
+	demolition_mode = false
+	_is_designation_dragging = false
+	if _drag_overlay:
+		_drag_overlay.queue_redraw()
+	# 恢复默认鼠标
+	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
+	demolition_mode_changed.emit(false)
+
+func toggle_building_demolition(grid_pos: Vector2i) -> bool:
+	"""切换指定网格位置的建筑拆除标记状态，返回标记后的状态（true=已标记）"""
+	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
+	
+	# 检查该位置是否有已完成建筑
+	var bld = building_system.get_building_at(grid_pos) if building_system else null
+	if bld == null or not bld.is_completed:
+		return false
+	
+	# 检查建筑数据是否存在
+	var data = bld.get_data()
+	if data == null:
+		return false
+	
+	if designated_demolitions.has(key):
+		# 已标记 → 取消标记
+		designated_demolitions.erase(key)
+		designated_resources_changed.emit()
+		return false
+	else:
+		# 标记为待拆除
+		designated_demolitions[key] = true
+		designated_resources_changed.emit()
+		return true
+
+func _toggle_demolition_at_pos(global_pos: Vector2) -> bool:
+	"""使用鼠标像素位置查找建筑并切换拆除标记"""
+	var grid_pos = Vector2i(
+		floori(global_pos.x / world.tile_size),
+		floori(global_pos.y / world.tile_size)
+	)
+	return toggle_building_demolition(grid_pos)
+
 func toggle_resource_designation(grid_pos: Vector2i) -> bool:
 	"""切换指定网格位置的资源标记状态，返回标记后的状态（true=已标记）"""
 	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
@@ -618,8 +688,9 @@ func is_enemy_designated(enemy_instance_id: int) -> bool:
 	return designated_enemies.has(enemy_instance_id)
 
 func clear_all_designations():
-	"""清除所有标记（包括资源标记、野猪标记和敌人标记）"""
+	"""清除所有标记（包括资源标记、野猪标记、敌人标记和拆除标记）"""
 	designated_resources.clear()
+	designated_demolitions.clear()
 	# 清除所有野猪标记视觉
 	for b in boars:
 		if is_instance_valid(b):
@@ -805,13 +876,16 @@ func _remove_designations_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 				b.queue_redraw()
 				boar_changed = true
 	
-	# 清除矩形内的资源标记
+	# 清除矩形内的资源标记和拆除标记
 	var changed = false
 	for x in range(min_x, max_x + 1):
 		for y in range(min_y, max_y + 1):
 			var key = "%d,%d" % [x, y]
 			if designated_resources.has(key):
 				designated_resources.erase(key)
+				changed = true
+			if designated_demolitions.has(key):
+				designated_demolitions.erase(key)
 				changed = true
 	
 	if changed or boar_changed or enemy_changed:
@@ -1188,6 +1262,9 @@ func _input(event):
 		if selected_tile_pos.x >= 0:
 			_deselect_tile()
 			return
+		if demolition_mode:
+			exit_demolition_mode()
+			return
 		if build_mode:
 			exit_build_mode()
 			return
@@ -1231,6 +1308,8 @@ func _input(event):
 				exit_build_mode()
 			if clear_mode:
 				exit_clear_mode()
+			if demolition_mode:
+				exit_demolition_mode()
 			enter_designation_mode(-2)
 		get_viewport().set_input_as_handled()
 		return
@@ -1244,6 +1323,8 @@ func _input(event):
 				exit_build_mode()
 			if designation_mode:
 				exit_designation_mode()
+			if demolition_mode:
+				exit_demolition_mode()
 			enter_clear_mode()
 		get_viewport().set_input_as_handled()
 		return
@@ -1255,6 +1336,9 @@ func _input(event):
 			return
 		if clear_mode:
 			exit_clear_mode()
+			return
+		if demolition_mode:
+			exit_demolition_mode()
 			return
 		if build_mode:
 			exit_build_mode()
@@ -1366,6 +1450,10 @@ func _input(event):
 						if designated_resources.has(key):
 							designated_resources.erase(key)
 							designated_resources_changed.emit()
+						# 也清除该位置的拆除标记
+						if designated_demolitions.has(key):
+							designated_demolitions.erase(key)
+							designated_resources_changed.emit()
 					else:
 						# 框选：清除矩形内所有标记
 						_remove_designations_in_rect(_drag_start_grid, end_grid)
@@ -1384,12 +1472,19 @@ func _input(event):
 					_drag_end_grid = Vector2i(-999999, -999999)
 			return
 	
+	# 拆除模式的左键处理
+	if event is InputEventMouseButton and not build_mode and demolition_mode:
+		if event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+			var global_pos = get_global_mouse_position()
+			_toggle_demolition_at_pos(global_pos)
+			return
+	
 	if event.is_action_pressed("left_click") and build_mode:
 		_try_place_building()
 		return
 	
-	# 定居者点击选择（非建造/标记/清除模式下的左键单击）
-	if event.is_action_pressed("left_click") and not build_mode and not designation_mode and not clear_mode:
+	# 定居者点击选择（非建造/标记/清除/拆除模式下的左键单击）
+	if event.is_action_pressed("left_click") and not build_mode and not designation_mode and not clear_mode and not demolition_mode:
 		var global_pos = get_global_mouse_position()
 		var grid_pos = Vector2i(
 			floori(global_pos.x / world.tile_size),
@@ -1656,6 +1751,11 @@ func _restore_from_save(data: Dictionary):
 	if data.has("designated_resources"):
 		designated_resources = data.designated_resources.duplicate()
 		designated_resources_changed.emit()
+	
+	# 恢复拆除标记（v5+）
+	if data.has("designated_demolitions"):
+		designated_demolitions = data.designated_demolitions.duplicate()
+		designated_resources_changed.emit()
 
 # -------- 定居者管理 --------
 func get_idle_settlers() -> Array:
@@ -1828,6 +1928,10 @@ func _assign_ai_tasks():
 	# 4.5 维修任务 - 修复受损建筑
 	var repair_tasks = _scan_repair_tasks(idle_settlers)
 	tasks.append_array(repair_tasks)
+	
+	# 4.75 拆除任务 - 拆除被标记的建筑
+	var demolition_tasks = _scan_demolition_tasks()
+	tasks.append_array(demolition_tasks)
 	
 	# 5. 采集任务 - 在已生成的区块中找最近的资源（不主动生成新区块）
 	var harvest_tasks = _scan_nearby_resources(idle_settlers)
@@ -2002,6 +2106,39 @@ func _scan_repair_tasks(_idle_settlers: Array) -> Array:
 			"skill": "construction",
 			"work_required": work_needed,
 			"work_type": WorkManager.WorkType.REPAIR,
+		})
+	
+	return result
+
+func _scan_demolition_tasks() -> Array:
+	"""扫描被标记的待拆除建筑，生成拆除任务（拆除属于建筑工作，使用建造优先级）"""
+	var result: Array = []
+	if not building_system or designated_demolitions.is_empty():
+		return result
+	
+	for key in designated_demolitions:
+		var parts = key.split(",")
+		if parts.size() != 2:
+			continue
+		var grid_pos = Vector2i(int(parts[0]), int(parts[1]))
+		var bld = building_system.get_building_at(grid_pos)
+		if bld == null:
+			continue
+		
+		# 跳过正在被其他定居者拆除的建筑（检查是否有任务正在做）
+		# 只扫描已完成建筑
+		if not bld.is_completed:
+			continue
+		
+		var center_pixel = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
+		result.append({
+			"id": "demolish_%d_%d" % [grid_pos.x, grid_pos.y],
+			"type": "DEMOLISH",
+			"target_pos": bld.grid_pos,
+			"target_world_pos": center_pixel,
+			"skill": "construction",
+			"work_required": bld.max_hp,  # 拆除工作量等于建筑HP
+			"work_type": WorkManager.WorkType.CONSTRUCTION,  # 拆除属于建筑工作，使用建造优先级
 		})
 	
 	return result
@@ -2327,6 +2464,23 @@ func _cleanup_depleted_designations():
 	for key in to_remove:
 		designated_resources.erase(key)
 	if not to_remove.is_empty():
+		designated_resources_changed.emit()
+	
+	# 清理已不存在的建筑的拆除标记
+	var demo_to_remove: Array[String] = []
+	for key in designated_demolitions:
+		var parts = key.split(",")
+		if parts.size() != 2:
+			demo_to_remove.append(key)
+			continue
+		var grid_pos = Vector2i(int(parts[0]), int(parts[1]))
+		if building_system:
+			var bld = building_system.get_building_at(grid_pos)
+			if bld == null:
+				demo_to_remove.append(key)
+	for key in demo_to_remove:
+		designated_demolitions.erase(key)
+	if not demo_to_remove.is_empty():
 		designated_resources_changed.emit()
 
 func _cleanup_harvest_claims():

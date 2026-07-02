@@ -8,6 +8,8 @@ const WorkManager = preload("res://scripts/autoload/work_manager.gd")
 
 # 自动模式特殊值
 const AUTO_WORK_TYPE := -2
+# 拆除模式特殊值
+const DEMOLISH_WORK_TYPE := -3
 
 # 指令按钮配置（使用 Dictionary 代替 struct）
 var commands: Array[Dictionary] = [
@@ -18,6 +20,7 @@ var commands: Array[Dictionary] = [
 	{"name": "搬运", "work_type": WorkManager.WorkType.HAULING, "icon": "📦", "desc": "标记地面物品为搬运目标"},
 	{"name": "狩猎", "work_type": WorkManager.WorkType.HUNTING, "icon": "🏹", "desc": "标记野生动物为狩猎目标"},
 	{"name": "攻击", "work_type": WorkManager.WorkType.COMBAT, "icon": "⚔️", "desc": "标记敌对敌人为攻击目标，有战斗工作的居民会攻击标记的敌人"},
+	{"name": "拆除", "work_type": DEMOLISH_WORK_TYPE, "icon": "💥", "desc": "点击建筑标记为待拆除，拆除后建材100%掉落地面"},
 ]
 
 @onready var button_container: VBoxContainer = $MarginContainer/VBox/ButtonContainer
@@ -44,6 +47,7 @@ func _ready():
 	if _game:
 		_game.designation_mode_changed.connect(_on_designation_mode_changed)
 		_game.clear_mode_changed.connect(_on_clear_mode_changed)
+		_game.demolition_mode_changed.connect(_on_demolition_mode_changed)
 	
 	visible = true
 
@@ -58,11 +62,35 @@ func _create_cmd_button(icon: String, cmd_name: String, work_type: int, desc: St
 	if work_type == CLEAR_WORK_TYPE:
 		_clear_btn = btn
 		btn.pressed.connect(_on_clear_pressed)
+	elif work_type == DEMOLISH_WORK_TYPE:
+		btn.pressed.connect(_on_demolish_button_pressed.bind(btn))
+		_buttons[work_type] = btn
 	else:
 		btn.pressed.connect(_on_command_button_pressed.bind(work_type, btn))
 		_buttons[work_type] = btn
 	
 	button_container.add_child(btn)
+
+func _on_demolish_button_pressed(btn: Button):
+	"""进入/退出拆除模式"""
+	if not _game:
+		return
+	
+	if _game.demolition_mode:
+		_game.exit_demolition_mode()
+		btn.button_pressed = false
+	else:
+		for wt in _buttons:
+			if wt != DEMOLISH_WORK_TYPE:
+				_buttons[wt].button_pressed = false
+		if _clear_btn:
+			_clear_btn.button_pressed = false
+		if _game.designation_mode:
+			_game.exit_designation_mode()
+		if _game.clear_mode:
+			_game.exit_clear_mode()
+		_game.enter_demolition_mode()
+		btn.button_pressed = true
 
 func _on_command_button_pressed(work_type: int, btn: Button):
 	if not _game:
@@ -79,6 +107,8 @@ func _on_command_button_pressed(work_type: int, btn: Button):
 			_clear_btn.button_pressed = false
 		if _game.clear_mode:
 			_game.exit_clear_mode()
+		if _game.demolition_mode:
+			_game.exit_demolition_mode()
 		_game.enter_designation_mode(work_type)
 		btn.button_pressed = true
 
@@ -95,6 +125,8 @@ func _on_clear_pressed():
 			_buttons[wt].button_pressed = false
 		if _game.designation_mode:
 			_game.exit_designation_mode()
+		if _game.demolition_mode:
+			_game.exit_demolition_mode()
 		_game.enter_clear_mode()
 		_clear_btn.button_pressed = true
 
@@ -102,12 +134,17 @@ func _on_designation_mode_changed(active: bool, work_type: int):
 	"""当外部退出标记模式时，同步按钮状态"""
 	if not active:
 		for wt in _buttons:
-			_buttons[wt].button_pressed = false
+			if wt != DEMOLISH_WORK_TYPE:
+				_buttons[wt].button_pressed = false
 	else:
 		for wt in _buttons:
-			_buttons[wt].button_pressed = (wt == work_type)
+			if wt != DEMOLISH_WORK_TYPE:
+				_buttons[wt].button_pressed = (wt == work_type)
 		if _clear_btn:
 			_clear_btn.button_pressed = false
+		# 退出拆除模式
+		if _buttons.has(DEMOLISH_WORK_TYPE):
+			_buttons[DEMOLISH_WORK_TYPE].button_pressed = false
 	
 	if _clear_btn and not active:
 		_clear_btn.button_pressed = false
@@ -119,3 +156,14 @@ func _on_clear_mode_changed(active: bool):
 	if active:
 		for wt in _buttons:
 			_buttons[wt].button_pressed = false
+
+func _on_demolition_mode_changed(active: bool):
+	"""拆除模式状态变化时更新UI"""
+	if _buttons.has(DEMOLISH_WORK_TYPE):
+		_buttons[DEMOLISH_WORK_TYPE].button_pressed = active
+	if active:
+		for wt in _buttons:
+			if wt != DEMOLISH_WORK_TYPE:
+				_buttons[wt].button_pressed = false
+		if _clear_btn:
+			_clear_btn.button_pressed = false

@@ -66,6 +66,7 @@ const DESIGNATION_ICONS = {
 	5: "🌾",   # FARMING
 	6: "📦",   # HAULING
 	-2: "🔄",  # AUTO 自动
+	-3: "💥",  # DEMOLISH 拆除
 }
 
 func _ready():
@@ -848,24 +849,33 @@ func _on_designated_resources_changed():
 	_rebuild_designation_overlays()
 
 func _rebuild_designation_overlays():
-	"""重建所有指令标记覆盖层"""
+	"""重建所有指令标记覆盖层（包括资源标记和拆除标记）"""
 	_clear_all_designation_overlays()
 	
 	var game = get_node_or_null("/root/Game")
 	if game == null:
 		return
 	
+	# 渲染资源采集标记
 	var designated = game.designated_resources
-	if designated.is_empty():
-		return
+	if not designated.is_empty():
+		for key in designated:
+			var parts = key.split(",")
+			if parts.size() != 2:
+				continue
+			var grid_pos = Vector2i(int(parts[0]), int(parts[1]))
+			var work_type = designated[key]
+			_create_designation_overlay(grid_pos, work_type)
 	
-	for key in designated:
-		var parts = key.split(",")
-		if parts.size() != 2:
-			continue
-		var grid_pos = Vector2i(int(parts[0]), int(parts[1]))
-		var work_type = designated[key]
-		_create_designation_overlay(grid_pos, work_type)
+	# 渲染拆除标记
+	var demolitions = game.designated_demolitions
+	if not demolitions.is_empty():
+		for key in demolitions:
+			var parts = key.split(",")
+			if parts.size() != 2:
+				continue
+			var grid_pos = Vector2i(int(parts[0]), int(parts[1]))
+			_create_designation_overlay(grid_pos, -3)  # DEMOLISH
 
 func _create_designation_overlay(grid_pos: Vector2i, work_type: int):
 	"""为指定位置的资源创建图标标记"""

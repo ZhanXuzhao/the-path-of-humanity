@@ -385,6 +385,7 @@ static func get_work_type_from_task(task_data: Dictionary) -> String:
 		"COMBAT": return "战斗"
 		"HUNTING": return "狩猎"
 		"REPAIR": return "维修"
+		"DEMOLISH": return "拆除"
 		"EAT_FROM_RACK": return "进食"
 		"SLEEP": return "睡眠"
 		_: return ""
@@ -592,6 +593,8 @@ func _do_work_tick(task_type: String):
 			_tick_harvest()
 		"CONSTRUCT":
 			_tick_construct()
+		"DEMOLISH":
+			_tick_demolish()
 		"CRAFT":
 			_tick_craft()
 		"STORE":
@@ -1490,6 +1493,43 @@ func _tick_repair():
 	
 	# 检查是否已修满
 	if bld.hp >= bld.max_hp:
+		complete_task()
+
+func _tick_demolish():
+	"""执行一次拆除工作——每次工作刻减少建筑HP，HP归零则建筑被拆除，建材100%掉落"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		complete_task()
+		return
+	
+	var grid_pos: Vector2i = current_task.get("target_pos", Vector2i.ZERO)
+	var bld = game.building_system.get_building_at(grid_pos)
+	if bld == null or not bld.is_completed:
+		# 建筑已不存在或已完成拆除
+		game._cleanup_depleted_designations()
+		complete_task()
+		return
+	
+	# 根据建造技能决定拆除速度（技能越高拆得越快）
+	var skill_level = get_skill("construction")
+	var demolish_damage = 5.0 + skill_level * 2.0
+	
+	# 对建筑造成伤害
+	bld.hp -= int(demolish_damage)
+	game.building_system.building_damaged.emit(bld.grid_pos, demolish_damage, bld.hp)
+	
+	# 增加技能经验
+	add_skill_experience("construction", 0.5)
+	
+	# HP归零 → 拆除完成
+	if bld.hp <= 0:
+		# 从拆除标记中移除
+		var key = "%d,%d" % [grid_pos.x, grid_pos.y]
+		if game.designated_demolitions.has(key):
+			game.designated_demolitions.erase(key)
+		
+		# 执行拆除：掉落全部建材+库存物品到地面
+		game.building_system.demolish_building(bld.grid_pos)
 		complete_task()
 
 func find_nearest_residential() -> Dictionary:
