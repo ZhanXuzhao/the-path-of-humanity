@@ -5,6 +5,7 @@ class_name WorldRenderer
 
 const _ID = preload("res://resources/item_definitions.gd")
 const _TG = preload("res://scripts/core/texture_generator.gd")
+const TowerRangeOverlay = preload("res://scripts/core/tower_range_overlay.gd")
 
 @onready var world: World = get_parent()
 @onready var building_system = get_node("/root/Game/Systems/BuildingSystem")
@@ -445,6 +446,9 @@ func _update_selection_overlay():
 	
 	# 在选中框上方绘制HP条（始终保持在最上面）
 	_update_building_hp_bar()
+	
+	# 如果选中的是箭塔等防御建筑，绘制射程范围
+	_update_tower_range_overlay()
 
 func _update_building_hp_bar():
 	"""在选中建筑上方绘制/刷新HP条"""
@@ -499,6 +503,27 @@ func _update_building_hp_bar():
 	fill.size = Vector2(bar_width * hp_ratio, bar_height)
 	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_selection_overlay.add_child(fill)
+
+func _update_tower_range_overlay():
+	var bld = _selected_building_instance
+	if bld == null:
+		return
+	var data = bld.get_data()
+	if data == null or data.attack_range <= 0:
+		return
+
+	var tile_size = world.tile_size
+	var center = Vector2(
+		bld.grid_pos.x * tile_size + tile_size / 2.0,
+		bld.grid_pos.y * tile_size + tile_size / 2.0
+	)
+	var radius = data.attack_range * tile_size
+
+	var overlay = TowerRangeOverlay.new()
+	overlay.center = center
+	overlay.radius = radius
+	_selection_overlay.add_child(overlay)
+	overlay.queue_redraw()
 
 func _on_building_damaged(pos: Vector2i, _damage: float, _current_hp: int):
 	"""建筑受到伤害时刷新选中建筑的HP条"""
