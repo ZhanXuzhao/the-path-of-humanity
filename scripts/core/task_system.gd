@@ -169,6 +169,12 @@ func _assign_ai_tasks():
 	var harvest_tasks = _scan_nearby_resources(idle_settlers)
 	tasks.append_array(harvest_tasks)
 
+	var farm_plant_tasks = _scan_farm_plant_tasks(idle_settlers)
+	tasks.append_array(farm_plant_tasks)
+
+	var farm_harvest_tasks = _scan_farm_harvest_tasks(idle_settlers)
+	tasks.append_array(farm_harvest_tasks)
+
 	if tasks.is_empty():
 		return
 
@@ -412,6 +418,48 @@ func _scan_nearby_resources(idle_settlers: Array) -> Array:
 					"work_required": dep.harvest_time,
 					"work_type": work_type,
 				})
+
+	return result
+
+func _scan_farm_plant_tasks(_idle_settlers: Array) -> Array:
+	var result: Array = []
+	if _game.farming_system == null:
+		return result
+
+	var plots = _game.farming_system.get_plots_needing_planting()
+	for plot in plots:
+		var world_pos = _grid_to_world(plot.grid_pos)
+		result.append({
+			"id": "plant_%d_%d" % [plot.grid_pos.x, plot.grid_pos.y],
+			"type": "PLANT",
+			"target_pos": plot.grid_pos,
+			"target_world_pos": world_pos,
+			"crop_id": plot.crop_id,
+			"skill": "farming",
+			"work_required": 5.0,
+			"work_type": WorkManager.WorkType.FARMING,
+		})
+
+	return result
+
+func _scan_farm_harvest_tasks(_idle_settlers: Array) -> Array:
+	var result: Array = []
+	if _game.farming_system == null:
+		return result
+
+	var plots = _game.farming_system.get_plots_ready_for_harvest()
+	for plot in plots:
+		var world_pos = _grid_to_world(plot.grid_pos)
+		result.append({
+			"id": "harvest_farm_%d_%d" % [plot.grid_pos.x, plot.grid_pos.y],
+			"type": "HARVEST_FARM",
+			"target_pos": plot.grid_pos,
+			"target_world_pos": world_pos,
+			"crop_id": plot.crop_id,
+			"skill": "farming",
+			"work_required": 5.0,
+			"work_type": WorkManager.WorkType.FARMING,
+		})
 
 	return result
 

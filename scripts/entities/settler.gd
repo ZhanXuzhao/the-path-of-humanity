@@ -386,6 +386,8 @@ static func get_work_type_from_task(task_data: Dictionary) -> String:
 		"HUNTING": return "狩猎"
 		"REPAIR": return "维修"
 		"DEMOLISH": return "拆除"
+		"PLANT": return "种植"
+		"HARVEST_FARM": return "收割"
 		"EAT_FROM_RACK": return "进食"
 		"SLEEP": return "睡眠"
 		_: return ""
@@ -607,6 +609,10 @@ func _do_work_tick(task_type: String):
 			_tick_go_sleep()
 		"REPAIR":
 			_tick_repair()
+		"PLANT":
+			_tick_plant()
+		"HARVEST_FARM":
+			_tick_harvest_farm()
 
 func _tick_harvest():
 	"""执行一次采集工作——采集任务目标格子上的资源（角色站在相邻格子上采集）"""
@@ -1568,6 +1574,45 @@ func _tick_demolish():
 		# 执行拆除：掉落全部建材+库存物品到地面
 		game.building_system.demolish_building(bld.grid_pos)
 		complete_task()
+
+func _tick_plant():
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.farming_system == null:
+		complete_task()
+		return
+
+	var grid_pos: Vector2i = current_task.get("target_pos", Vector2i.ZERO)
+	var crop_id: String = current_task.get("crop_id", "")
+
+	if crop_id == "":
+		complete_task()
+		return
+
+	if game.farming_system.plant_crop(grid_pos):
+		var crop_def = game.farming_system.get_crop_def(crop_id)
+		var name_str = crop_def.name if crop_def else crop_id
+		add_skill_experience("farming", 1.0)
+	else:
+		pass
+
+	complete_task()
+
+func _tick_harvest_farm():
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.farming_system == null:
+		complete_task()
+		return
+
+	var grid_pos: Vector2i = current_task.get("target_pos", Vector2i.ZERO)
+
+	var harvested_item = game.farming_system.harvest_crop(grid_pos)
+	if harvested_item != "":
+		inventory.add_item(harvested_item, 1)
+		var item_data = ItemDefinitions.get_item(harvested_item)
+		var name_str = item_data.name if item_data else harvested_item
+		add_skill_experience("farming", 1.0)
+
+	complete_task()
 
 func find_nearest_residential() -> Dictionary:
 	"""查找最近的居住建筑（优先使用自己的床，其次帐篷/房屋），返回{pos, world_pos}"""

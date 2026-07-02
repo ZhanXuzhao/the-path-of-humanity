@@ -20,6 +20,7 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var work_btn: Button = $BottomBar/WorkBtn
 @onready var event_btn: Button = $BottomBar/EventBtn
 @onready var menu_btn: Button = $BottomBar/MenuBtn
+@onready var plant_btn: Button = $BottomBar/PlantBtn
 
 # 定居者信息面板
 @onready var settler_info_panel: Panel = $SettlerInfoPanel
@@ -124,6 +125,8 @@ func _ready():
 		event_btn.pressed.connect(_on_event_pressed)
 	if menu_btn:
 		menu_btn.pressed.connect(_on_menu_pressed)
+	if plant_btn:
+		plant_btn.pressed.connect(_on_plant_pressed)
 	
 	# 初始化事件面板
 	if event_panel:
@@ -1043,6 +1046,13 @@ func _on_menu_pressed():
 		main_menu.visible = not main_menu.visible
 		if main_menu.visible:
 			game_manager.pause_game()
+
+func _on_plant_pressed():
+	var plant_panel = get_node_or_null("/root/Game/UI/PlantPanel")
+	if plant_panel:
+		plant_panel.visible = not plant_panel.visible
+		if plant_panel.visible:
+			plant_panel._populate_crops()
 
 func _on_notification(msg: String, type: int):
 	var notif = notification_scene.instantiate()

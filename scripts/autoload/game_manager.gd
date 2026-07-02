@@ -229,6 +229,7 @@ func save_game(silent: bool = false) -> bool:
 		"work_priorities": get_node_or_null("/root/WorkManager").to_dict() if get_node_or_null("/root/WorkManager") else {},
 		"designated_resources": game.designation_system.designated_resources.duplicate(),
 		"designated_demolitions": game.designation_system.designated_demolitions.duplicate(),
+		"farming": game.farming_system.to_dict() if game.farming_system else {},
 	}
 	
 	var file = FileAccess.open("user://savegame.dat", FileAccess.WRITE)

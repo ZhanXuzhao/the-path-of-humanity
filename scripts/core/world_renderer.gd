@@ -6,6 +6,7 @@ class_name WorldRenderer
 const _ID = preload("res://resources/item_definitions.gd")
 const _TG = preload("res://scripts/core/texture_generator.gd")
 const TowerRangeOverlay = preload("res://scripts/core/tower_range_overlay.gd")
+const _FS = preload("res://scripts/systems/farming_system.gd")
 
 @onready var world: World = get_parent()
 @onready var building_system = get_node("/root/Game/Systems/BuildingSystem")
@@ -60,6 +61,9 @@ var _designation_overlay: Node2D  # 标记覆盖层
 var _designation_sprites: Dictionary = {}  # "x,y" -> Node2D (每个标记位置的图标容器)
 var _designation_preview_sprites: Dictionary = {}  # "x,y" -> Node2D (拖拽预览图标)
 
+# 农田地块精灵
+var _farm_plot_sprites: Dictionary = {}  # "x,y" -> Sprite2D
+
 # 工作类型对应的图标 Emoji
 const DESIGNATION_ICONS = {
 	0: "⛏️",   # MINING
@@ -93,6 +97,11 @@ func _ready():
 		building_system.construction_progress_updated.connect(_on_construction_progress_updated)
 		building_system.building_damaged.connect(_on_building_damaged)
 	
+	# 连接农业系统信号
+	var farming_system = get_node_or_null("/root/Game/Systems/FarmingSystem")
+	if farming_system:
+		farming_system.plot_changed.connect(_on_farm_plot_changed)
+
 	# 连接选中信号（延迟一帧确保 Game._ready() 已创建 SelectionSystem）
 	call_deferred("_connect_selection_signals")
 	
@@ -128,6 +137,9 @@ func _ready():
 	
 	# 渲染已有的地面物品（加载存档时可能已有数据）
 	call_deferred("_render_existing_ground_items")
+	
+	# 渲染已有的农田地块
+	call_deferred("_render_existing_farm_plots")
 	
 	# 强制触发 _draw()
 	queue_redraw()
@@ -1056,3 +1068,64 @@ func _is_resource_match_work_type(resource_type: int, work_type: int) -> bool:
 			]
 		_:
 			return false
+
+# ==================== 农田地块渲染 ====================
+func _on_farm_plot_changed(grid_pos: Vector2i):
+	_update_farm_plot_sprite(grid_pos)
+
+func _update_farm_plot_sprite(grid_pos: Vector2i):
+	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
+
+	if _farm_plot_sprites.has(key):
+		_farm_plot_sprites[key].queue_free()
+		_farm_plot_sprites.erase(key)
+
+	var farming_system = get_node_or_null("/root/Game/Systems/FarmingSystem")
+	if farming_system == null:
+		return
+
+	var plot = farming_system.get_plot(grid_pos)
+	if plot == null:
+		return
+
+	var pixel_pos = Vector2(
+		grid_pos.x * world.tile_size + world.tile_size / 2.0,
+		grid_pos.y * world.tile_size + world.tile_size / 2.0
+	)
+
+	var sprite = Sprite2D.new()
+	sprite.position = pixel_pos
+	sprite.z_index = 5
+
+	var color: Color
+	match plot.state:
+		_FS.PlotState.EMPTY:
+			color = Color(0.6, 0.4, 0.2, 0.4)
+		_FS.PlotState.PLANTED:
+			color = Color(0.3, 0.8, 0.3, 0.5)
+		_FS.PlotState.READY:
+			color = Color(1.0, 0.8, 0.2, 0.6)
+		_:
+			color = Color(1, 1, 1, 0.3)
+
+	var img = Image.create(world.tile_size, world.tile_size, false, Image.FORMAT_RGBA8)
+	img.fill(color)
+	var border_color = Color(color.r * 1.2, color.g * 1.2, color.b * 1.2, 0.8)
+	for x in world.tile_size:
+		img.set_pixel(x, 0, border_color)
+		img.set_pixel(x, world.tile_size - 1, border_color)
+	for y in world.tile_size:
+		img.set_pixel(0, y, border_color)
+		img.set_pixel(world.tile_size - 1, y, border_color)
+
+	sprite.texture = ImageTexture.create_from_image(img)
+	sprite.scale = Vector2(1, 1)
+	add_child(sprite)
+	_farm_plot_sprites[key] = sprite
+
+func _render_existing_farm_plots():
+	var farming_system = get_node_or_null("/root/Game/Systems/FarmingSystem")
+	if farming_system == null:
+		return
+	for plot in farming_system.get_all_plots():
+		_update_farm_plot_sprite(plot.grid_pos)

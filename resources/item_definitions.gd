@@ -126,6 +126,7 @@ static func _register_items():
 	_add_item("cooked_meat", "熟肉", "烹饪过的肉食", ItemCategory.FOOD, 20, 0.3, 13, 20.0, 0.0, 4.0)
 	_add_item("bread", "面包", "用面粉烤制的面包", ItemCategory.FOOD, 30, 0.2, 14, 15.0, 0.0, 3.0)
 	_add_item("vegetable_soup", "蔬菜汤", "营养丰富的蔬菜汤", ItemCategory.FOOD, 10, 0.5, 15, 25.0, 0.0, 5.0)
+	_add_item("rice", "水稻", "种植收获的水稻，可食用", ItemCategory.FOOD, 50, 0.2, 5, 8.0, 0.0, 1.0)
 
 	# 工具和设备
 	_add_item("stone_axe", "石斧", "用石头制作的简易斧头", ItemCategory.TOOL, 1, 2.0, 16, 0.0, 0.0, 8.0)

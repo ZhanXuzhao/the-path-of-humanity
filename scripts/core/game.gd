@@ -17,12 +17,18 @@ const WorkManager = preload("res://scripts/autoload/work_manager.gd")
 var designation_system: DesignationSystem
 var selection_system: SelectionSystem
 var task_system: TaskSystem
+var farming_system: FarmingSystem
 
 # 建造模式
 var build_mode: bool = false
 var selected_building: String = ""
 var build_preview: Sprite2D = null
 var mouse_grid_pos: Vector2i
+
+# 种植模式
+var plant_mode: bool = false
+var selected_crop: String = ""
+var plant_preview: Sprite2D = null
 
 # 定居者管理
 var settlers = []
@@ -51,6 +57,7 @@ func _ready():
 	task_system = TaskSystem.new()
 	task_system.name = "TaskSystem"
 	add_child(task_system)
+	farming_system = $Systems/FarmingSystem
 	
 	# ===== 存档验证与加载 =====
 	# 1. 检查是否有存档
@@ -97,6 +104,10 @@ func _process(delta):
 	if build_mode:
 		_update_build_preview()
 	
+	# 种植模式预览
+	if plant_mode:
+		_update_plant_preview()
+	
 	# 只有游戏进行中才执行AI和系统更新
 	if _gm.state != 1:
 		return
@@ -108,6 +119,8 @@ func _process(delta):
 		crafting_system.process_crafting(delta)
 	if tech_system:
 		tech_system.process_research(delta)
+	if farming_system:
+		farming_system.process_farming(delta)
 	
 	# 标记/清除模式：更新框选视觉
 	designation_system.process_drag_update()
@@ -354,6 +367,96 @@ func _try_place_building():
 		_gm.show_notification("无法建造: " + check.reason,
 			1)
 
+# ==================== 种植模式 ====================
+func enter_plant_mode(crop_id: String):
+	plant_mode = true
+	selected_crop = crop_id
+
+	if build_mode:
+		exit_build_mode()
+	if designation_system.designation_mode:
+		designation_system.exit_designation_mode()
+	if designation_system.clear_mode:
+		designation_system.exit_clear_mode()
+	if designation_system.demolition_mode:
+		designation_system.exit_demolition_mode()
+
+	if plant_preview == null:
+		plant_preview = Sprite2D.new()
+		plant_preview.z_index = 100
+		add_child(plant_preview)
+
+	var preview_tex = _create_plant_preview_texture()
+	plant_preview.texture = preview_tex
+	plant_preview.visible = true
+	plant_preview.modulate = Color(0, 1, 0, 0.5)
+
+func exit_plant_mode():
+	plant_mode = false
+	selected_crop = ""
+	if plant_preview:
+		plant_preview.visible = false
+
+	var plant_panel = get_node_or_null("UI/PlantPanel")
+	if plant_panel:
+		plant_panel.visible = false
+
+func _create_plant_preview_texture() -> Texture2D:
+	var img = Image.create(32, 32, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 1, 0, 0.3))
+	for x in 32:
+		img.set_pixel(x, 0, Color(0, 1, 0, 0.8))
+		img.set_pixel(x, 31, Color(0, 1, 0, 0.8))
+	for y in 32:
+		img.set_pixel(0, y, Color(0, 1, 0, 0.8))
+		img.set_pixel(31, y, Color(0, 1, 0, 0.8))
+	return ImageTexture.create_from_image(img)
+
+func _update_plant_preview():
+	var mouse_pos = get_global_mouse_position()
+	mouse_grid_pos = Vector2i(
+		floori(mouse_pos.x / world.tile_size),
+		floori(mouse_pos.y / world.tile_size)
+	)
+
+	if plant_preview and plant_mode:
+		var pixel_pos = Vector2(
+			mouse_grid_pos.x * world.tile_size + world.tile_size / 2.0,
+			mouse_grid_pos.y * world.tile_size + world.tile_size / 2.0
+		)
+		plant_preview.position = pixel_pos
+
+		var can_plant = _can_place_farm(mouse_grid_pos)
+		if can_plant:
+			plant_preview.modulate = Color(0, 1, 0, 0.5)
+		else:
+			plant_preview.modulate = Color(1, 0, 0, 0.5)
+
+func _can_place_farm(grid_pos: Vector2i) -> bool:
+	if not world or not world.is_in_world_bounds(grid_pos):
+		return false
+	if not world.is_walkable(grid_pos):
+		return false
+	if building_system and building_system.get_building_at(grid_pos) != null:
+		return false
+	if farming_system and farming_system.has_plot(grid_pos):
+		return false
+	return true
+
+func _try_place_farm():
+	if not plant_mode or selected_crop == "":
+		return
+
+	if not _can_place_farm(mouse_grid_pos):
+		_gm.show_notification("无法在此处种植", _gm.NotificationType.WARNING)
+		return
+
+	if farming_system:
+		if farming_system.add_plot(mouse_grid_pos, selected_crop):
+			var crop_def = farming_system.get_crop_def(selected_crop)
+			var name_str = crop_def.name if crop_def else selected_crop
+			_gm.show_notification("已设置 %s 农田" % name_str, _gm.NotificationType.SUCCESS)
+
 # ==================== 定居者自主AI系统 ====================
 
 func _input(event):
@@ -383,6 +486,9 @@ func _input(event):
 			return
 		if designation_system.demolition_mode:
 			designation_system.exit_demolition_mode()
+			return
+		if plant_mode:
+			exit_plant_mode()
 			return
 		if build_mode:
 			exit_build_mode()
@@ -458,6 +564,9 @@ func _input(event):
 			return
 		if designation_system.demolition_mode:
 			designation_system.exit_demolition_mode()
+			return
+		if plant_mode:
+			exit_plant_mode()
 			return
 		if build_mode:
 			exit_build_mode()
@@ -580,12 +689,16 @@ func _input(event):
 			designation_system._toggle_demolition_at_pos(global_pos)
 			return
 	
+	if event.is_action_pressed("left_click") and plant_mode:
+		_try_place_farm()
+		return
+
 	if event.is_action_pressed("left_click") and build_mode:
 		_try_place_building()
 		return
 	
-	# 定居者点击选择（非建造/标记/清除/拆除模式下的左键单击）
-	if event.is_action_pressed("left_click") and not build_mode and not designation_system.designation_mode and not designation_system.clear_mode and not designation_system.demolition_mode:
+	# 定居者点击选择（非建造/种植/标记/清除/拆除模式下的左键单击）
+	if event.is_action_pressed("left_click") and not plant_mode and not build_mode and not designation_system.designation_mode and not designation_system.clear_mode and not designation_system.demolition_mode:
 		var global_pos = get_global_mouse_position()
 		var grid_pos = Vector2i(
 			floori(global_pos.x / world.tile_size),
@@ -835,6 +948,10 @@ func _restore_from_save(data: Dictionary):
 	if data.has("designated_demolitions"):
 		designation_system.designated_demolitions = data.designated_demolitions.duplicate()
 		designation_system.designated_resources_changed.emit()
+
+	# 恢复农田数据
+	if farming_system and data.has("farming"):
+		farming_system.from_dict(data.farming)
 
 # ==================== 野猪系统 ====================
 
