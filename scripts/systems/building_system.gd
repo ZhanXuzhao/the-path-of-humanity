@@ -12,7 +12,6 @@ signal construction_progress_updated(pos: Vector2i, progress: float, work_cost: 
 signal production_output(pos: Vector2i, item_id: String, amount: int)
 signal building_damaged(pos: Vector2i, damage: float, current_hp: int)
 signal building_destroyed(building_id: String, pos: Vector2i)
-signal recruit_settler_requested(pos: Vector2i)
 
 # 建筑实例数据
 class BuildingInstance:
@@ -367,20 +366,6 @@ func _try_produce(bld, data):
 		if bld.inventory:
 			bld.inventory.add_item(item_id, produced)
 		production_output.emit(bld.grid_pos, item_id, produced)
-
-func try_recruit_settler(pos: Vector2i) -> bool:
-	"""城镇中心消耗2个面包招募一名新居民"""
-	var bld = get_building_at(pos)
-	if bld == null or not bld.is_completed:
-		return false
-	var data = bld.get_data()
-	if data == null or data.id != "town_center":
-		return false
-	if bld.inventory == null or not bld.inventory.has_item("bread", 2):
-		return false
-	bld.inventory.remove_item("bread", 2)
-	recruit_settler_requested.emit(bld.grid_pos)
-	return true
 
 # -------- 建筑查询 --------
 func get_building_at(pos: Vector2i) -> BuildingInstance:

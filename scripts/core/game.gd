@@ -106,7 +106,9 @@ func _ready():
 	# 初始化系统引用
 	if building_system:
 		building_system.world = world
-		building_system.recruit_settler_requested.connect(_on_recruit_settler_requested)
+
+	if crafting_system:
+		crafting_system.crafting_completed.connect(_on_crafting_completed)
 	
 	# 更新HUD速度标签（此时存档已加载完毕，time_speed 为实际值）
 	_update_speed_label()
@@ -240,33 +242,10 @@ func _spawn_initial_settlers():
 	world.drop_item_on_ground(spawn_center_grid + Vector2i(1, 0), "bow", 1)
 	world.drop_item_on_ground(spawn_center_grid + Vector2i(0, 1), "arrow", 30)
 
-func _on_recruit_settler_requested(town_center_pos: Vector2i):
-	"""在城镇中心附近出生一个新定居者"""
-	var used_names: Array = []
-	for s in settlers:
-		if is_instance_valid(s):
-			used_names.append(s.settler_name)
-	
-	var settler_name = Settler.generate_unique_name(used_names)
-	
-	# 寻找城镇中心附近的可行走位置
-	var spawn_grid = _find_walkable_near(town_center_pos, 5)
-	var spawn_pos = Vector2(
-		spawn_grid.x * world.tile_size + world.tile_size / 2.0,
-		spawn_grid.y * world.tile_size + world.tile_size / 2.0
-	)
-	
-	var settler = Settler.new()
-	settler.position = spawn_pos
-	settler.settler_name = settler_name
-	add_child(settler)
-	settlers.append(settler)
-	
-	var work_manager = get_node_or_null("/root/WorkManager")
-	if work_manager:
-		work_manager.init_settler(settler.settler_id)
-	
-	_gm.show_notification("新成员加入了聚居地: %s" % settler_name, _gm.NotificationType.SUCCESS)
+func _on_crafting_completed(recipe_id: String, building_pos: Vector2i):
+	"""制作完成时触发。处理招募完成等特殊事件。"""
+	if recipe_id == "recruit_settler":
+		_spawn_settler_near(building_pos)
 
 func _spawn_initial_boars():
 	"""在地图上随机位置生成初始野猪（数量由 GameConfig 配置）"""
@@ -299,6 +278,33 @@ func _spawn_initial_boars():
 		boars.append(boar)
 		boar.died.connect(_on_boar_died.bind(boar))
 		spawned += 1
+
+func _spawn_settler_near(pos: Vector2i):
+	"""在指定位置附近出生一个新定居者"""
+	var used_names: Array = []
+	for s in settlers:
+		if is_instance_valid(s):
+			used_names.append(s.settler_name)
+
+	var settler_name = Settler.generate_unique_name(used_names)
+
+	var spawn_grid = _find_walkable_near(pos, 5)
+	var spawn_pos = Vector2(
+		spawn_grid.x * world.tile_size + world.tile_size / 2.0,
+		spawn_grid.y * world.tile_size + world.tile_size / 2.0
+	)
+
+	var settler = Settler.new()
+	settler.position = spawn_pos
+	settler.settler_name = settler_name
+	add_child(settler)
+	settlers.append(settler)
+
+	var work_manager = get_node_or_null("/root/WorkManager")
+	if work_manager:
+		work_manager.init_settler(settler.settler_id)
+
+	_gm.show_notification("新成员加入了聚居地: %s" % settler_name, _gm.NotificationType.SUCCESS)
 
 func _find_walkable_near(from_grid: Vector2i, max_radius: int) -> Vector2i:
 	"""从 from_grid 开始螺旋搜索，返回半径 max_radius 内第一个可行走网格"""
