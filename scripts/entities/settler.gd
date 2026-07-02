@@ -1990,8 +1990,13 @@ func shoot_at(target_node: Node2D) -> bool:
 	if not has_bow() or not has_arrow():
 		return false
 	
+	# 攻击间隔跟随游戏变速
+	var gm = get_node("/root/GameManager")
+	var speed_mult = gm.time_speed if gm else 1.0
+	var effective_cooldown = ARROW_COOLDOWN / speed_mult
+	
 	var now = Time.get_ticks_msec() / 1000.0
-	if now - _last_arrow_shot_time < ARROW_COOLDOWN:
+	if now - _last_arrow_shot_time < effective_cooldown:
 		return false
 	
 	# 检查距离（3格射程）
