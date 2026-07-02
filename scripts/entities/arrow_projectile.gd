@@ -10,6 +10,7 @@ var damage: float = 5.0
 var target: Node2D = null
 var target_pos: Vector2 = Vector2.ZERO
 var shooter: Node2D = null
+var shooter_grid_pos: Vector2i = Vector2i(-1, -1)  # 攻击来源的网格坐标（防御建筑专用）
 
 var _sprite: Sprite2D
 
@@ -49,6 +50,9 @@ func _hit_target():
 	if target and is_instance_valid(target):
 		if target.has_method("take_damage"):
 			target.take_damage(damage, shooter)
+		# 如果是从防御建筑射出的箭矢，通知目标反击来源建筑
+		if shooter_grid_pos.x >= 0 and target.has_method("notify_tower_attack"):
+			target.notify_tower_attack(shooter_grid_pos)
 	
 	# 击中特效
 	var spark = Sprite2D.new()

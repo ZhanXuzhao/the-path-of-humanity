@@ -65,6 +65,8 @@ var is_designated: bool = false
 
 # 攻击目标
 var attack_target: Node2D = null
+# 反击建筑目标（防御建筑攻击时设置）
+var target_building_grid: Vector2i = Vector2i(-1, -1)
 
 const TILE_SIZE: float = 32.0
 
@@ -255,6 +257,13 @@ func _process(delta):
 					else:
 						# 追向目标
 						_chase_target(delta, game)
+			elif target_building_grid.x >= 0:
+				# 反击防御建筑（哨塔）
+				if now - _last_attack_time >= effective_cd:
+					if _is_adjacent_to_building_grid(target_building_grid):
+						_melee_attack_building()
+					else:
+						_chase_building(delta, game)
 			else:
 				attack_target = null
 				state = BoarState.IDLE
@@ -452,6 +461,77 @@ func _chase_target(delta, game):
 		state = BoarState.IDLE
 		_wait_timer = 1.0
 		return
+	_move_towards(delta, game)
+
+# -------- 建筑反击系统 --------
+func notify_tower_attack(tower_grid: Vector2i):
+	"""被防御建筑（哨塔）攻击时，设置反击目标"""
+	if state == BoarState.DEAD:
+		return
+	target_building_grid = tower_grid
+	attack_target = null
+	state = BoarState.COMBAT
+
+func _is_adjacent_to_building_grid(bld_grid: Vector2i) -> bool:
+	"""检查是否在建筑旁边"""
+	var my_grid = _get_grid()
+	return abs(my_grid.x - bld_grid.x) <= 1 and abs(my_grid.y - bld_grid.y) <= 1
+
+func _melee_attack_building():
+	"""近战攻击反击防御建筑"""
+	if target_building_grid.x < 0:
+		return
+	_last_attack_time = Time.get_ticks_msec() / 1000.0
+	
+	var game = get_node_or_null("/root/Game")
+	if game and game.building_system:
+		game.building_system.damage_building(target_building_grid, attack_damage)
+	
+	# 面向建筑方向
+	var bld_center = Vector2(
+		target_building_grid.x * TILE_SIZE + TILE_SIZE / 2.0,
+		target_building_grid.y * TILE_SIZE + TILE_SIZE / 2.0
+	)
+	var dir = bld_center - position
+	if dir.length_squared() > 0:
+		facing_direction = dir.normalized()
+	
+	# 检查建筑是否已被摧毁
+	if game and game.building_system:
+		if game.building_system.get_building_at(target_building_grid) == null:
+			target_building_grid = Vector2i(-1, -1)
+			state = BoarState.IDLE
+			_wait_timer = 1.0
+
+func _chase_building(delta, game):
+	"""追踪防御建筑并靠近"""
+	if target_building_grid.x < 0:
+		return
+	if not game or not game.world:
+		return
+	
+	var cur_grid = _get_grid()
+	
+	# 如果已经在相邻格，停止移动
+	if abs(cur_grid.x - target_building_grid.x) <= 1 and abs(cur_grid.y - target_building_grid.y) <= 1:
+		return
+	
+	# 检查建筑是否仍然存在
+	if game.building_system:
+		if game.building_system.get_building_at(target_building_grid) == null:
+			target_building_grid = Vector2i(-1, -1)
+			state = BoarState.IDLE
+			_wait_timer = 1.0
+			return
+	
+	# 寻路到建筑旁边
+	if game.world.is_in_world_bounds(target_building_grid):
+		target_world_pos = Vector2(
+			target_building_grid.x * TILE_SIZE + TILE_SIZE / 2.0,
+			target_building_grid.y * TILE_SIZE + TILE_SIZE / 2.0
+		)
+		var occupied = _get_occupied()
+		_path = game.world.find_path_generated_only(cur_grid, target_building_grid, 200, occupied)
 	_move_towards(delta, game)
 
 # -------- 移动系统 --------

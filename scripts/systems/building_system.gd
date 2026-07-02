@@ -335,7 +335,7 @@ func _try_tower_attack(bld, data):
 	# 发射箭矢
 	var arrow = load("res://scripts/entities/arrow_projectile.gd").new()
 	arrow.init(tower_center, nearest_enemy, data.attack_damage)
-	arrow.shooter = null  # 塔不是具体角色
+	arrow.shooter_grid_pos = bld.grid_pos  # 记录塔的网格坐标，野猪被击中后可反击
 	game.call_deferred("add_child", arrow)
 
 func _try_produce(bld, data):
