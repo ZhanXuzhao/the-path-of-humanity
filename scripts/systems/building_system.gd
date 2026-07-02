@@ -386,11 +386,14 @@ func damage_building(pos: Vector2i, damage: float) -> bool:
 	"""对建筑造成伤害，返回建筑是否被摧毁"""
 	var bld = get_building_at(pos)
 	if bld == null:
+		print("[damage_building] no building at ", pos)
 		return false
 	if not bld.is_completed:
+		print("[damage_building] building at ", pos, " not completed")
 		return false
 	
 	bld.hp -= int(damage)
+	print("[damage_building] ", bld.building_id, " at ", pos, " took ", int(damage), " damage, hp now ", bld.hp, "/", bld.max_hp)
 	building_damaged.emit(bld.grid_pos, damage, bld.hp)
 	
 	if bld.hp <= 0:

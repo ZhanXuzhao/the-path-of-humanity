@@ -648,10 +648,17 @@ func _update_building_info_panel(bld, data):
 			mat_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
 			building_info_extra_container.add_child(mat_label)
 
-	# 显示建筑耐久度
+	# 显示建筑耐久度（使用实例的当前 HP，而非模板的 max HP）
 	var hp_label = Label.new()
-	hp_label.text = "耐久: %d" % data.hp
-	hp_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+	var hp_ratio = float(bld.hp) / float(bld.max_hp) if bld.max_hp > 0 else 1.0
+	var hp_color = Color(0.3, 1.0, 0.3)
+	if hp_ratio < 0.3:
+		hp_color = Color(1.0, 0.3, 0.3)
+	elif hp_ratio < 0.6:
+		hp_color = Color(1.0, 0.8, 0.2)
+	hp_label.text = "耐久: %d/%d" % [bld.hp, bld.max_hp]
+	hp_label.add_theme_color_override("font_color", hp_color)
+	hp_label.add_theme_constant_override("minimum_font_size", 12)
 	building_info_extra_container.add_child(hp_label)
 	
 	# ===== 可制作配方（生产建筑专用） =====
@@ -884,6 +891,25 @@ func _process(delta):
 		var game = get_node("/root/Game")
 		if game and game.selected_construction_building:
 			_update_construction_panel(game.selected_construction_building)
+	
+	# 定时更新建筑信息面板（HP 实时变化）
+	if Engine.get_physics_frames() % 30 == 0 and building_info_panel.visible:
+		var game = get_node("/root/Game")
+		if game and game.selected_building_instance:
+			var bld = game.selected_building_instance
+			if is_instance_valid(bld) and bld.get_data():
+				# 只更新耐久度标签（最后一个子节点）
+				for child in building_info_extra_container.get_children():
+					if child is Label and child.text.begins_with("耐久:"):
+						var hp_ratio = float(bld.hp) / float(bld.max_hp) if bld.max_hp > 0 else 1.0
+						var hp_color = Color(0.3, 1.0, 0.3)
+						if hp_ratio < 0.3:
+							hp_color = Color(1.0, 0.3, 0.3)
+						elif hp_ratio < 0.6:
+							hp_color = Color(1.0, 0.8, 0.2)
+						child.text = "耐久: %d/%d" % [bld.hp, bld.max_hp]
+						child.add_theme_color_override("font_color", hp_color)
+						break
 	
 	# 定时更新人口（不每帧刷新）
 	if Engine.get_physics_frames() % 60 == 0:

@@ -173,8 +173,8 @@ func _process(delta):
 	
 	match state:
 		EnemyState.MOVING:
-			# 检查目标建筑是否仍然有效
-			if target_building == null or not is_instance_valid(target_building) or not target_building.is_completed:
+			# 检查目标建筑是否仍然有效（BuildingInstance 不是 Node，需通过系统查询）
+			if target_building == null or not _is_building_valid(target_building):
 				_find_best_building_target()
 				if target_building == null:
 					_pick_wander_target()
@@ -194,7 +194,7 @@ func _process(delta):
 		
 		EnemyState.APPROACHING:
 			# 接近阶段：向目标移动直到进入射程
-			if target_building == null or not is_instance_valid(target_building) or not target_building.is_completed:
+			if target_building == null or not _is_building_valid(target_building):
 				target_building = null
 				_find_best_building_target()
 				if target_building == null:
@@ -221,7 +221,7 @@ func _process(delta):
 			var now = Time.get_ticks_msec() / 1000.0
 			
 			# 检查目标是否依然有效
-			if target_building == null or not is_instance_valid(target_building) or not target_building.is_completed:
+			if target_building == null or not _is_building_valid(target_building):
 				target_building = null
 				_find_best_building_target()
 				if target_building == null:
@@ -391,6 +391,17 @@ func _find_adjacent_walkable_target(bld_grid: Vector2i, bld_size: Vector2i, from
 	
 	return best_target
 
+func _is_building_valid(bld) -> bool:
+	"""检查 BuildingInstance 是否仍然存在于建筑系统中（BuildingInstance 不是 Node，不能用 is_instance_valid）"""
+	if bld == null:
+		return false
+	if not bld.is_completed:
+		return false
+	var game = get_node_or_null("/root/Game")
+	if not game or not game.building_system:
+		return false
+	return game.building_system.get_building_at(bld.grid_pos) != null
+
 func _get_building_center(bld) -> Vector2:
 	var game = get_node_or_null("/root/Game")
 	if not game or not game.world:
@@ -424,14 +435,18 @@ func _is_adjacent_to_building(bld) -> bool:
 
 func _shoot_arrow_at_building():
 	"""远程射箭攻击目标建筑"""
-	if target_building == null or not is_instance_valid(target_building):
+	if target_building == null or not _is_building_valid(target_building):
+		print("[enemy] _shoot_arrow_at_building skipped: target invalid")
 		return
 	
 	_last_attack_time = Time.get_ticks_msec() / 1000.0
 	
 	var game = get_node_or_null("/root/Game")
 	if not game:
+		print("[enemy] _shoot_arrow_at_building skipped: no game")
 		return
+	
+	print("[enemy] shooting arrow at ", target_building.building_id, " pos=", target_building.grid_pos, " damage=", _arrow_projectile_damage)
 	
 	var bld_center = _get_building_center(target_building)
 	var actual_damage = _arrow_projectile_damage
@@ -463,15 +478,21 @@ func _launch_arrow_visual(target_pos: Vector2, attacked_building, damage: float,
 	
 	# 命中后处理
 	tween.tween_callback(func():
-		# 对建筑造成伤害
-		if is_instance_valid(attacked_building) and game and game.building_system:
-			var killed = game.building_system.damage_building(attacked_building.grid_pos, damage)
-			if killed:
-				target_building = null
-				_find_best_building_target()
-				if target_building == null:
-					_pick_wander_target()
-		building_attacked.emit(attacked_building, damage)
+		# 对建筑造成伤害（BuildingInstance 不是 Node，不能用 is_instance_valid）
+		print("[enemy arrow] hit! building=", attacked_building.building_id if attacked_building else "null", " pos=", attacked_building.grid_pos if attacked_building else "?")
+		if attacked_building != null and game and game.building_system:
+			# 检查建筑是否仍存在于系统中（未被其他敌人先摧毁）
+			var still_exists = game.building_system.get_building_at(attacked_building.grid_pos) != null
+			print("[enemy arrow] still_exists=", still_exists)
+			if still_exists:
+				var killed = game.building_system.damage_building(attacked_building.grid_pos, damage)
+				print("[enemy arrow] killed=", killed)
+				if killed:
+					target_building = null
+					call_deferred("_find_best_building_target")
+					if target_building == null:
+						call_deferred("_pick_wander_target")
+			building_attacked.emit(attacked_building, damage)
 		
 		# 击中特效
 		var spark = Sprite2D.new()
