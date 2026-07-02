@@ -32,6 +32,14 @@ var _boar_spawn_timer: float = 0.0
 const BOAR_SPAWN_INTERVAL: float = 30.0  # 每30现实秒尝试生成一头野猪
 const MAX_BOARS: int = 5  # 地图上最多5头野猪
 
+# 敌对敌人管理
+var enemies: Array = []
+signal enemy_selected(enemy)
+signal enemy_deselected()
+
+# 选中敌人
+var selected_enemy = null
+
 # 选中定居者
 var selected_settler = null
 signal settler_selected(settler)
@@ -188,6 +196,9 @@ func _process(delta):
 	# 更新野猪AI
 	_update_boars(delta)
 	
+	# 更新敌人AI
+	_update_enemies(delta)
+	
 	# 定居者AI定时更新（每1秒执行一次）
 	_autonomy_timer += delta
 	if _autonomy_timer >= 1.0:
@@ -210,6 +221,10 @@ func _process(delta):
 		# 检查选中的野猪是否还存活
 		if selected_boar != null and not is_instance_valid(selected_boar):
 			_deselect_boar()
+		
+		# 检查选中的敌人是否还存活
+		if selected_enemy != null and not is_instance_valid(selected_enemy):
+			_deselect_enemy()
 		
 		# 检查选中的资源节点是否还存在（可能已被采集完）
 		if selected_resource_pos.x >= 0:
@@ -838,9 +853,11 @@ func _select_settler(settler, focus_camera: bool = false):
 	# 取消之前的选中
 	if selected_settler != null and is_instance_valid(selected_settler):
 		selected_settler.set_selected(false)
-	# 选中定居者时取消野猪选中
+	# 选中定居者时取消野猪和敌人选中
 	if selected_boar != null:
 		_deselect_boar()
+	if selected_enemy != null:
+		_deselect_enemy()
 	# 选中新定居者
 	selected_settler = settler
 	settler.set_selected(true)
@@ -884,6 +901,7 @@ func _select_boar(boar):
 	boar_selected.emit(boar)
 	# 同时取消其他选中
 	_deselect_settler()
+	_deselect_enemy()
 	_deselect_construction()
 	_deselect_building()
 	_deselect_resource()
@@ -1091,6 +1109,11 @@ func _input(event):
 		if work_panel and work_panel.visible:
 			work_panel.visible = false
 			return
+		# 关闭事件面板
+		var hud = get_node_or_null("UI/HUD")
+		if hud and hud.has_method("_on_event_pressed") and hud.event_panel and hud.event_panel.visible:
+			hud.event_panel.visible = false
+			return
 		
 		# 无菜单打开时，Esc 打开暂停菜单
 		if main_menu:
@@ -1140,6 +1163,9 @@ func _input(event):
 			return
 		if selected_settler != null:
 			_deselect_settler()
+			return
+		if selected_enemy != null:
+			_deselect_enemy()
 			return
 	
 	# 点击UI控件时不处理世界点击逻辑
@@ -1252,15 +1278,28 @@ func _input(event):
 		# 查找当前位置的所有可选目标
 		var clicked_settler = _find_settler_at_pos(global_pos)
 		var clicked_boar = _find_boar_at_pos(global_pos)
+		var clicked_enemy = _find_enemy_at_pos(global_pos)
 		var clicked_bld = building_system.get_building_at(grid_pos) if building_system else null
 		
 		# 判断建筑是否可选择（所有建筑均可选）
 		var bld_selectable = clicked_bld != null
 		
+		# 敌人选择（优先级低于野猪，高于建筑/资源）
+		if clicked_enemy != null and clicked_settler == null and clicked_boar == null and not bld_selectable:
+			_deselect_settler()
+			_deselect_boar()
+			_deselect_construction()
+			_deselect_building()
+			_deselect_resource()
+			_deselect_ground_item()
+			_select_enemy(clicked_enemy)
+			return
+		
 		# 如果有野猪在最上层（优先级高于定居者/建筑用于选中）
 		if clicked_boar != null and not bld_selectable and clicked_settler == null:
 			# 只有野猪
 			_deselect_settler()
+			_deselect_enemy()
 			_deselect_construction()
 			_deselect_building()
 			_deselect_resource()
@@ -1327,6 +1366,7 @@ func _input(event):
 				_deselect_building()
 				_deselect_settler()
 				_deselect_boar()
+				_deselect_enemy()
 				_deselect_resource()
 				_select_ground_item(grid_pos, clicked_ground_stacks)
 			else:
@@ -1338,16 +1378,28 @@ func _input(event):
 					_deselect_building()
 					_deselect_settler()
 					_deselect_boar()
+					_deselect_enemy()
 					_deselect_ground_item()
 					_select_resource(grid_pos, clicked_resource)
 				else:
-					# 什么都没选中
-					_deselect_boar()
-					_deselect_construction()
-					_deselect_building()
-					_deselect_settler()
-					_deselect_resource()
-					_deselect_ground_item()
+					# 检查是否有敌人可选中
+					if clicked_enemy != null:
+						_deselect_boar()
+						_deselect_construction()
+						_deselect_building()
+						_deselect_settler()
+						_deselect_resource()
+						_deselect_ground_item()
+						_select_enemy(clicked_enemy)
+					else:
+						# 什么都没选中
+						_deselect_enemy()
+						_deselect_boar()
+						_deselect_construction()
+						_deselect_building()
+						_deselect_settler()
+						_deselect_resource()
+						_deselect_ground_item()
 	
 	# 快捷键 Tab：在定居者之间循环切换，镜头居中聚焦
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -2160,6 +2212,113 @@ func _update_boars(_delta):
 			var dir = nearest_boar.position - settler.position
 			settler.facing_direction = dir.normalized()
 			settler.shoot_at(nearest_boar)
+
+# ==================== 敌对敌人系统 ====================
+
+func get_enemies() -> Array:
+	"""获取所有敌人列表（供建筑系统调用）"""
+	return enemies
+
+func trigger_enemy_raid(count: int = 3):
+	"""触发敌袭事件：在地图边缘生成指定数量的敌人"""
+	if enemies.size() >= 10:
+		_gm.show_notification("地图上已有太多敌人，无法生成更多", _gm.NotificationType.WARNING)
+		return
+	
+	var spawned = 0
+	var attempts = 0
+	var max_attempts = count * 20
+	
+	while spawned < count and attempts < max_attempts:
+		attempts += 1
+		var enemy = load("res://scripts/entities/enemy.gd").new()
+		if not enemy.spawn_at_edge(self):
+			enemy.queue_free()
+			continue
+		enemy.died.connect(_on_enemy_died.bind(enemy))
+		add_child(enemy)
+		enemies.append(enemy)
+		spawned += 1
+	
+	if spawned > 0:
+		_gm.show_notification("⚠️ 敌袭！%d个敌人从边缘入侵！" % spawned, _gm.NotificationType.COMBAT)
+		print("敌袭事件：生成了 %d 个敌人" % spawned)
+
+func _update_enemies(_delta):
+	"""更新所有敌人状态（检查死亡清理、定居者自动反击）"""
+	# 清理已死亡的敌人
+	var dead_enemies: Array = []
+	for e in enemies:
+		if not is_instance_valid(e) or e.state == e.EnemyState.DEAD:
+			dead_enemies.append(e)
+	for e in dead_enemies:
+		enemies.erase(e)
+	
+	# 定居者自动反击射程内的敌人
+	for settler in settlers:
+		if not is_instance_valid(settler):
+			continue
+		if not settler.has_ranged_weapon():
+			continue
+		if settler.state != Settler.SettlerState.IDLE and settler.state != Settler.SettlerState.MOVING:
+			continue
+		
+		var nearest_enemy = null
+		var nearest_dist = INF
+		for e in enemies:
+			if not is_instance_valid(e) or e.state == e.EnemyState.DEAD:
+				continue
+			var dist = settler.position.distance_squared_to(e.position)
+			if dist < nearest_dist and dist <= settler.ARROW_RANGE * settler.ARROW_RANGE:
+				nearest_dist = dist
+				nearest_enemy = e
+		
+		if nearest_enemy:
+			var dir = nearest_enemy.position - settler.position
+			settler.facing_direction = dir.normalized()
+			settler.shoot_at(nearest_enemy)
+
+func _on_enemy_died(_grid_pos: Vector2i, enemy: Node2D):
+	"""敌人死亡时从列表中移除"""
+	enemies.erase(enemy)
+
+# -------- 敌人选择 --------
+func _find_enemy_at_pos(global_pos: Vector2):
+	"""查找指定位置附近的敌人"""
+	var closest = null
+	var closest_dist = world.tile_size * 0.6
+	
+	for e in enemies:
+		if not is_instance_valid(e) or e.state == e.EnemyState.DEAD:
+			continue
+		var dist = e.position.distance_to(global_pos)
+		if dist < closest_dist:
+			closest_dist = dist
+			closest = e
+	return closest
+
+func _select_enemy(enemy):
+	"""选中敌人"""
+	if selected_enemy == enemy:
+		return
+	_deselect_enemy()
+	selected_enemy = enemy
+	enemy.set_selected(true)
+	enemy_selected.emit(enemy)
+	# 取消其他选中
+	_deselect_settler()
+	_deselect_boar()
+	_deselect_construction()
+	_deselect_building()
+	_deselect_resource()
+	_deselect_ground_item()
+
+func _deselect_enemy():
+	"""取消选中敌人"""
+	if selected_enemy != null and is_instance_valid(selected_enemy):
+		selected_enemy.set_selected(false)
+	selected_enemy = null
+	enemy_deselected.emit()
 
 func _is_mouse_over_ui() -> bool:
 	"""检查鼠标是否悬浮在任意可见 UI 控件上方（点击UI时不触发世界操作）"""

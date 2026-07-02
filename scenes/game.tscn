@@ -140,9 +140,9 @@ anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -200.0
+offset_left = -250.0
 offset_top = -50.0
-offset_right = 200.0
+offset_right = 250.0
 offset_bottom = -8.0
 theme_override_constants/separation = 8
 
@@ -160,6 +160,11 @@ text = "科技"
 custom_minimum_size = Vector2(70, 40)
 layout_mode = 2
 text = "工作"
+
+[node name="EventBtn" type="Button" parent="UI/HUD/BottomBar"]
+custom_minimum_size = Vector2(70, 40)
+layout_mode = 2
+text = "事件"
 
 [node name="MenuBtn" type="Button" parent="UI/HUD/BottomBar" unique_id=1461223249]
 custom_minimum_size = Vector2(70, 40)
@@ -269,6 +274,53 @@ layout_mode = 2
 
 [node name="NeedsContainer" type="VBoxContainer" parent="UI/HUD/BoarInfoPanel/ScrollContainer/VBox"]
 layout_mode = 2
+
+[node name="EnemyInfoPanel" type="Panel" parent="UI/HUD"]
+visible = false
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -470.0
+offset_right = 262.0
+offset_bottom = -10.0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("2")
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/EnemyInfoPanel"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
+
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/EnemyInfoPanel/ScrollContainer"]
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1.0, 0.3, 0.3, 1)
+theme_override_constants/minimum_font_size = 14
+text = "👹 入侵者"
+
+[node name="StateLabel" type="Label" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox"]
+layout_mode = 2
+text = "状态: 前进中"
+
+[node name="HpBarHBox" type="HBoxContainer" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox"]
+layout_mode = 2
+
+[node name="HPLabel" type="Label" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox/HpBarHBox"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+text = "生命:"
+
+[node name="HPBar" type="ProgressBar" parent="UI/HUD/EnemyInfoPanel/ScrollContainer/VBox/HpBarHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+value = 100.0
 
 [node name="StoragePanel" type="Panel" parent="UI/HUD" unique_id=1748318168]
 visible = false
@@ -428,6 +480,37 @@ text = "剩余: 0"
 layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
 text = "总量: 0"
+
+[node name="EventPanel" type="Panel" parent="UI/HUD"]
+visible = false
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 300.0
+offset_top = -400.0
+offset_right = 580.0
+offset_bottom = -10.0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("2")
+
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/EventPanel"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = -8.0
+
+[node name="TitleLabel" type="Label" parent="UI/HUD/EventPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.8, 1.0, 1)
+theme_override_constants/minimum_font_size = 18
+text = "🗡️ 事件"
+
+[node name="EventListContainer" type="VBoxContainer" parent="UI/HUD/EventPanel/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
 
 [node name="BuildMenu" type="Panel" parent="UI" unique_id=1575822565]
 visible = false

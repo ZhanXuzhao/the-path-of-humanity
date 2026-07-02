@@ -10,6 +10,8 @@ signal building_removed(building_id: String, pos: Vector2i)
 signal building_completed(pos: Vector2i)
 signal construction_progress_updated(pos: Vector2i, progress: float, work_cost: float)
 signal production_output(pos: Vector2i, item_id: String, amount: int)
+signal building_damaged(pos: Vector2i, damage: float, current_hp: int)
+signal building_destroyed(building_id: String, pos: Vector2i)
 
 # 建筑实例数据
 class BuildingInstance:
@@ -317,6 +319,16 @@ func _try_tower_attack(bld, data):
 			nearest_dist = dist
 			nearest_enemy = boar
 	
+	# 扫描所有敌对敌人
+	if game.has_method("get_enemies"):
+		for enemy in game.get_enemies():
+			if not is_instance_valid(enemy) or enemy.state == enemy.EnemyState.DEAD:
+				continue
+			var dist = tower_center.distance_squared_to(enemy.position)
+			if dist < nearest_dist and dist <= attack_range_pixels * attack_range_pixels:
+				nearest_dist = dist
+				nearest_enemy = enemy
+	
 	if nearest_enemy == null:
 		return
 	
@@ -368,6 +380,76 @@ func get_buildings_by_type(building_id: String) -> Array:
 		if bld.building_id == building_id:
 			result.append(bld)
 	return result
+
+# -------- 建筑伤害系统 --------
+func damage_building(pos: Vector2i, damage: float) -> bool:
+	"""对建筑造成伤害，返回建筑是否被摧毁"""
+	var bld = get_building_at(pos)
+	if bld == null:
+		return false
+	if not bld.is_completed:
+		return false
+	
+	bld.hp -= int(damage)
+	building_damaged.emit(bld.grid_pos, damage, bld.hp)
+	
+	if bld.hp <= 0:
+		_destroy_building(bld)
+		return true
+	return false
+
+func _destroy_building(bld):
+	"""摧毁建筑并清理（掉落库存物品到地面）"""
+	var data = bld.get_data()
+	var bld_id = bld.building_id
+	var bld_pos = bld.grid_pos
+	
+	# 掉落库存物品到地面（存储建筑/生产建筑有 inventory）
+	if bld.inventory != null and world:
+		var world_node = world
+		var game = get_node_or_null("/root/Game")
+		# 遍历建筑占据的所有格子，将物品分散掉落
+		var drop_positions: Array[Vector2i] = []
+		var size = bld.get_size()
+		for x in size.x:
+			for y in size.y:
+				drop_positions.append(bld.grid_pos + Vector2i(x, y))
+		
+		for item_id in bld.inventory.items:
+			var amount = bld.inventory.items[item_id]
+			if amount <= 0:
+				continue
+			# 分散掉落到每个格子
+			var per_grid = ceil(amount / float(drop_positions.size()))
+			var remaining = amount
+			for gpos in drop_positions:
+				if remaining <= 0:
+					break
+				var drop_amt = mini(per_grid, remaining)
+				world_node.drop_item_on_ground(gpos, item_id, drop_amt)
+				remaining -= drop_amt
+	
+	# 从索引中移除
+	_completed_storage_index.erase(bld.grid_pos)
+	_completed_bed_index.erase(bld.grid_pos)
+	
+	# 清除占用格子
+	var size = bld.get_size()
+	for x in size.x:
+		for y in size.y:
+			var grid_pos = bld.grid_pos + Vector2i(x, y)
+			buildings.erase(grid_pos)
+			if world:
+				world.remove_building_at(grid_pos)
+	
+	building_destroyed.emit(bld_id, bld_pos)
+	
+	# 通知游戏管理器
+	var gm = get_node("/root/GameManager")
+	if gm:
+		var data2 = bld.get_data()
+		var name_str = data2.name if data2 else bld_id
+		gm.show_notification("建筑被摧毁: %s" % name_str, gm.NotificationType.COMBAT)
 
 # -------- 存储建筑查询（使用预索引，O(1)~O(n)） --------
 func get_completed_storage_buildings() -> Array:

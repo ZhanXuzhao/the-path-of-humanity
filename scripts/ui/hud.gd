@@ -18,6 +18,7 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var build_menu_btn: Button = $BottomBar/BuildBtn
 @onready var tech_btn: Button = $BottomBar/TechBtn
 @onready var work_btn: Button = $BottomBar/WorkBtn
+@onready var event_btn: Button = $BottomBar/EventBtn
 @onready var menu_btn: Button = $BottomBar/MenuBtn
 
 # 定居者信息面板
@@ -34,6 +35,12 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var boar_hp_bar: ProgressBar = $BoarInfoPanel/ScrollContainer/VBox/HpBarHBox/HPBar
 @onready var boar_hp_label: Label = $BoarInfoPanel/ScrollContainer/VBox/HpBarHBox/HPLabel
 @onready var boar_needs_container: VBoxContainer = $BoarInfoPanel/ScrollContainer/VBox/NeedsContainer
+
+# 敌对敌人信息面板
+@onready var enemy_info_panel: Panel = $EnemyInfoPanel
+@onready var enemy_state_label: Label = $EnemyInfoPanel/ScrollContainer/VBox/StateLabel
+@onready var enemy_hp_bar: ProgressBar = $EnemyInfoPanel/ScrollContainer/VBox/HpBarHBox/HPBar
+@onready var enemy_hp_label: Label = $EnemyInfoPanel/ScrollContainer/VBox/HpBarHBox/HPLabel
 
 # 存储建筑信息面板
 @onready var storage_panel: Panel = $StoragePanel
@@ -62,6 +69,11 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var resource_name_label: Label = $ResourcePanel/ScrollContainer/VBox/NameLabel
 @onready var resource_amount_label: Label = $ResourcePanel/ScrollContainer/VBox/AmountLabel
 @onready var resource_max_label: Label = $ResourcePanel/ScrollContainer/VBox/MaxLabel
+
+# 事件菜单面板
+@onready var event_panel: Panel = $EventPanel
+@onready var event_title_label: Label = $EventPanel/VBox/TitleLabel
+@onready var event_button_container: VBoxContainer = $EventPanel/VBox/EventListContainer
 
 var game_manager
 var notification_scene = load("res://scenes/ui/notification.tscn")
@@ -103,8 +115,15 @@ func _ready():
 		tech_btn.pressed.connect(_on_tech_pressed)
 	if work_btn:
 		work_btn.pressed.connect(_on_work_pressed)
+	if event_btn:
+		event_btn.pressed.connect(_on_event_pressed)
 	if menu_btn:
 		menu_btn.pressed.connect(_on_menu_pressed)
+	
+	# 初始化事件面板
+	if event_panel:
+		event_panel.visible = false
+		_populate_event_buttons()
 	
 	# 延迟一帧初始化资源显示（等 Game 场景就绪）
 	call_deferred("_refresh_resource_display")
@@ -148,11 +167,14 @@ func _settler_info_connections():
 		game.ground_item_deselected.connect(_on_ground_item_deselected_storage)
 		game.boar_selected.connect(_on_boar_selected)
 		game.boar_deselected.connect(_on_boar_deselected)
+		game.enemy_selected.connect(_on_enemy_selected)
+		game.enemy_deselected.connect(_on_enemy_deselected)
 
 func _hide_all_info_panels():
 	"""隐藏所有左下角信息面板，确保同时只显示一个"""
 	settler_info_panel.visible = false
 	boar_info_panel.visible = false
+	enemy_info_panel.visible = false
 	storage_panel.visible = false
 	building_info_panel.visible = false
 	construction_panel.visible = false
@@ -229,6 +251,26 @@ func _on_boar_deselected():
 	"""取消选中时隐藏野猪面板"""
 	boar_info_panel.visible = false
 	_tracked_boar = null
+
+# -------- 敌对敌人信息面板 --------
+func _on_enemy_selected(enemy):
+	"""选中敌人时显示信息面板"""
+	_hide_all_info_panels()
+	enemy_info_panel.visible = true
+	_update_enemy_info_panel(enemy)
+
+func _on_enemy_deselected():
+	"""取消选中时隐藏敌人面板"""
+	enemy_info_panel.visible = false
+
+func _update_enemy_info_panel(enemy):
+	"""更新敌人信息面板"""
+	if not is_instance_valid(enemy):
+		return
+	enemy_state_label.text = "状态: " + Enemy.get_state_display(enemy.state)
+	enemy_hp_label.text = "生命:"
+	enemy_hp_bar.max_value = enemy.max_hp
+	enemy_hp_bar.value = enemy.hp
 
 func _build_boar_info_ui(boar):
 	"""构建野猪信息面板"""
@@ -797,6 +839,17 @@ func _process(delta):
 		if game:
 			game.selected_boar = null
 	
+	# 选中敌人时实时更新信息面板
+	if enemy_info_panel.visible:
+		var game = get_node("/root/Game")
+		if game and game.selected_enemy != null and is_instance_valid(game.selected_enemy):
+			var e = game.selected_enemy
+			enemy_state_label.text = "状态: " + Enemy.get_state_display(e.state)
+			enemy_hp_bar.max_value = e.max_hp
+			enemy_hp_bar.value = e.hp
+		elif game and (game.selected_enemy == null or not is_instance_valid(game.selected_enemy)):
+			_on_enemy_deselected()
+	
 	# 选中地面物品时实时更新物品列表（复用存储面板）
 	if storage_panel.visible and _showing_ground_items:
 		var game = get_node("/root/Game")
@@ -977,3 +1030,155 @@ func _refresh_resource_display():
 func _on_ground_items_changed(_grid_pos: Vector2i):
 	"""地面物品变化时实时刷新资源显示"""
 	_refresh_resource_display()
+
+# ==================== 事件菜单系统 ====================
+
+# 事件配置列表
+var _event_list: Array[Dictionary] = [
+	{
+		"id": "enemy_raid",
+		"name": "⚔️ 敌袭",
+		"desc": "从地图边缘生成3名敌对战士，他们会主动攻击你的建筑！",
+		"cost": {},
+		"cooldown": 60.0,  # 冷却秒数（现实时间）
+		"enemy_count": 3,
+	},
+	{
+		"id": "enemy_raid_large",
+		"name": "⚔️ 大规模敌袭",
+		"desc": "从地图边缘生成6名敌对战士，危险程度更高！",
+		"cost": {},
+		"cooldown": 120.0,
+		"enemy_count": 6,
+	},
+]
+
+# 事件冷却跟踪 {event_id: remaining_cooldown_seconds}
+var _event_cooldowns: Dictionary = {}
+
+func _populate_event_buttons():
+	"""填充事件按钮列表"""
+	if not event_button_container:
+		return
+	
+	for child in event_button_container.get_children():
+		child.queue_free()
+	
+	for evt in _event_list:
+		var event_id = evt.id
+		var event_frame = VBoxContainer.new()
+		
+		# 事件标题行
+		var title_hbox = HBoxContainer.new()
+		
+		var name_label = Label.new()
+		name_label.text = evt.name
+		name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+		name_label.add_theme_constant_override("minimum_font_size", 14)
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		title_hbox.add_child(name_label)
+		
+		# 冷却标签
+		var cooldown_label = Label.new()
+		cooldown_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+		cooldown_label.add_theme_constant_override("minimum_font_size", 11)
+		cooldown_label.visible = false
+		cooldown_label.name = "CooldownLabel"
+		title_hbox.add_child(cooldown_label)
+		
+		event_frame.add_child(title_hbox)
+		
+		# 描述文字
+		var desc_label = Label.new()
+		desc_label.text = evt.desc
+		desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		desc_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+		desc_label.add_theme_constant_override("minimum_font_size", 11)
+		event_frame.add_child(desc_label)
+		
+		# 触发按钮
+		var trigger_btn = Button.new()
+		trigger_btn.text = "触发事件"
+		trigger_btn.custom_minimum_size = Vector2(0, 30)
+		trigger_btn.add_theme_constant_override("minimum_font_size", 12)
+		trigger_btn.pressed.connect(_on_trigger_event.bind(event_id, trigger_btn, cooldown_label))
+		event_frame.add_child(trigger_btn)
+		
+		# 分隔线
+		var separator = HSeparator.new()
+		separator.add_theme_color_override("default_color", Color(0.3, 0.3, 0.3, 0.5))
+		event_frame.add_child(separator)
+		
+		event_button_container.add_child(event_frame)
+
+func _on_event_pressed():
+	"""事件按钮：切换事件面板显示"""
+	if event_panel:
+		event_panel.visible = not event_panel.visible
+		if event_panel.visible:
+			_update_event_cooldowns()
+
+func _on_trigger_event(event_id: String, btn: Button, cooldown_label: Label):
+	"""触发指定事件"""
+	# 检查冷却
+	var now = Time.get_ticks_msec() / 1000.0
+	if _event_cooldowns.has(event_id) and _event_cooldowns[event_id] > now:
+		var remaining = int(_event_cooldowns[event_id] - now)
+		game_manager.show_notification("事件冷却中，剩余 %d 秒" % remaining, game_manager.NotificationType.WARNING)
+		return
+	
+	var evt = null
+	for e in _event_list:
+		if e.id == event_id:
+			evt = e
+			break
+	
+	if evt == null:
+		return
+	
+	match event_id:
+		"enemy_raid", "enemy_raid_large":
+			var game = get_node_or_null("/root/Game")
+			if game and game.has_method("trigger_enemy_raid"):
+				game.trigger_enemy_raid(evt.enemy_count)
+				# 设置冷却
+				var cooldown_end = now + evt.cooldown
+				_event_cooldowns[event_id] = cooldown_end
+				cooldown_label.visible = true
+				cooldown_label.text = "冷却中"
+				btn.disabled = true
+				# 启动冷却计时
+				_start_cooldown_timer(event_id, btn, cooldown_label, evt.cooldown)
+
+func _start_cooldown_timer(event_id: String, btn: Button, cooldown_label: Label, duration: float):
+	"""启动冷却计时器"""
+	var timer = Timer.new()
+	timer.name = "EventCooldown_%s" % event_id
+	timer.wait_time = 1.0
+	timer.one_shot = false
+	timer.timeout.connect(func():
+		var now = Time.get_ticks_msec() / 1000.0
+		var end_time = _event_cooldowns.get(event_id, 0.0)
+		var remaining = int(maxf(0.0, end_time - now))
+		
+		if remaining <= 0:
+			cooldown_label.visible = false
+			cooldown_label.text = ""
+			btn.disabled = false
+			_event_cooldowns.erase(event_id)
+			timer.queue_free()
+		else:
+			cooldown_label.text = "冷却 %ds" % remaining
+	)
+	add_child(timer)
+	timer.start()
+
+func _update_event_cooldowns():
+	"""打开面板时更新所有冷却显示"""
+	var now = Time.get_ticks_msec() / 1000.0
+	for evt in _event_list:
+		var event_id = evt.id
+		var remaining = _event_cooldowns.get(event_id, 0.0) - now
+		if remaining > 0:
+			# 找到对应的按钮和标签更新
+			pass  # 由计时器自动更新
