@@ -83,7 +83,7 @@ const _FS = preload("res://scripts/systems/farming_system.gd")
 @onready var event_button_container: VBoxContainer = $EventPanel/VBox/EventListContainer
 
 var game_manager
-var notification_scene = load("res://scenes/ui/notification.tscn")
+
 
 # 要显示的资源列表
 var tracked_resources = ["wood", "stone", "food", "iron_ore", "copper_ore", "coal"]
@@ -1209,13 +1209,25 @@ func _on_plant_pressed():
 			plant_panel._populate_crops()
 
 func _on_notification(msg: String, type: int):
-	var notif = notification_scene.instantiate()
-	notification_container.add_child(notif)
-	notif.show_notification(msg, type)
-	# 自动移除
-	await get_tree().create_timer(4.0).timeout
-	if is_instance_valid(notif):
-		notif.queue_free()
+	var label := Label.new()
+	label.text = msg
+	label.add_theme_font_size_override("font_size", 14)
+	label.add_theme_color_override("font_color", _notification_color(type))
+	notification_container.add_child(label)
+	notification_container.move_child(label, 0)
+	var tween = create_tween()
+	tween.tween_property(label, "modulate", Color(1, 1, 1, 0), 0.5).set_delay(2.5)
+	tween.tween_callback(label.queue_free)
+
+func _notification_color(type: int) -> Color:
+	match type:
+		0: return Color(0.5, 0.8, 1.0)   # INFO
+		1: return Color(1.0, 0.8, 0.2)   # WARNING
+		2: return Color(1.0, 0.3, 0.3)   # ERROR
+		3: return Color(0.3, 1.0, 0.3)   # SUCCESS
+		4: return Color(0.8, 0.5, 1.0)   # RESEARCH
+		5: return Color(1.0, 0.3, 0.3)   # COMBAT
+		_: return Color.WHITE
 
 func _refresh_resource_display():
 	"""扫描所有置物架和地面，更新资源数量显示"""
