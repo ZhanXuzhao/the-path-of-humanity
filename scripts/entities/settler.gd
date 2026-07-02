@@ -629,8 +629,8 @@ func _tick_harvest():
 	var result = game.world.harvest_resource(grid_pos, max_amount)
 	if result.is_empty() or result.amount <= 0:
 		# 资源已耗尽，同时移除采集标记
-		if game.has_method("remove_designation_at"):
-			game.remove_designation_at(grid_pos)
+		if game.designation_system:
+			game.designation_system.remove_designation_at(grid_pos)
 		complete_task()
 		return
 	
@@ -653,8 +653,8 @@ func _tick_harvest():
 			game.claim_harvest_resource(grid_pos, settler_id)
 	else:
 		# 资源已被完全采完，移除采集标记
-		if game.has_method("remove_designation_at"):
-			game.remove_designation_at(grid_pos)
+		if game.designation_system:
+			game.designation_system.remove_designation_at(grid_pos)
 	
 	# 增加经验
 	add_skill_experience(current_task.get("skill", ""), 1.0)
@@ -1562,8 +1562,8 @@ func _tick_demolish():
 	if bld.hp <= 0:
 		# 从拆除标记中移除
 		var key = "%d,%d" % [grid_pos.x, grid_pos.y]
-		if game.designated_demolitions.has(key):
-			game.designated_demolitions.erase(key)
+		if game.designation_system.designated_demolitions.has(key):
+			game.designation_system.designated_demolitions.erase(key)
 		
 		# 执行拆除：掉落全部建材+库存物品到地面
 		game.building_system.demolish_building(bld.grid_pos)
@@ -1712,7 +1712,7 @@ func _tick_hunting(_delta):
 		# 野猪已死亡，清理标记并完成任务
 		var game = get_node_or_null("/root/Game")
 		if game:
-			game.designated_boars.erase(boar_inst_id)
+			game.designation_system.designated_boars.erase(boar_inst_id)
 		complete_task()
 		return
 	
@@ -1756,7 +1756,7 @@ func _tick_combat(_delta):
 		# 敌人已死亡，清理标记并完成任务
 		var game = get_node_or_null("/root/Game")
 		if game:
-			game.designated_enemies.erase(enemy_inst_id)
+			game.designation_system.designated_enemies.erase(enemy_inst_id)
 		complete_task()
 		return
 	

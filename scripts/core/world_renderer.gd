@@ -131,9 +131,8 @@ func _ready():
 	_designation_overlay.name = "DesignationOverlay"
 	add_child(_designation_overlay)
 	
-	# 连接指令标记变化信号
-	if game:
-		game.designated_resources_changed.connect(_on_designated_resources_changed)
+	# 连接指令标记变化信号（延迟一帧确保 Game._ready() 已创建 DesignationSystem）
+	call_deferred("_connect_designation_signals")
 	
 	# 渲染已有的地面物品（加载存档时可能已有数据）
 	call_deferred("_render_existing_ground_items")
@@ -844,6 +843,11 @@ func clear_all():
 
 # ==================== 指令标记视觉渲染 ====================
 
+func _connect_designation_signals():
+	var game = get_node_or_null("/root/Game")
+	if game and game.designation_system:
+		game.designation_system.designated_resources_changed.connect(_on_designated_resources_changed)
+
 func _on_designated_resources_changed():
 	"""指令标记变化时，增量更新标记覆盖层"""
 	_rebuild_designation_overlays()
@@ -857,7 +861,7 @@ func _rebuild_designation_overlays():
 		return
 	
 	# 渲染资源采集标记
-	var designated = game.designated_resources
+	var designated = game.designation_system.designated_resources
 	if not designated.is_empty():
 		for key in designated:
 			var parts = key.split(",")
@@ -868,7 +872,7 @@ func _rebuild_designation_overlays():
 			_create_designation_overlay(grid_pos, work_type)
 	
 	# 渲染拆除标记
-	var demolitions = game.designated_demolitions
+	var demolitions = game.designation_system.designated_demolitions
 	if not demolitions.is_empty():
 		for key in demolitions:
 			var parts = key.split(",")
@@ -969,7 +973,7 @@ func update_designation_preview(from_grid: Vector2i, to_grid: Vector2i, work_typ
 				# 清除模式：检查是否已被标记
 				var key = "%d,%d" % [x, y]
 				var game = get_node_or_null("/root/Game")
-				if game and game.designated_resources.has(key):
+				if game and game.designation_system.designated_resources.has(key):
 					_create_preview_icon(pos, -1, true)
 			else:
 				# 标记模式：检查是否有匹配的资源

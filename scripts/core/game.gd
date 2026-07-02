@@ -14,6 +14,7 @@ const WorkManager = preload("res://scripts/autoload/work_manager.gd")
 @onready var ui: CanvasLayer = $UI
 @onready var world_renderer = $World/WorldRenderer
 @onready var _gm = get_node("/root/GameManager")
+var designation_system: DesignationSystem
 
 # 建造模式
 var build_mode: bool = false
@@ -85,44 +86,12 @@ var _autonomy_timer: float = 0.0
 # 资源采集占用标记——防止多个定居者被分配到同一资源
 # key: "x,y" -> settler_id，表示该资源正被哪个定居者采集
 var _claimed_harvest_resources: Dictionary = {}
-
-# ==================== 指令标记系统 ====================
-# 标记模式——玩家可标记哪些资源允许采集
-var designation_mode: bool = false
-var designation_work_type: int = -1  # WorkManager.WorkType
-
-# 清除模式——玩家可框选/点选清除已标记的资源
-var clear_mode: bool = false
-
-# 拆除模式——玩家可点击建筑标记为拆除
-var demolition_mode: bool = false
-
-# 已标记的资源 {"x,y": work_type}
-# 只有被标记的资源才会被定居者采集
-var designated_resources: Dictionary = {}
-
-# 已标记的野猪 {boar_instance_id: true} — 狩猎目标
-var designated_boars: Dictionary = {}
-
-# 已标记的敌对敌人 {enemy_instance_id: true} — 攻击目标
-var designated_enemies: Dictionary = {}
-
-# 已标记的待拆除建筑 {"x,y": true}
-var designated_demolitions: Dictionary = {}
-
-signal designation_mode_changed(active: bool, work_type: int)
-signal clear_mode_changed(active: bool)
-signal demolition_mode_changed(active: bool)
-signal designated_resources_changed()
-
-# 框选拖拽状态
-var _is_designation_dragging: bool = false
-var _drag_start_grid: Vector2i = Vector2i(-999999, -999999)
-var _drag_end_grid: Vector2i = Vector2i(-999999, -999999)
-var _drag_overlay: Node2D = null  # 框选覆盖层（高z_index，显示在最上面）
-
-# 清理过期采集占用的定时器（每30帧清理一次）
 func _ready():
+	# 初始化指令标记系统
+	designation_system = DesignationSystem.new()
+	designation_system.name = "DesignationSystem"
+	add_child(designation_system)
+	
 	# ===== 存档验证与加载 =====
 	# 1. 检查是否有存档
 	var has_save = _gm.has_save_file()
@@ -165,17 +134,6 @@ func _ready():
 	# 更新HUD速度标签（此时存档已加载完毕，time_speed 为实际值）
 	_update_speed_label()
 
-func _init_drag_overlay():
-	"""创建框选覆盖层（独立 Node2D，高 z_index，确保绘制在最上面）"""
-	if _drag_overlay != null:
-		return
-	_drag_overlay = Node2D.new()
-	_drag_overlay.name = "DragOverlay"
-	_drag_overlay.z_index = 200
-	_drag_overlay.set_script(preload("res://scripts/core/drag_overlay.gd"))
-	add_child(_drag_overlay)
-	move_child(_drag_overlay, get_child_count() - 1)  # 移到最末尾，最后渲染
-
 func _process(delta):
 	# 建造模式预览
 	if build_mode:
@@ -194,13 +152,7 @@ func _process(delta):
 		tech_system.process_research(delta)
 	
 	# 标记/清除模式：更新框选视觉
-	if (designation_mode or clear_mode) and _is_designation_dragging:
-		var mouse_pos = get_global_mouse_position()
-		_drag_end_grid = Vector2i(
-			floori(mouse_pos.x / world.tile_size),
-			floori(mouse_pos.y / world.tile_size)
-		)
-		_update_designation_drag_visual()
+	designation_system.process_drag_update()
 
 	# 野猪生成（每2秒检查一次）
 	_boar_spawn_timer += delta
@@ -409,531 +361,6 @@ func exit_build_mode():
 			build_menu.selected_building = ""
 			for i in build_menu.category_tabs.get_child_count():
 				build_menu.category_tabs.get_child(i).button_pressed = false
-
-# ==================== 指令标记模式 ====================
-
-func enter_designation_mode(work_type: int):
-	"""进入标记模式，玩家可以标记指定类型的资源"""
-	if build_mode:
-		exit_build_mode()
-	if clear_mode:
-		exit_clear_mode()
-	
-	designation_mode = true
-	designation_work_type = work_type
-	_is_designation_dragging = false
-	_init_drag_overlay()
-	
-	# 鼠标变为十字准星
-	Input.set_default_cursor_shape(Input.CURSOR_CROSS)
-	
-	designation_mode_changed.emit(true, work_type)
-
-func exit_designation_mode():
-	"""退出标记模式"""
-	designation_mode = false
-	designation_work_type = -1
-	_is_designation_dragging = false
-	if _drag_overlay:
-		_drag_overlay.queue_redraw()
-	if world_renderer and world_renderer.has_method("_clear_designation_preview"):
-		world_renderer._clear_designation_preview()
-	# 恢复默认鼠标
-	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
-	designation_mode_changed.emit(false, -1)
-
-func enter_clear_mode():
-	"""进入清除模式，玩家可以框选/点选清除已标记的资源"""
-	if build_mode:
-		exit_build_mode()
-	if designation_mode:
-		exit_designation_mode()
-	
-	clear_mode = true
-	_is_designation_dragging = false
-	_init_drag_overlay()
-	
-	# 鼠标变为禁止图标
-	Input.set_default_cursor_shape(Input.CURSOR_FORBIDDEN)
-	
-	clear_mode_changed.emit(true)
-
-func exit_clear_mode():
-	"""退出清除模式"""
-	clear_mode = false
-	_is_designation_dragging = false
-	if _drag_overlay:
-		_drag_overlay.queue_redraw()
-	if world_renderer and world_renderer.has_method("_clear_designation_preview"):
-		world_renderer._clear_designation_preview()
-	# 恢复默认鼠标
-	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
-	clear_mode_changed.emit(false)
-
-# ==================== 拆除标记模式 ====================
-
-func enter_demolition_mode():
-	"""进入拆除模式，玩家可以点击建筑标记为拆除"""
-	if build_mode:
-		exit_build_mode()
-	if designation_mode:
-		exit_designation_mode()
-	if clear_mode:
-		exit_clear_mode()
-	
-	demolition_mode = true
-	_is_designation_dragging = false
-	_init_drag_overlay()
-	
-	# 鼠标变为十字准星
-	Input.set_default_cursor_shape(Input.CURSOR_CROSS)
-	
-	demolition_mode_changed.emit(true)
-
-func exit_demolition_mode():
-	"""退出拆除模式"""
-	demolition_mode = false
-	_is_designation_dragging = false
-	if _drag_overlay:
-		_drag_overlay.queue_redraw()
-	# 恢复默认鼠标
-	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
-	demolition_mode_changed.emit(false)
-
-func toggle_building_demolition(grid_pos: Vector2i) -> bool:
-	"""切换指定网格位置的建筑拆除标记状态，返回标记后的状态（true=已标记）"""
-	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
-	
-	# 检查该位置是否有已完成建筑
-	var bld = building_system.get_building_at(grid_pos) if building_system else null
-	if bld == null or not bld.is_completed:
-		return false
-	
-	# 检查建筑数据是否存在
-	var data = bld.get_data()
-	if data == null:
-		return false
-	
-	if designated_demolitions.has(key):
-		# 已标记 → 取消标记
-		designated_demolitions.erase(key)
-		designated_resources_changed.emit()
-		return false
-	else:
-		# 标记为待拆除
-		designated_demolitions[key] = true
-		designated_resources_changed.emit()
-		return true
-
-func _toggle_demolition_at_pos(global_pos: Vector2) -> bool:
-	"""使用鼠标像素位置查找建筑并切换拆除标记"""
-	var grid_pos = Vector2i(
-		floori(global_pos.x / world.tile_size),
-		floori(global_pos.y / world.tile_size)
-	)
-	return toggle_building_demolition(grid_pos)
-
-func toggle_resource_designation(grid_pos: Vector2i) -> bool:
-	"""切换指定网格位置的资源标记状态，返回标记后的状态（true=已标记）"""
-	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
-	var is_auto = (designation_work_type == -2)
-	
-	# 攻击模式：标记/取消标记敌人
-	if designation_work_type == WorkManager.WorkType.COMBAT:
-		return _toggle_enemy_designation_at(grid_pos)
-	
-	# 狩猎/自动模式：标记/取消标记野猪
-	if designation_work_type == WorkManager.WorkType.HUNTING or is_auto:
-		if _toggle_boar_designation_at(grid_pos):
-			return true
-		if not is_auto:
-			return false  # 纯狩猎模式，没有找到野猪
-	
-	if designated_resources.has(key):
-		if is_auto:
-			# 自动模式：无论什么类型，再次点击即取消
-			designated_resources.erase(key)
-			designated_resources_changed.emit()
-			return false
-		else:
-			# 如果已标记，且工作类型相同则取消标记；类型不同则更新
-			if designated_resources[key] == designation_work_type:
-				designated_resources.erase(key)
-				designated_resources_changed.emit()
-				return false
-			else:
-				designated_resources[key] = designation_work_type
-				designated_resources_changed.emit()
-				return true
-	else:
-		# 检查该位置是否有可标记的资源
-		var dep = world.get_resource_at(grid_pos) if world else null
-		if dep != null and dep.amount > 0:
-			if _is_resource_match_work_type(dep.type, designation_work_type):
-				var actual_type = _auto_detect_work_type(dep.type) if is_auto else designation_work_type
-				if actual_type >= 0:
-					designated_resources[key] = actual_type
-					designated_resources_changed.emit()
-					return true
-		# 搬运/自动模式：也标记地面物品
-		if (designation_work_type == WorkManager.WorkType.HAULING or is_auto) and world:
-			var stacks = world.get_ground_items_at(grid_pos)
-			if not stacks.is_empty():
-				designated_resources[key] = WorkManager.WorkType.HAULING
-				designated_resources_changed.emit()
-				return true
-	
-	return false
-
-func is_resource_designated(grid_pos: Vector2i) -> bool:
-	"""检查指定网格位置的资源是否已被标记"""
-	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
-	return designated_resources.has(key)
-
-func get_designated_work_type(grid_pos: Vector2i) -> int:
-	"""获取指定资源的标记工作类型，-1表示未标记"""
-	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
-	return designated_resources.get(key, -1)
-
-# -------- 野猪标记（狩猎） --------
-func _toggle_boar_designation_at(grid_pos: Vector2i) -> bool:
-	"""切换指定网格位置的野猪标记状态（使用网格中心像素距离检测）"""
-	var tile_center = Vector2(
-		grid_pos.x * world.tile_size + world.tile_size / 2.0,
-		grid_pos.y * world.tile_size + world.tile_size / 2.0
-	)
-	var click_dist = world.tile_size * 0.6  # 与点击选择相同的容差
-	
-	for b in boars:
-		if not is_instance_valid(b) or b.state == b.BoarState.DEAD:
-			continue
-		var dist = b.position.distance_to(tile_center)
-		if dist < click_dist:
-			var inst_id = b.get_instance_id()
-			if designated_boars.has(inst_id):
-				designated_boars.erase(inst_id)
-				b.is_designated = false
-				b.queue_redraw()
-				designated_resources_changed.emit()
-				return false
-			else:
-				designated_boars[inst_id] = true
-				b.is_designated = true
-				b.queue_redraw()
-				designated_resources_changed.emit()
-				return true
-	return false
-
-func _toggle_boar_designation_at_pos(global_pos: Vector2) -> bool:
-	"""使用鼠标像素位置直接查找并标记野猪（更精确，不依赖网格对齐）"""
-	var click_dist = world.tile_size * 0.6
-	
-	for b in boars:
-		if not is_instance_valid(b) or b.state == b.BoarState.DEAD:
-			continue
-		var dist = b.position.distance_to(global_pos)
-		if dist < click_dist:
-			var inst_id = b.get_instance_id()
-			if designated_boars.has(inst_id):
-				designated_boars.erase(inst_id)
-				b.is_designated = false
-				b.queue_redraw()
-				designated_resources_changed.emit()
-				return true
-			else:
-				designated_boars[inst_id] = true
-				b.is_designated = true
-				b.queue_redraw()
-				designated_resources_changed.emit()
-				return true
-	return false
-
-func is_boar_designated(boar_instance_id: int) -> bool:
-	return designated_boars.has(boar_instance_id)
-
-# -------- 敌人标记（攻击） --------
-func _toggle_enemy_designation_at(grid_pos: Vector2i) -> bool:
-	"""切换指定网格位置的敌人标记状态"""
-	var tile_center = Vector2(
-		grid_pos.x * world.tile_size + world.tile_size / 2.0,
-		grid_pos.y * world.tile_size + world.tile_size / 2.0
-	)
-	return _toggle_enemy_designation_at_pos(tile_center)
-
-func _toggle_enemy_designation_at_pos(global_pos: Vector2) -> bool:
-	"""使用鼠标像素位置查找并标记敌人"""
-	var click_dist = world.tile_size * 0.6
-	
-	for e in enemies:
-		if not is_instance_valid(e) or e.state == e.EnemyState.DEAD:
-			continue
-		var dist = e.position.distance_to(global_pos)
-		if dist < click_dist:
-			var inst_id = e.get_instance_id()
-			if designated_enemies.has(inst_id):
-				designated_enemies.erase(inst_id)
-				e.is_designated = false
-				e.queue_redraw()
-				designated_resources_changed.emit()
-				return true
-			else:
-				designated_enemies[inst_id] = true
-				e.is_designated = true
-				e.queue_redraw()
-				designated_resources_changed.emit()
-				return true
-	return false
-
-func is_enemy_designated(enemy_instance_id: int) -> bool:
-	return designated_enemies.has(enemy_instance_id)
-
-func clear_all_designations():
-	"""清除所有标记（包括资源标记、野猪标记、敌人标记和拆除标记）"""
-	designated_resources.clear()
-	designated_demolitions.clear()
-	# 清除所有野猪标记视觉
-	for b in boars:
-		if is_instance_valid(b):
-			b.is_designated = false
-			b.queue_redraw()
-	designated_boars.clear()
-	# 清除所有敌人标记视觉
-	for e in enemies:
-		if is_instance_valid(e):
-			e.is_designated = false
-			e.queue_redraw()
-	designated_enemies.clear()
-	designated_resources_changed.emit()
-
-func clear_designations_by_type(work_type: int):
-	"""清除指定工作类型的所有标记"""
-	var to_remove: Array[String] = []
-	for key in designated_resources:
-		if designated_resources[key] == work_type:
-			to_remove.append(key)
-	for key in to_remove:
-		designated_resources.erase(key)
-	if not to_remove.is_empty():
-		designated_resources_changed.emit()
-
-func remove_designation_at(grid_pos: Vector2i):
-	"""移除指定网格位置的资源采集标记"""
-	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
-	if designated_resources.has(key):
-		designated_resources.erase(key)
-		designated_resources_changed.emit()
-
-func _auto_detect_work_type(resource_type: int) -> int:
-	"""根据资源类型自动推断工作类型"""
-	match resource_type:
-		World.ResourceNodeType.STONE_DEPOSIT, World.ResourceNodeType.IRON_DEPOSIT, World.ResourceNodeType.COPPER_DEPOSIT, World.ResourceNodeType.COAL_DEPOSIT:
-			return WorkManager.WorkType.MINING
-		World.ResourceNodeType.TREE:
-			return WorkManager.WorkType.WOODCUTTING
-		World.ResourceNodeType.BERRY_BUSH:
-			return WorkManager.WorkType.FARMING
-		_:
-			return -1
-
-func _is_resource_match_work_type(resource_type: int, work_type: int) -> bool:
-	"""检查资源类型是否匹配指定的工作类型"""
-	match work_type:
-		WorkManager.WorkType.MINING:
-			return resource_type in [
-				World.ResourceNodeType.STONE_DEPOSIT,
-				World.ResourceNodeType.IRON_DEPOSIT,
-				World.ResourceNodeType.COPPER_DEPOSIT,
-				World.ResourceNodeType.COAL_DEPOSIT,
-			]
-		WorkManager.WorkType.WOODCUTTING:
-			return resource_type == World.ResourceNodeType.TREE
-		WorkManager.WorkType.FARMING:
-			return resource_type == World.ResourceNodeType.BERRY_BUSH
-		-2:  # 自动模式：匹配所有可采集资源
-			return resource_type in [
-				World.ResourceNodeType.STONE_DEPOSIT,
-				World.ResourceNodeType.IRON_DEPOSIT,
-				World.ResourceNodeType.COPPER_DEPOSIT,
-				World.ResourceNodeType.COAL_DEPOSIT,
-				World.ResourceNodeType.TREE,
-				World.ResourceNodeType.BERRY_BUSH,
-			]
-		_:
-			return false
-
-func _designate_resources_in_rect(from_grid: Vector2i, to_grid: Vector2i):
-	"""在矩形区域内标记所有匹配工作类型的资源"""
-	var min_x = mini(from_grid.x, to_grid.x)
-	var max_x = maxi(from_grid.x, to_grid.x)
-	var min_y = mini(from_grid.y, to_grid.y)
-	var max_y = maxi(from_grid.y, to_grid.y)
-	var is_auto = (designation_work_type == -2)
-	
-	var tile_size = world.tile_size if world else 32.0
-	var rect_pixel_min = Vector2(min_x * tile_size, min_y * tile_size)
-	var rect_pixel_max = Vector2((max_x + 1) * tile_size, (max_y + 1) * tile_size)
-	
-	# 攻击模式：标记矩形内的敌对敌人
-	if designation_work_type == WorkManager.WorkType.COMBAT:
-		var enemy_changed = false
-		for e in enemies:
-			if not is_instance_valid(e) or e.state == e.EnemyState.DEAD:
-				continue
-			if e.position.x >= rect_pixel_min.x and e.position.x < rect_pixel_max.x \
-					and e.position.y >= rect_pixel_min.y and e.position.y < rect_pixel_max.y:
-				var inst_id = e.get_instance_id()
-				if not designated_enemies.has(inst_id):
-					designated_enemies[inst_id] = true
-					e.is_designated = true
-					e.queue_redraw()
-					enemy_changed = true
-		if enemy_changed:
-			designated_resources_changed.emit()
-		return
-	
-	# 标记矩形内的野猪（狩猎模式专用，或自动模式下也标记）
-	var boar_changed = false
-	if designation_work_type == WorkManager.WorkType.HUNTING or is_auto:
-		for b in boars:
-			if not is_instance_valid(b) or b.state == b.BoarState.DEAD:
-				continue
-			# 检查野猪位置是否在矩形内
-			if b.position.x >= rect_pixel_min.x and b.position.x < rect_pixel_max.x \
-					and b.position.y >= rect_pixel_min.y and b.position.y < rect_pixel_max.y:
-				var inst_id = b.get_instance_id()
-				if not designated_boars.has(inst_id):
-					designated_boars[inst_id] = true
-					b.is_designated = true
-					b.queue_redraw()
-					boar_changed = true
-	
-	# 纯狩猎模式标记完野猪即可返回
-	if designation_work_type == WorkManager.WorkType.HUNTING:
-		if boar_changed:
-			designated_resources_changed.emit()
-		return
-	
-	# 其他模式（含自动模式）：继续标记资源/地面物品
-	var changed = false
-	for x in range(min_x, max_x + 1):
-		for y in range(min_y, max_y + 1):
-			var pos = Vector2i(x, y)
-			var dep = world.get_resource_at(pos) if world else null
-			if dep != null and dep.amount > 0:
-				if _is_resource_match_work_type(dep.type, designation_work_type):
-					var key = "%d,%d" % [x, y]
-					var actual_type = _auto_detect_work_type(dep.type) if is_auto else designation_work_type
-					if actual_type >= 0:
-						designated_resources[key] = actual_type
-						changed = true
-			# 搬运/自动模式也标记地面物品
-			if (designation_work_type == WorkManager.WorkType.HAULING or is_auto) and world:
-				var stacks = world.get_ground_items_at(pos)
-				if not stacks.is_empty():
-					var key = "%d,%d" % [x, y]
-					designated_resources[key] = WorkManager.WorkType.HAULING
-					changed = true
-	
-	if changed or boar_changed:
-		designated_resources_changed.emit()
-
-func _remove_designations_in_rect(from_grid: Vector2i, to_grid: Vector2i):
-	"""在矩形区域内清除所有标记（包括资源标记和野猪标记）"""
-	var min_x = mini(from_grid.x, to_grid.x)
-	var max_x = maxi(from_grid.x, to_grid.x)
-	var min_y = mini(from_grid.y, to_grid.y)
-	var max_y = maxi(from_grid.y, to_grid.y)
-	
-	var tile_size = world.tile_size if world else 32.0
-	var rect_pixel_min = Vector2(min_x * tile_size, min_y * tile_size)
-	var rect_pixel_max = Vector2((max_x + 1) * tile_size, (max_y + 1) * tile_size)
-	
-	# 清除矩形内的敌人标记
-	var enemy_changed = false
-	for e in enemies:
-		if not is_instance_valid(e) or e.state == e.EnemyState.DEAD:
-			continue
-		if e.position.x >= rect_pixel_min.x and e.position.x < rect_pixel_max.x \
-				and e.position.y >= rect_pixel_min.y and e.position.y < rect_pixel_max.y:
-			var inst_id = e.get_instance_id()
-			if designated_enemies.has(inst_id):
-				designated_enemies.erase(inst_id)
-				e.is_designated = false
-				e.queue_redraw()
-				enemy_changed = true
-	
-	# 清除矩形内的野猪标记
-	var boar_changed = false
-	for b in boars:
-		if not is_instance_valid(b) or b.state == b.BoarState.DEAD:
-			continue
-		if b.position.x >= rect_pixel_min.x and b.position.x < rect_pixel_max.x \
-				and b.position.y >= rect_pixel_min.y and b.position.y < rect_pixel_max.y:
-			var inst_id = b.get_instance_id()
-			if designated_boars.has(inst_id):
-				designated_boars.erase(inst_id)
-				b.is_designated = false
-				b.queue_redraw()
-				boar_changed = true
-	
-	# 清除矩形内的资源标记和拆除标记
-	var changed = false
-	for x in range(min_x, max_x + 1):
-		for y in range(min_y, max_y + 1):
-			var key = "%d,%d" % [x, y]
-			if designated_resources.has(key):
-				designated_resources.erase(key)
-				changed = true
-			if designated_demolitions.has(key):
-				designated_demolitions.erase(key)
-				changed = true
-	
-	if changed or boar_changed or enemy_changed:
-		designated_resources_changed.emit()
-
-func _update_designation_drag_visual():
-	"""更新框选拖拽的视觉反馈——将框选数据写入覆盖层并触发重绘"""
-	if not _drag_overlay:
-		return
-	
-	if not _is_designation_dragging or _drag_start_grid.x < -99999 or _drag_end_grid.x < -99999:
-		_drag_overlay.visible = false
-		return
-	
-	_drag_overlay.visible = true
-	
-	# 计算框选矩形，存入覆盖层供其 _draw() 使用
-	var min_x = mini(_drag_start_grid.x, _drag_end_grid.x)
-	var max_x = maxi(_drag_start_grid.x, _drag_end_grid.x)
-	var min_y = mini(_drag_start_grid.y, _drag_end_grid.y)
-	var max_y = maxi(_drag_start_grid.y, _drag_end_grid.y)
-	
-	var pixel_pos = Vector2(min_x * world.tile_size, min_y * world.tile_size)
-	var pixel_size = Vector2(
-		(max_x - min_x + 1) * world.tile_size,
-		(max_y - min_y + 1) * world.tile_size
-	)
-	
-	_drag_overlay.set("drag_rect_pos", pixel_pos)
-	_drag_overlay.set("drag_rect_size", pixel_size)
-	_drag_overlay.set("is_clear_mode", clear_mode)
-	_drag_overlay.queue_redraw()
-	
-	# 更新框选内的标记预览
-	if designation_mode and world_renderer and world_renderer.has_method("update_designation_preview"):
-		world_renderer.update_designation_preview(
-			Vector2i(min_x, min_y),
-			Vector2i(max_x, max_y),
-			designation_work_type,
-			false
-		)
-	if clear_mode and world_renderer and world_renderer.has_method("update_designation_preview"):
-		world_renderer.update_designation_preview(
-			Vector2i(min_x, min_y),
-			Vector2i(max_x, max_y),
-			-1,
-			true
-		)
 
 func _update_build_preview():
 	var mouse_pos = get_global_mouse_position()
@@ -1262,8 +689,8 @@ func _input(event):
 		if selected_tile_pos.x >= 0:
 			_deselect_tile()
 			return
-		if demolition_mode:
-			exit_demolition_mode()
+		if designation_system.demolition_mode:
+			designation_system.exit_demolition_mode()
 			return
 		if build_mode:
 			exit_build_mode()
@@ -1301,44 +728,44 @@ func _input(event):
 	
 	# Q 键切换采集标记模式（自动）
 	if event is InputEventKey and event.keycode == KEY_Q and event.pressed:
-		if designation_mode and designation_work_type == -2:
-			exit_designation_mode()
+		if designation_system.designation_mode and designation_system.designation_work_type == -2:
+			designation_system.exit_designation_mode()
 		else:
 			if build_mode:
 				exit_build_mode()
-			if clear_mode:
-				exit_clear_mode()
-			if demolition_mode:
-				exit_demolition_mode()
-			enter_designation_mode(-2)
+			if designation_system.clear_mode:
+				designation_system.exit_clear_mode()
+			if designation_system.demolition_mode:
+				designation_system.exit_demolition_mode()
+			designation_system.enter_designation_mode(-2)
 		get_viewport().set_input_as_handled()
 		return
 	
 	# C 键切换清除模式
 	if event is InputEventKey and event.keycode == KEY_C and event.pressed:
-		if clear_mode:
-			exit_clear_mode()
+		if designation_system.clear_mode:
+			designation_system.exit_clear_mode()
 		else:
 			if build_mode:
 				exit_build_mode()
-			if designation_mode:
-				exit_designation_mode()
-			if demolition_mode:
-				exit_demolition_mode()
-			enter_clear_mode()
+			if designation_system.designation_mode:
+				designation_system.exit_designation_mode()
+			if designation_system.demolition_mode:
+				designation_system.exit_demolition_mode()
+			designation_system.enter_clear_mode()
 		get_viewport().set_input_as_handled()
 		return
 	
 	# 右键退出标记/清除/建造模式
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-		if designation_mode:
-			exit_designation_mode()
+		if designation_system.designation_mode:
+			designation_system.exit_designation_mode()
 			return
-		if clear_mode:
-			exit_clear_mode()
+		if designation_system.clear_mode:
+			designation_system.exit_clear_mode()
 			return
-		if demolition_mode:
-			exit_demolition_mode()
+		if designation_system.demolition_mode:
+			designation_system.exit_demolition_mode()
 			return
 		if build_mode:
 			exit_build_mode()
@@ -1362,24 +789,22 @@ func _input(event):
 		return
 	
 	# 标记模式的左键处理
-	if event is InputEventMouseButton and not build_mode and designation_mode:
+	if event is InputEventMouseButton and not build_mode and designation_system.designation_mode:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				# 开始拖拽或点选
 				var global_pos = get_global_mouse_position()
-				_drag_start_grid = Vector2i(
+				designation_system._drag_start_grid = Vector2i(
 					floori(global_pos.x / world.tile_size),
 					floori(global_pos.y / world.tile_size)
 				)
-				_drag_end_grid = _drag_start_grid
-				_is_designation_dragging = true
+				designation_system._drag_end_grid = designation_system._drag_start_grid
+				designation_system._is_designation_dragging = true
 				if world_renderer and world_renderer.has_method("_clear_designation_preview"):
 					world_renderer._clear_designation_preview()
-				_update_designation_drag_visual()
+				designation_system._update_designation_drag_visual()
 			else:
-				# 鼠标释放：完成框选
-				if _is_designation_dragging:
-					_is_designation_dragging = false
+				if designation_system._is_designation_dragging:
+					designation_system._is_designation_dragging = false
 					
 					var global_pos = get_global_mouse_position()
 					var end_grid = Vector2i(
@@ -1387,56 +812,46 @@ func _input(event):
 						floori(global_pos.y / world.tile_size)
 					)
 					
-					# 判断是点选还是框选
-					if _drag_start_grid == end_grid:
-						var is_auto = (designation_work_type == -2)
-						# 攻击模式：点选切换敌人标记
-						if designation_work_type == WorkManager.WorkType.COMBAT:
-							_toggle_enemy_designation_at_pos(global_pos)
-						# 点选：先尝试切换野猪标记（使用鼠标实际像素位置）
-						elif designation_work_type == WorkManager.WorkType.HUNTING or is_auto:
-							if not _toggle_boar_designation_at_pos(global_pos) and is_auto:
-								# 自动模式下未点到野猪，回退到常规资源标记
-								toggle_resource_designation(_drag_start_grid)
+					if designation_system._drag_start_grid == end_grid:
+						var is_auto = (designation_system.designation_work_type == -2)
+						if designation_system.designation_work_type == WorkManager.WorkType.COMBAT:
+							designation_system._toggle_enemy_designation_at_pos(global_pos)
+						elif designation_system.designation_work_type == WorkManager.WorkType.HUNTING or is_auto:
+							if not designation_system._toggle_boar_designation_at_pos(global_pos) and is_auto:
+								designation_system.toggle_resource_designation(designation_system._drag_start_grid)
 						else:
-							toggle_resource_designation(_drag_start_grid)
+							designation_system.toggle_resource_designation(designation_system._drag_start_grid)
 					else:
-						# 框选：标记矩形内所有匹配资源
-						_designate_resources_in_rect(_drag_start_grid, end_grid)
+						designation_system._designate_resources_in_rect(designation_system._drag_start_grid, end_grid)
 					
-					# 先隐藏框选覆盖层
-					if _drag_overlay:
-						_drag_overlay.visible = false
-						_drag_overlay.queue_redraw()
+					if designation_system._drag_overlay:
+						designation_system._drag_overlay.visible = false
+						designation_system._drag_overlay.queue_redraw()
 					
-					# 清除标记预览（放在 designation 之后，确保信号链 _rebuild_designation_overlays
-					# 先生成永久标记图标，再清理旧的预览图标，避免视觉闪烁）
 					if world_renderer and world_renderer.has_method("_clear_designation_preview"):
 						world_renderer._clear_designation_preview()
 					
-					_drag_start_grid = Vector2i(-999999, -999999)
-					_drag_end_grid = Vector2i(-999999, -999999)
+					designation_system._drag_start_grid = Vector2i(-999999, -999999)
+					designation_system._drag_end_grid = Vector2i(-999999, -999999)
 			return
 	
 	# 清除模式的左键处理
-	if event is InputEventMouseButton and not build_mode and clear_mode:
+	if event is InputEventMouseButton and not build_mode and designation_system.clear_mode:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				# 开始拖拽
 				var global_pos = get_global_mouse_position()
-				_drag_start_grid = Vector2i(
+				designation_system._drag_start_grid = Vector2i(
 					floori(global_pos.x / world.tile_size),
 					floori(global_pos.y / world.tile_size)
 				)
-				_drag_end_grid = _drag_start_grid
-				_is_designation_dragging = true
+				designation_system._drag_end_grid = designation_system._drag_start_grid
+				designation_system._is_designation_dragging = true
 				if world_renderer and world_renderer.has_method("_clear_designation_preview"):
 					world_renderer._clear_designation_preview()
-				_update_designation_drag_visual()
+				designation_system._update_designation_drag_visual()
 			else:
-				# 鼠标释放：清除框选区域内的标记
-				if _is_designation_dragging:
-					_is_designation_dragging = false
+				if designation_system._is_designation_dragging:
+					designation_system._is_designation_dragging = false
 					
 					var global_pos = get_global_mouse_position()
 					var end_grid = Vector2i(
@@ -1444,39 +859,33 @@ func _input(event):
 						floori(global_pos.y / world.tile_size)
 					)
 					
-					if _drag_start_grid == end_grid:
-						# 点选：清除单个资源的标记
-						var key = "%d,%d" % [_drag_start_grid.x, _drag_start_grid.y]
-						if designated_resources.has(key):
-							designated_resources.erase(key)
-							designated_resources_changed.emit()
-						# 也清除该位置的拆除标记
-						if designated_demolitions.has(key):
-							designated_demolitions.erase(key)
-							designated_resources_changed.emit()
+					if designation_system._drag_start_grid == end_grid:
+						var key = "%d,%d" % [designation_system._drag_start_grid.x, designation_system._drag_start_grid.y]
+						if designation_system.designated_resources.has(key):
+							designation_system.designated_resources.erase(key)
+							designation_system.designated_resources_changed.emit()
+						if designation_system.designated_demolitions.has(key):
+							designation_system.designated_demolitions.erase(key)
+							designation_system.designated_resources_changed.emit()
 					else:
-						# 框选：清除矩形内所有标记
-						_remove_designations_in_rect(_drag_start_grid, end_grid)
+						designation_system._remove_designations_in_rect(designation_system._drag_start_grid, end_grid)
 					
-					# 先隐藏框选覆盖层
-					if _drag_overlay:
-						_drag_overlay.visible = false
-						_drag_overlay.queue_redraw()
+					if designation_system._drag_overlay:
+						designation_system._drag_overlay.visible = false
+						designation_system._drag_overlay.queue_redraw()
 					
-					# 清除标记预览（放在清除操作之后，确保信号链 _rebuild_designation_overlays
-					# 先生成更新后的永久标记，再清理预览图标）
 					if world_renderer and world_renderer.has_method("_clear_designation_preview"):
 						world_renderer._clear_designation_preview()
 					
-					_drag_start_grid = Vector2i(-999999, -999999)
-					_drag_end_grid = Vector2i(-999999, -999999)
+					designation_system._drag_start_grid = Vector2i(-999999, -999999)
+					designation_system._drag_end_grid = Vector2i(-999999, -999999)
 			return
 	
 	# 拆除模式的左键处理
-	if event is InputEventMouseButton and not build_mode and demolition_mode:
+	if event is InputEventMouseButton and not build_mode and designation_system.demolition_mode:
 		if event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 			var global_pos = get_global_mouse_position()
-			_toggle_demolition_at_pos(global_pos)
+			designation_system._toggle_demolition_at_pos(global_pos)
 			return
 	
 	if event.is_action_pressed("left_click") and build_mode:
@@ -1484,7 +893,7 @@ func _input(event):
 		return
 	
 	# 定居者点击选择（非建造/标记/清除/拆除模式下的左键单击）
-	if event.is_action_pressed("left_click") and not build_mode and not designation_mode and not clear_mode and not demolition_mode:
+	if event.is_action_pressed("left_click") and not build_mode and not designation_system.designation_mode and not designation_system.clear_mode and not designation_system.demolition_mode:
 		var global_pos = get_global_mouse_position()
 		var grid_pos = Vector2i(
 			floori(global_pos.x / world.tile_size),
@@ -1749,13 +1158,13 @@ func _restore_from_save(data: Dictionary):
 	
 	# 恢复资源采集标记（v3+）
 	if data.has("designated_resources"):
-		designated_resources = data.designated_resources.duplicate()
-		designated_resources_changed.emit()
+		designation_system.designated_resources = data.designated_resources.duplicate()
+		designation_system.designated_resources_changed.emit()
 	
 	# 恢复拆除标记（v5+）
 	if data.has("designated_demolitions"):
-		designated_demolitions = data.designated_demolitions.duplicate()
-		designated_resources_changed.emit()
+		designation_system.designated_demolitions = data.designated_demolitions.duplicate()
+		designation_system.designated_resources_changed.emit()
 
 # -------- 定居者管理 --------
 func get_idle_settlers() -> Array:
@@ -2020,19 +1429,18 @@ func _assign_ai_tasks():
 func _scan_hunting_targets(_idle_settlers: Array) -> Array:
 	"""扫描被标记的野猪，生成狩猎任务"""
 	var result: Array = []
-	if designated_boars.is_empty():
+	if designation_system.designated_boars.is_empty():
 		return result
 	
 	for b in boars:
 		if not is_instance_valid(b) or b.state == b.BoarState.DEAD:
-			# 已死亡的野猪自动取消标记
 			var dead_id = b.get_instance_id() if is_instance_valid(b) else 0
-			if designated_boars.has(dead_id):
-				designated_boars.erase(dead_id)
+			if designation_system.designated_boars.has(dead_id):
+				designation_system.designated_boars.erase(dead_id)
 			continue
 		
 		var inst_id = b.get_instance_id()
-		if not designated_boars.has(inst_id):
+		if not designation_system.designated_boars.has(inst_id):
 			continue
 		
 		result.append({
@@ -2051,18 +1459,18 @@ func _scan_hunting_targets(_idle_settlers: Array) -> Array:
 func _scan_enemy_combat_targets(_idle_settlers: Array) -> Array:
 	"""扫描被标记的敌对敌人，生成战斗任务"""
 	var result: Array = []
-	if designated_enemies.is_empty():
+	if designation_system.designated_enemies.is_empty():
 		return result
 	
 	for e in enemies:
 		if not is_instance_valid(e) or e.state == e.EnemyState.DEAD:
 			var dead_id = e.get_instance_id() if is_instance_valid(e) else 0
-			if designated_enemies.has(dead_id):
-				designated_enemies.erase(dead_id)
+			if designation_system.designated_enemies.has(dead_id):
+				designation_system.designated_enemies.erase(dead_id)
 			continue
 		
 		var inst_id = e.get_instance_id()
-		if not designated_enemies.has(inst_id):
+		if not designation_system.designated_enemies.has(inst_id):
 			continue
 		
 		result.append({
@@ -2113,10 +1521,10 @@ func _scan_repair_tasks(_idle_settlers: Array) -> Array:
 func _scan_demolition_tasks() -> Array:
 	"""扫描被标记的待拆除建筑，生成拆除任务（拆除属于建筑工作，使用建造优先级）"""
 	var result: Array = []
-	if not building_system or designated_demolitions.is_empty():
+	if not building_system or designation_system.designated_demolitions.is_empty():
 		return result
 	
-	for key in designated_demolitions:
+	for key in designation_system.designated_demolitions:
 		var parts = key.split(",")
 		if parts.size() != 2:
 			continue
@@ -2181,8 +1589,7 @@ func _scan_nearby_resources(idle_settlers: Array) -> Array:
 				if _claimed_harvest_resources.has(res_key):
 					continue
 				
-				# 指令面板：只采集被标记的资源
-				if not designated_resources.has(res_key):
+				if not designation_system.designated_resources.has(res_key):
 					continue
 				
 				var world_pos = _grid_to_world(global_pos)
@@ -2316,9 +1723,8 @@ func _scan_ground_item_storage_tasks(_idle_settlers: Array, existing_haul_tasks:
 		if stacks.is_empty():
 			continue
 		
-		# 指令面板：搬运模式下只处理被标记的地面物品
 		var haul_key = "%d,%d" % [pos.x, pos.y]
-		if not designated_resources.is_empty() and not designated_resources.has(haul_key):
+		if not designation_system.designated_resources.is_empty() and not designation_system.designated_resources.has(haul_key):
 			continue
 		
 		for stack in stacks:
@@ -2435,17 +1841,16 @@ func release_harvest_resource(grid_pos: Vector2i):
 	_claimed_harvest_resources.erase(key)
 
 func _cleanup_depleted_designations():
-	"""清理已被采完但仍然保留在 designated_resources 中的标记"""
+	"""清理已被采完但仍然保留在标记中的资源"""
 	var to_remove: Array[String] = []
-	for res_key in designated_resources:
+	for res_key in designation_system.designated_resources:
 		var parts = res_key.split(",")
 		if parts.size() != 2:
 			to_remove.append(res_key)
 			continue
 		var grid_pos = Vector2i(int(parts[0]), int(parts[1]))
-		var wt = designated_resources[res_key]
+		var wt = designation_system.designated_resources[res_key]
 		
-		# 搬运标记：检查地面物品是否还在（不检查资源节点，因为地面物品不是资源节点）
 		if wt == WorkManager.WorkType.HAULING:
 			if world:
 				var stacks = world.get_ground_items_at(grid_pos)
@@ -2453,22 +1858,19 @@ func _cleanup_depleted_designations():
 					to_remove.append(res_key)
 			continue
 		
-		# 非搬运标记：检查资源节点是否还存在
 		if world:
 			var dep = world.get_resource_at(grid_pos)
 			if dep == null or dep.amount <= 0:
-				# 资源已不存在或已耗尽
 				to_remove.append(res_key)
 				continue
 	
 	for key in to_remove:
-		designated_resources.erase(key)
+		designation_system.designated_resources.erase(key)
 	if not to_remove.is_empty():
-		designated_resources_changed.emit()
+		designation_system.designated_resources_changed.emit()
 	
-	# 清理已不存在的建筑的拆除标记
 	var demo_to_remove: Array[String] = []
-	for key in designated_demolitions:
+	for key in designation_system.designated_demolitions:
 		var parts = key.split(",")
 		if parts.size() != 2:
 			demo_to_remove.append(key)
@@ -2479,9 +1881,9 @@ func _cleanup_depleted_designations():
 			if bld == null:
 				demo_to_remove.append(key)
 	for key in demo_to_remove:
-		designated_demolitions.erase(key)
+		designation_system.designated_demolitions.erase(key)
 	if not demo_to_remove.is_empty():
-		designated_resources_changed.emit()
+		designation_system.designated_resources_changed.emit()
 
 func _cleanup_harvest_claims():
 	"""清理已失效的资源采集占用标记"""
@@ -2536,14 +1938,13 @@ func _on_boar_died(_grid_pos: Vector2i, boar: Node2D):
 
 func _update_boars(_delta):
 	"""更新所有野猪的AI（野猪有独立的_process，这里检查战斗互动）"""
-	# 清理已死亡的野猪标记
 	var dead_marks: Array = []
-	for inst_id in designated_boars:
+	for inst_id in designation_system.designated_boars:
 		var b = instance_from_id(inst_id) if inst_id else null
 		if b == null or not is_instance_valid(b) or b.state == b.BoarState.DEAD:
 			dead_marks.append(inst_id)
 	for id in dead_marks:
-		designated_boars.erase(id)
+		designation_system.designated_boars.erase(id)
 	
 	# 检查定居者附近的野猪——自动防御射击
 	for settler in settlers:
@@ -2618,8 +2019,8 @@ func _update_enemies(_delta):
 	for e in dead_enemies:
 		if is_instance_valid(e):
 			var dead_id = e.get_instance_id()
-			if designated_enemies.has(dead_id):
-				designated_enemies.erase(dead_id)
+			if designation_system.designated_enemies.has(dead_id):
+				designation_system.designated_enemies.erase(dead_id)
 		enemies.erase(e)
 	
 	# 定居者自动反击射程内的敌人

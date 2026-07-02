@@ -227,8 +227,8 @@ func save_game(silent: bool = false) -> bool:
 		"crafting": game.crafting_system.to_dict() if game.crafting_system else {},
 		"settlers": _serialize_settlers(game.settlers),
 		"work_priorities": get_node_or_null("/root/WorkManager").to_dict() if get_node_or_null("/root/WorkManager") else {},
-		"designated_resources": game.designated_resources.duplicate(),
-		"designated_demolitions": game.designated_demolitions.duplicate(),
+		"designated_resources": game.designation_system.designated_resources.duplicate(),
+		"designated_demolitions": game.designation_system.designated_demolitions.duplicate(),
 	}
 	
 	var file = FileAccess.open("user://savegame.dat", FileAccess.WRITE)

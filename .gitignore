@@ -17,6 +17,9 @@ Thumbs.db
 .DS_Store
 Desktop.ini
 
+# Kilo
+.kilo/
+
 # Build artifacts
 /standalone/
 /build/

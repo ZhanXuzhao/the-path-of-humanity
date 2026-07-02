@@ -43,11 +43,8 @@ func _ready():
 	# 创建取消按钮（风格统一）
 	_create_cmd_button("❌", "取消", CLEAR_WORK_TYPE, "框选或点选清除已标记的资源")
 	
-	# 连接游戏信号
-	if _game:
-		_game.designation_mode_changed.connect(_on_designation_mode_changed)
-		_game.clear_mode_changed.connect(_on_clear_mode_changed)
-		_game.demolition_mode_changed.connect(_on_demolition_mode_changed)
+	# 连接游戏信号（延迟一帧确保 Game._ready() 已创建 DesignationSystem）
+	call_deferred("_connect_designation_signals")
 	
 	visible = true
 
@@ -76,8 +73,8 @@ func _on_demolish_button_pressed(btn: Button):
 	if not _game:
 		return
 	
-	if _game.demolition_mode:
-		_game.exit_demolition_mode()
+	if _game.designation_system.demolition_mode:
+		_game.designation_system.exit_demolition_mode()
 		btn.button_pressed = false
 	else:
 		for wt in _buttons:
@@ -85,19 +82,19 @@ func _on_demolish_button_pressed(btn: Button):
 				_buttons[wt].button_pressed = false
 		if _clear_btn:
 			_clear_btn.button_pressed = false
-		if _game.designation_mode:
-			_game.exit_designation_mode()
-		if _game.clear_mode:
-			_game.exit_clear_mode()
-		_game.enter_demolition_mode()
+		if _game.designation_system.designation_mode:
+			_game.designation_system.exit_designation_mode()
+		if _game.designation_system.clear_mode:
+			_game.designation_system.exit_clear_mode()
+		_game.designation_system.enter_demolition_mode()
 		btn.button_pressed = true
 
 func _on_command_button_pressed(work_type: int, btn: Button):
 	if not _game:
 		return
 	
-	if _game.designation_mode and _game.designation_work_type == work_type:
-		_game.exit_designation_mode()
+	if _game.designation_system.designation_mode and _game.designation_system.designation_work_type == work_type:
+		_game.designation_system.exit_designation_mode()
 		btn.button_pressed = false
 	else:
 		for wt in _buttons:
@@ -105,30 +102,35 @@ func _on_command_button_pressed(work_type: int, btn: Button):
 				_buttons[wt].button_pressed = false
 		if _clear_btn:
 			_clear_btn.button_pressed = false
-		if _game.clear_mode:
-			_game.exit_clear_mode()
-		if _game.demolition_mode:
-			_game.exit_demolition_mode()
-		_game.enter_designation_mode(work_type)
+		if _game.designation_system.clear_mode:
+			_game.designation_system.exit_clear_mode()
+		if _game.designation_system.demolition_mode:
+			_game.designation_system.exit_demolition_mode()
+		_game.designation_system.enter_designation_mode(work_type)
 		btn.button_pressed = true
 
 func _on_clear_pressed():
-	"""进入/退出清除模式"""
 	if not _game or not _clear_btn:
 		return
 	
-	if _game.clear_mode:
-		_game.exit_clear_mode()
+	if _game.designation_system.clear_mode:
+		_game.designation_system.exit_clear_mode()
 		_clear_btn.button_pressed = false
 	else:
 		for wt in _buttons:
 			_buttons[wt].button_pressed = false
-		if _game.designation_mode:
-			_game.exit_designation_mode()
-		if _game.demolition_mode:
-			_game.exit_demolition_mode()
-		_game.enter_clear_mode()
+		if _game.designation_system.designation_mode:
+			_game.designation_system.exit_designation_mode()
+		if _game.designation_system.demolition_mode:
+			_game.designation_system.exit_demolition_mode()
+		_game.designation_system.enter_clear_mode()
 		_clear_btn.button_pressed = true
+
+func _connect_designation_signals():
+	if _game and _game.designation_system:
+		_game.designation_system.designation_mode_changed.connect(_on_designation_mode_changed)
+		_game.designation_system.clear_mode_changed.connect(_on_clear_mode_changed)
+		_game.designation_system.demolition_mode_changed.connect(_on_demolition_mode_changed)
 
 func _on_designation_mode_changed(active: bool, work_type: int):
 	"""当外部退出标记模式时，同步按钮状态"""
