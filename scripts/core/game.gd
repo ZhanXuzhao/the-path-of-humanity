@@ -73,18 +73,17 @@ func _ready():
 		_gm.state = 1  # GameState.PLAYING
 		_restore_from_save(_gm._loaded_save_data)
 		_gm._loaded_save_data.clear()
-		# 加载存档后也将相机移到世界中心
-		_center_camera_on_world()
 	else:
 		# 新游戏 - 初始化世界和定居者
 		_gm.start_game()
 		_generate_initial_area()
 		_spawn_initial_settlers()
 		_spawn_initial_boars()
-		_center_camera_on_world()
-		
 		# 新游戏提示：使用指令面板标记资源
 		call_deferred("_show_command_panel_tutorial")
+	
+	# 镜头对准第一个居民
+	_focus_on_first_settler()
 	
 	# 初始化系统引用
 	if building_system:
@@ -264,6 +263,11 @@ func _center_camera_on_world():
 	var center_pixel = world.get_world_center_pixel()
 	if camera:
 		camera.position = center_pixel
+
+func _focus_on_first_settler():
+	"""延迟聚焦到第一个居民"""
+	if settlers.size() > 0 and camera:
+		camera.focus_on(settlers[0].position, 0.8)
 
 # -------- 建造模式 --------
 func enter_build_mode(building_id: String):
