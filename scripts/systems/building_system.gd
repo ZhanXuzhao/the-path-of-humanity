@@ -286,9 +286,11 @@ func process_buildings(delta: float):
 				bld.production_timer = 0.0
 				_try_produce(bld, data)
 		
-		# 防御建筑——自动攻击
+		# 防御建筑——自动攻击（攻击间隔跟随游戏变速）
 		if data.attack_range > 0 and data.attack_damage > 0:
-			bld.attack_timer += delta
+			var gm = get_node_or_null("/root/GameManager")
+			var speed_mult = gm.time_speed if gm else 1.0
+			bld.attack_timer += delta * speed_mult
 			if bld.attack_timer >= data.attack_cooldown:
 				bld.attack_timer = 0.0
 				_try_tower_attack(bld, data)
