@@ -1079,13 +1079,22 @@ func _tick_craft():
 		complete_task()
 		return
 	
-	# 查找对应制作任务并推进进度
-	var queue = game.crafting_system.get_or_create_queue(building_pos)
 	var recipe = ItemDefinitions.get_recipe(recipe_id)
 	if recipe == null:
 		complete_task()
 		return
 	
+	# 检查是否有足够的输入材料，不够则去取
+	if not _craft_has_inputs(recipe):
+		if not _craft_fetch_inputs(recipe, building_pos):
+			# 无法获取材料，取消任务
+			LogUtil.info(self, "制作取消: %s - 缺少材料" % recipe.name)
+			_abort_craft_job(building_pos, recipe_id, game)
+			complete_task()
+		return
+	
+	# 查找对应制作任务并推进进度
+	var queue = game.crafting_system.get_or_create_queue(building_pos)
 	for job in queue:
 		if job.recipe_id == recipe_id and job.is_active:
 			# 推进制作进度
@@ -1128,6 +1137,69 @@ func _tick_craft():
 	
 	# 没有找到对应的活跃任务
 	complete_task()
+
+func _craft_has_inputs(recipe) -> bool:
+	for in_id in recipe.inputs:
+		var in_amt = recipe.inputs[in_id]
+		if not inventory.has_item(in_id, in_amt):
+			return false
+	return true
+
+func _craft_fetch_inputs(recipe, building_pos: Vector2i) -> bool:
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.world == null:
+		return false
+	
+	for in_id in recipe.inputs:
+		var in_amt = recipe.inputs[in_id]
+		var in_bp = inventory.get_item_count(in_id)
+		if in_bp >= in_amt:
+			continue
+		var needed = in_amt - in_bp
+		
+		# 从存储建筑取
+		var storage_blds = _find_storage_with_item(in_id, 99999)
+		for sbld in storage_blds:
+			if sbld.inventory == null:
+				continue
+			var available = sbld.inventory.get_item_count(in_id)
+			if available <= 0:
+				continue
+			var to_take = mini(needed, available)
+			var removed = sbld.inventory.remove_item(in_id, to_take)
+			if removed > 0:
+				inventory.add_item(in_id, removed)
+				needed -= removed
+			if needed <= 0:
+				break
+		
+		if needed <= 0:
+			continue
+		
+		# 从地面捡取
+		var cur_grid = Vector2i(
+			floori(position.x / game.world.tile_size),
+			floori(position.y / game.world.tile_size)
+		)
+		var ground_pos = game.world.find_nearest_ground_item(cur_grid, in_id, 10)
+		if ground_pos.x >= 0:
+			var picked = game.world.pickup_from_ground(ground_pos, in_id, needed)
+			if picked > 0:
+				inventory.add_item(in_id, picked)
+				needed -= picked
+		
+		if needed > 0:
+			return false
+	
+	return true
+
+func _abort_craft_job(building_pos: Vector2i, recipe_id: String, game):
+	var queue = game.crafting_system.get_or_create_queue(building_pos)
+	for job in queue:
+		if job.recipe_id == recipe_id and job.is_active:
+			queue.erase(job)
+			game.crafting_system.active_jobs.erase(job)
+			return
 
 # -------- 库存负重管理 --------
 func get_inventory_weight() -> float:
