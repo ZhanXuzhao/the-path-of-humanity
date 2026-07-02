@@ -50,7 +50,7 @@ const _FS = preload("res://scripts/systems/farming_system.gd")
 @onready var storage_capacity_label: Label = $StoragePanel/ScrollContainer/VBox/CapacityLabel
 @onready var storage_items_container: VBoxContainer = $StoragePanel/ScrollContainer/VBox/ItemsContainer
 var _recruit_button: Button = null
-var _recruit_bld: Node = null  # 当前选中的城镇中心实例
+var _recruit_bld = null  # 当前选中的城镇中心实例
 
 # 通用建筑信息面板（非存储建筑）
 @onready var building_info_panel: Panel = $BuildingInfoPanel

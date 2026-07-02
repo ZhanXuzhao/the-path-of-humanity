@@ -105,6 +105,7 @@ func _assign_ai_tasks():
 		if not bld.is_materials_ready():
 			var has_any_material = false
 			var missing = bld.get_missing_materials()
+			var any_auto_queued = false
 			for mat_id in missing.keys():
 				if _has_material_in_storage(mat_id):
 					has_any_material = true
@@ -112,8 +113,14 @@ func _assign_ai_tasks():
 				if _game.world and _game.world.has_ground_item(mat_id, 1):
 					has_any_material = true
 					break
+				# 尝试自动生产缺失的中间材料（木板、铁锭等）
+				if _game.crafting_system and _game.crafting_system.auto_queue_production_for_item(mat_id, missing[mat_id]):
+					any_auto_queued = true
 			if not has_any_material:
-				_construction_retry_cooldown[bld_key] = current_frame
+				if any_auto_queued:
+					_construction_retry_cooldown[bld_key] = current_frame - 240
+				else:
+					_construction_retry_cooldown[bld_key] = current_frame
 				continue
 
 		var center_pixel = _grid_to_world(bld.grid_pos + bld.get_size() / 2)

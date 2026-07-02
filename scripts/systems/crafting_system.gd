@@ -126,6 +126,31 @@ func get_available_recipes(building_id: String, researched_techs: Array) -> Arra
 	
 	return available
 
+func auto_queue_production_for_item(item_id: String, needed: int) -> bool:
+	"""自动为缺失的施工材料排队生产任务。返回是否有配方被成功排队。"""
+	var producers = _find_recipes_producing(item_id)
+	if producers.is_empty():
+		return false
+
+	for producer in producers:
+		var produced_per_run = producer.outputs.get(item_id, 0)
+		if produced_per_run <= 0:
+			continue
+		var runs = int(ceil(float(needed) / produced_per_run))
+
+		var target_bld = _find_best_building_for_recipe(producer.id)
+		if target_bld == null:
+			continue
+
+		add_with_prerequisites(producer.id, target_bld.grid_pos)
+
+		for i in range(runs):
+			add_to_queue(producer.id, target_bld.grid_pos)
+
+		return true
+
+	return false
+
 # -------- 连锁制作（自动补齐中间材料） --------
 func add_with_prerequisites(recipe_id: String, building_pos: Vector2i,
 		visited: Dictionary = {}) -> bool:
