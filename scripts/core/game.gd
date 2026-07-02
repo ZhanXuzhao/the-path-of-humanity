@@ -1231,10 +1231,6 @@ func get_enemies() -> Array:
 
 func trigger_enemy_raid(count: int = 3):
 	"""触发敌袭事件：在地图边缘生成指定数量的敌人"""
-	if enemies.size() >= 10:
-		_gm.show_notification("地图上已有太多敌人，无法生成更多", _gm.NotificationType.WARNING)
-		return
-	
 	var spawned = 0
 	var attempts = 0
 	var max_attempts = count * 20
