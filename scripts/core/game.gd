@@ -199,6 +199,9 @@ func _process(delta):
 	# 更新敌人AI
 	_update_enemies(delta)
 	
+	# 单位分离——防止角色/敌人/野猪叠在一起
+	_apply_unit_separation(delta)
+	
 	# 定居者AI定时更新（每1秒执行一次）
 	_autonomy_timer += delta
 	if _autonomy_timer >= 1.0:
@@ -2317,6 +2320,43 @@ func _update_enemies(_delta):
 func _on_enemy_died(_grid_pos: Vector2i, enemy: Node2D):
 	"""敌人死亡时从列表中移除"""
 	enemies.erase(enemy)
+
+# -------- 单位分离（防止重叠） --------
+func _apply_unit_separation(_delta: float):
+	"""对所有可移动单位施加软分离力，避免重叠"""
+	var all_units: Array[Node2D] = []
+	
+	# 收集所有活着的单位
+	for s in settlers:
+		if is_instance_valid(s):
+			all_units.append(s)
+	for b in boars:
+		if is_instance_valid(b):
+			all_units.append(b)
+	for e in enemies:
+		if is_instance_valid(e):
+			all_units.append(e)
+	
+	var count = all_units.size()
+	if count < 2:
+		return
+	
+	var min_dist = world.tile_size * 0.5  # 半个格子
+	var push_force = 0.5  # 每帧推开幅度
+	
+	for i in range(count):
+		var a = all_units[i]
+		for j in range(i + 1, count):
+			var b = all_units[j]
+			var offset = a.position - b.position
+			var dist_sq = offset.length_squared()
+			
+			if dist_sq < min_dist * min_dist and dist_sq > 0.01:
+				var dist = sqrt(dist_sq)
+				var push = (min_dist - dist) / min_dist * push_force
+				var dir = offset / dist
+				a.position += dir * push
+				b.position -= dir * push
 
 # -------- 敌人选择 --------
 func _find_enemy_at_pos(global_pos: Vector2):
