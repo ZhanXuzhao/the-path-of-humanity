@@ -1275,10 +1275,6 @@ func _input(event):
 				# 鼠标释放：完成框选
 				if _is_designation_dragging:
 					_is_designation_dragging = false
-					_update_designation_drag_visual()
-					# 清除标记预览
-					if world_renderer and world_renderer.has_method("_clear_designation_preview"):
-						world_renderer._clear_designation_preview()
 					
 					var global_pos = get_global_mouse_position()
 					var end_grid = Vector2i(
@@ -1303,6 +1299,16 @@ func _input(event):
 						# 框选：标记矩形内所有匹配资源
 						_designate_resources_in_rect(_drag_start_grid, end_grid)
 					
+					# 先隐藏框选覆盖层
+					if _drag_overlay:
+						_drag_overlay.visible = false
+						_drag_overlay.queue_redraw()
+					
+					# 清除标记预览（放在 designation 之后，确保信号链 _rebuild_designation_overlays
+					# 先生成永久标记图标，再清理旧的预览图标，避免视觉闪烁）
+					if world_renderer and world_renderer.has_method("_clear_designation_preview"):
+						world_renderer._clear_designation_preview()
+					
 					_drag_start_grid = Vector2i(-999999, -999999)
 					_drag_end_grid = Vector2i(-999999, -999999)
 			return
@@ -1326,9 +1332,6 @@ func _input(event):
 				# 鼠标释放：清除框选区域内的标记
 				if _is_designation_dragging:
 					_is_designation_dragging = false
-					_update_designation_drag_visual()
-					if world_renderer and world_renderer.has_method("_clear_designation_preview"):
-						world_renderer._clear_designation_preview()
 					
 					var global_pos = get_global_mouse_position()
 					var end_grid = Vector2i(
@@ -1345,6 +1348,16 @@ func _input(event):
 					else:
 						# 框选：清除矩形内所有标记
 						_remove_designations_in_rect(_drag_start_grid, end_grid)
+					
+					# 先隐藏框选覆盖层
+					if _drag_overlay:
+						_drag_overlay.visible = false
+						_drag_overlay.queue_redraw()
+					
+					# 清除标记预览（放在清除操作之后，确保信号链 _rebuild_designation_overlays
+					# 先生成更新后的永久标记，再清理预览图标）
+					if world_renderer and world_renderer.has_method("_clear_designation_preview"):
+						world_renderer._clear_designation_preview()
 					
 					_drag_start_grid = Vector2i(-999999, -999999)
 					_drag_end_grid = Vector2i(-999999, -999999)
