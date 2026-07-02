@@ -73,8 +73,8 @@ func _process(delta):
 	if state != GameState.PLAYING:
 		return
 	
-	# 更新时间
-	var time_delta = delta * time_speed * (24.0 / day_length)
+	# 更新时间（delta 已包含 Engine.time_scale 倍率）
+	var time_delta = delta * (24.0 / day_length)
 	game_time += time_delta
 	
 	if game_time >= 24.0:
@@ -91,6 +91,7 @@ func start_game():
 	game_time = 6.0
 	current_day = 1
 	time_speed = 1.0
+	Engine.time_scale = 1.0
 	# 重置统计数据
 	stats = {
 		"total_settlers": 0,
@@ -120,6 +121,7 @@ func toggle_pause():
 
 func set_time_speed(speed: float):
 	time_speed = clampf(speed, 0.0, 10.0)
+	Engine.time_scale = time_speed
 
 # -------- 辅助方法 --------
 func get_time_string() -> String:

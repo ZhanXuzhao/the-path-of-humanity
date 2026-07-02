@@ -187,7 +187,8 @@ func _process(delta):
 	if state == BoarState.DEAD:
 		return
 	
-	var delta_hours = gm.time_speed * delta * (24.0 / gm.day_length)
+	# delta 已包含 Engine.time_scale 倍率
+	var delta_hours = delta * (24.0 / gm.day_length)
 	var is_night = not gm.is_daytime()
 	var now = Time.get_ticks_msec() / 1000.0
 	
@@ -246,7 +247,7 @@ func _process(delta):
 		
 		BoarState.COMBAT:
 			# 攻击冷却（跟随游戏变速）
-			var effective_cd = attack_cooldown / (gm.time_speed if gm else 1.0)
+			var effective_cd = attack_cooldown / (Engine.time_scale if Engine.time_scale > 0 else 1.0)
 			if attack_target and is_instance_valid(attack_target):
 				if now - _last_attack_time >= effective_cd:
 					if _is_adjacent_to_target():
@@ -507,9 +508,8 @@ func _move_towards(delta, game) -> bool:
 	if dist > 2.0:
 		var dir = offset.normalized()
 		facing_direction = dir
-		var gm = get_node("/root/GameManager")
-		var speed_mult = gm.time_speed if gm else 1.0
-		position += dir * move_speed * delta * speed_mult
+		# delta 已包含 Engine.time_scale 倍率
+		position += dir * move_speed * delta
 		return false  # 还在移动中
 	else:
 		if not _path.is_empty():

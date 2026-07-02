@@ -264,9 +264,7 @@ func _process(delta):
 				return
 			
 			# 射箭攻击冷却（跟随游戏变速）
-			var game_inst = get_node_or_null("/root/GameManager")
-			var speed_mult = game_inst.time_speed if game_inst else 1.0
-			var effective_cd = attack_cooldown / speed_mult
+			var effective_cd = attack_cooldown / (Engine.time_scale if Engine.time_scale > 0 else 1.0)
 			if now - _last_attack_time >= effective_cd:
 				_shoot_arrow_at_building()
 
@@ -636,9 +634,8 @@ func _move_towards(delta, game) -> bool:
 	if dist > 2.0:
 		var dir = offset.normalized()
 		facing_direction = dir
-		var gm = get_node("/root/GameManager")
-		var speed_mult = gm.time_speed if gm else 1.0
-		position += dir * move_speed * delta * speed_mult
+		# delta 已包含 Engine.time_scale 倍率
+		position += dir * move_speed * delta
 		return false
 	else:
 		if not _path.is_empty():

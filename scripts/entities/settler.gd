@@ -353,11 +353,10 @@ func _get_work_progress() -> float:
 	var level_bonus = _settler_setting("work_speed_level_bonus", 0.1)
 	var work_speed = base_speed + (skill_level - 1.0) * level_bonus
 	
-	var gm = get_node("/root/GameManager")
-	var speed_mult = gm.time_speed if gm else 1.0
+	var effective_speed = Engine.time_scale if Engine.time_scale > 0 else 1.0
 	
 	var now = Time.get_ticks_msec() / 1000.0
-	var adjusted_interval = work_tick_interval / (work_speed * speed_mult)
+	var adjusted_interval = work_tick_interval / (work_speed * effective_speed)
 	
 	if adjusted_interval <= 0:
 		return 0.0
@@ -494,9 +493,8 @@ func _move_towards(delta):
 	if dist > 2.0:
 		var dir = offset.normalized()
 		facing_direction = dir
-		var gm = get_node("/root/GameManager")
-		var speed_mult = gm.time_speed if gm else 1.0
-		var step = move_speed * delta * speed_mult
+		# delta 已包含 Engine.time_scale 倍率，无需额外乘速度
+		var step = move_speed * delta
 		# 限制步长不超过剩余距离，防止移动过头
 		if step >= dist:
 			position = target_pixel
@@ -578,13 +576,10 @@ func _execute_work(_delta):
 	var level_bonus = _settler_setting("work_speed_level_bonus", 0.1)
 	var work_speed = base_speed + (skill_level - 1.0) * level_bonus  # 技能越高干得越快
 	
-	# 根据时间加速倍率同步提升工作速度
-	var gm = get_node("/root/GameManager")
-	var speed_mult = gm.time_speed if gm else 1.0
-	
 	# 基于现实时间检测工作刻，不受 delta 累积误差影响
+	var effective_speed = Engine.time_scale if Engine.time_scale > 0 else 1.0
 	var now = Time.get_ticks_msec() / 1000.0
-	var adjusted_interval = work_tick_interval / (work_speed * speed_mult)
+	var adjusted_interval = work_tick_interval / (work_speed * effective_speed)
 	if now - _last_work_tick_time >= adjusted_interval:
 		_last_work_tick_time = now
 		_do_work_tick(task_type)
@@ -1427,10 +1422,9 @@ func _tick_go_sleep():
 
 func _tick_sleep(delta):
 	"""睡眠中恢复精力"""
+	# delta 已包含 Engine.time_scale 倍率
 	var gm = get_node("/root/GameManager")
-	var delta_hours = 1.0
-	if gm:
-		delta_hours = gm.time_speed * delta * (24.0 / gm.day_length)
+	var delta_hours = delta * (24.0 / gm.day_length) if gm else 0.0
 	
 	# 快速恢复精力
 	var sleep_restore = _settler_setting("sleep_restore_per_hour", 50.0)
@@ -1991,9 +1985,7 @@ func shoot_at(target_node: Node2D) -> bool:
 		return false
 	
 	# 攻击间隔跟随游戏变速
-	var gm = get_node("/root/GameManager")
-	var speed_mult = gm.time_speed if gm else 1.0
-	var effective_cooldown = ARROW_COOLDOWN / speed_mult
+	var effective_cooldown = ARROW_COOLDOWN / (Engine.time_scale if Engine.time_scale > 0 else 1.0)
 	
 	var now = Time.get_ticks_msec() / 1000.0
 	if now - _last_arrow_shot_time < effective_cooldown:

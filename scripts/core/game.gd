@@ -1628,7 +1628,8 @@ func get_settler_by_id(id: String):
 
 func _update_settlers(delta):
 	"""更新所有定居者的需求、基本状态和自主行为（进食/睡眠）"""
-	var delta_hours = _gm.time_speed * delta * (24.0 / _gm.day_length)
+	# delta 已包含 Engine.time_scale 倍率
+	var delta_hours = delta * (24.0 / _gm.day_length)
 	var _is_night = not _gm.is_daytime()
 	
 	for s in settlers:
