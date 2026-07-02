@@ -492,7 +492,12 @@ func _move_towards(delta):
 		facing_direction = dir
 		var gm = get_node("/root/GameManager")
 		var speed_mult = gm.time_speed if gm else 1.0
-		position += dir * move_speed * delta * speed_mult
+		var step = move_speed * delta * speed_mult
+		# 限制步长不超过剩余距离，防止移动过头
+		if step >= dist:
+			position = target_pixel
+		else:
+			position += dir * step
 	else:
 		# 到达当前路径点
 		if not _path.is_empty():
