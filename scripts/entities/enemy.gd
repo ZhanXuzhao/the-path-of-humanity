@@ -534,6 +534,7 @@ func _pick_wander_target():
 # -------- 伤害系统 --------
 func take_damage(amount: float, attacker: Node2D = null):
 	hp -= amount
+	queue_redraw()  # 刷新头顶HP条
 	if hp <= 0:
 		_die()
 		return

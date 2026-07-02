@@ -40,6 +40,7 @@ var PROGRESS_BAR_HEIGHT: float = 6.0
 # 选中框
 var _selected_building_pos: Vector2i = Vector2i(-1, -1)
 var _selected_building_size: Vector2i = Vector2i.ONE
+var _selected_building_instance = null  # 当前选中的建筑实例（用于刷新HP条）
 var _selection_overlay: Node2D  # 单独的高层级选中框叠加层
 
 # 选中资源节点
@@ -88,6 +89,7 @@ func _ready():
 		building_system.building_removed.connect(_on_building_removed)
 		building_system.building_completed.connect(_on_building_completed)
 		building_system.construction_progress_updated.connect(_on_construction_progress_updated)
+		building_system.building_damaged.connect(_on_building_damaged)
 	
 	# 连接选中信号
 	var game = get_node("/root/Game")
@@ -364,25 +366,30 @@ func _get_progress_color(ratio: float) -> Color:
 
 # -------- 选中框 --------
 func _on_building_selected(bld):
-	"""建筑被选中时记录位置并绘制选中框"""
+	"""建筑被选中时记录位置并绘制选中框 + HP条"""
 	_selected_building_pos = bld.grid_pos
 	_selected_building_size = bld.get_size()
+	_selected_building_instance = bld
 	_update_selection_overlay()
+	_update_building_hp_bar()
 
 func _on_building_deselected():
 	"""建筑取消选中时清除"""
 	_selected_building_pos = Vector2i(-1, -1)
+	_selected_building_instance = null
 	_clear_selection_overlay()
 
 func _on_construction_selected(bld):
 	"""在建建筑被选中时记录位置并绘制选中框"""
 	_selected_building_pos = bld.grid_pos
 	_selected_building_size = bld.get_size()
+	_selected_building_instance = null  # 在建建筑不显示HP条
 	_update_selection_overlay()
 
 func _on_construction_deselected():
 	"""在建建筑取消选中时清除"""
 	_selected_building_pos = Vector2i(-1, -1)
+	_selected_building_instance = null
 	_clear_selection_overlay()
 
 func _clear_selection_overlay():
@@ -444,6 +451,68 @@ func _update_selection_overlay():
 	right.size = Vector2(bw, pixel_size.y)
 	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_selection_overlay.add_child(right)
+	
+	# 在选中框上方绘制HP条（始终保持在最上面）
+	_update_building_hp_bar()
+
+func _update_building_hp_bar():
+	"""在选中建筑上方绘制/刷新HP条"""
+	# 清除旧的HP条
+	for child in _selection_overlay.get_children():
+		if child is ColorRect and (child.name == "BuildingHPBar" or child.name == "BuildingHPBarBG"):
+			child.queue_free()
+	
+	if _selected_building_pos.x < 0 or _selected_building_instance == null:
+		return
+	
+	var bld = _selected_building_instance
+	if bld.max_hp <= 0:
+		return
+	
+	var tile_size = world.tile_size
+	var pixel_pos = Vector2(
+		_selected_building_pos.x * tile_size,
+		_selected_building_pos.y * tile_size
+	)
+	var pixel_width = _selected_building_size.x * tile_size
+	
+	var hp_ratio = float(bld.hp) / float(bld.max_hp)
+	hp_ratio = clamp(hp_ratio, 0.0, 1.0)
+	
+	# HP条尺寸
+	var bar_width = pixel_width
+	var bar_height = 5.0
+	var bar_x = pixel_pos.x
+	var bar_y = pixel_pos.y - bar_height - 4.0  # 建筑上方4像素
+	
+	# 背景（深色底）
+	var bg = ColorRect.new()
+	bg.name = "BuildingHPBarBG"
+	bg.color = Color(0.1, 0.1, 0.1, 0.85)
+	bg.position = Vector2(bar_x, bar_y)
+	bg.size = Vector2(bar_width, bar_height)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_overlay.add_child(bg)
+	
+	# HP填充
+	var hp_color = Color(0.3, 1.0, 0.3, 0.9)  # 绿色
+	if hp_ratio < 0.3:
+		hp_color = Color(1.0, 0.3, 0.3, 0.9)  # 红色
+	elif hp_ratio < 0.6:
+		hp_color = Color(1.0, 0.8, 0.2, 0.9)  # 黄色
+	
+	var fill = ColorRect.new()
+	fill.name = "BuildingHPBar"
+	fill.color = hp_color
+	fill.position = Vector2(bar_x, bar_y)
+	fill.size = Vector2(bar_width * hp_ratio, bar_height)
+	fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_overlay.add_child(fill)
+
+func _on_building_damaged(pos: Vector2i, _damage: float, _current_hp: int):
+	"""建筑受到伤害时刷新选中建筑的HP条"""
+	if _selected_building_instance != null and _selected_building_instance.grid_pos == pos:
+		_update_building_hp_bar()
 
 # -------- 资源节点选中显示 --------
 func _on_resource_selected(pos: Vector2i, deposit):
