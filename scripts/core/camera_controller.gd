@@ -47,6 +47,9 @@ func _input(event):
 			zoom = Vector2(zoom_level, zoom_level)
 
 func _process(delta):
+	# 使用不受 time_scale 影响的 delta，保证镜头滚动速度不受游戏速度影响
+	var unscaled_delta = delta / Engine.time_scale if Engine.time_scale > 0 else delta
+	
 	# WASD移动
 	var move = Vector2.ZERO
 	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
@@ -59,21 +62,21 @@ func _process(delta):
 		move.x += 1
 	
 	if move != Vector2.ZERO:
-		position += move.normalized() * _scroll_speed * delta * (1.0 / zoom_level)
+		position += move.normalized() * _scroll_speed * unscaled_delta * (1.0 / zoom_level)
 	
 	# 屏幕边缘滚动
 	var viewport_size = get_viewport_rect().size
 	var mouse_pos = get_viewport().get_mouse_position()
 	
 	if mouse_pos.x < _edge_scroll_margin:
-		position.x -= _scroll_speed * delta * (1.0 / zoom_level)
+		position.x -= _scroll_speed * unscaled_delta * (1.0 / zoom_level)
 	elif mouse_pos.x > viewport_size.x - _edge_scroll_margin:
-		position.x += _scroll_speed * delta * (1.0 / zoom_level)
+		position.x += _scroll_speed * unscaled_delta * (1.0 / zoom_level)
 	
 	if mouse_pos.y < _edge_scroll_margin:
-		position.y -= _scroll_speed * delta * (1.0 / zoom_level)
+		position.y -= _scroll_speed * unscaled_delta * (1.0 / zoom_level)
 	elif mouse_pos.y > viewport_size.y - _edge_scroll_margin:
-		position.y += _scroll_speed * delta * (1.0 / zoom_level)
+		position.y += _scroll_speed * unscaled_delta * (1.0 / zoom_level)
 
 # -------- 镜头聚焦 --------
 func focus_on(target_pos: Vector2, duration: float = 0.3):
