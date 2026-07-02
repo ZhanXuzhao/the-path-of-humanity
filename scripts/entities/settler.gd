@@ -1106,6 +1106,9 @@ func _tick_craft():
 					if out_desc != "": out_desc += ", "
 					out_desc += "%s×%d" % [item_name, recipe.outputs[out_id]]
 				LogUtil.info(self, "制作完成: %s, 产出 %s" % [recipe.name, out_desc])
+				var gm = get_node("/root/GameManager")
+				if gm:
+					gm.show_notification("制作完成: %s %s" % [recipe.name, out_desc], gm.NotificationType.SUCCESS)
 				
 				game.crafting_system.complete_crafting(job, recipe)
 				queue.erase(job)
