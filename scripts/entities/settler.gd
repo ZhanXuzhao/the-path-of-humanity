@@ -880,7 +880,7 @@ func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 		for sbld in storage_blds:
 			if sbld.inventory == null:
 				continue
-			var center = _bld_world_center(sbld)
+			var center = _get_building_adjacent_stand_pos(sbld)
 			var dist_sq = position.distance_squared_to(center)
 			candidates.append({
 				"type": "storage",
@@ -1231,7 +1231,7 @@ func _auto_store_overweight():
 	
 	# 找最近的置物架
 	var best_bld = storage_buildings[0]
-	var center_pos = _bld_world_center(best_bld)
+	var center_pos = _get_building_adjacent_stand_pos(best_bld)
 	
 	# 创建搬运任务——走到置物架后自动存放超重物品
 	current_task = {
@@ -1413,11 +1413,10 @@ func _tick_store():
 		return
 	
 	# 检查是否在存储建筑附近（防止虚空转移）
-	var bld_center = _bld_world_center(bld)
+	var bld_center = _get_building_adjacent_stand_pos(bld)
 	var dist_to_bld = position.distance_to(bld_center)
-	var max_store_dist = _settler_setting("storage_search_radius", 300.0) * 0.3  # 默认为搜索半径的30%
+	var max_store_dist = _settler_setting("storage_search_radius", 300.0) * 0.3
 	if dist_to_bld > max_store_dist:
-		# 距离太远，重新走向建筑
 		target_world_pos = bld_center
 		set_state(SettlerState.MOVING)
 		return
@@ -1627,7 +1626,7 @@ func find_nearest_residential() -> Dictionary:
 	if assigned_bed_pos.x >= 0:
 		var bed_bld = game.building_system.get_building_at(assigned_bed_pos)
 		if bed_bld != null and bed_bld.is_completed and bed_bld.building_id == "wooden_bed":
-			return {"pos": bed_bld.grid_pos, "world_pos": _bld_world_center(bed_bld)}
+			return {"pos": bed_bld.grid_pos, "world_pos": _get_building_adjacent_stand_pos(bed_bld)}
 	
 	var residential_ids = ["tent", "house"]
 	var best = null
@@ -1637,7 +1636,7 @@ func find_nearest_residential() -> Dictionary:
 		if not bld.is_completed:
 			continue
 		if bld.building_id in residential_ids:
-			var center = _bld_world_center(bld)
+			var center = _get_building_adjacent_stand_pos(bld)
 			var dist = position.distance_squared_to(center)
 			if dist < best_dist:
 				best_dist = dist
@@ -1669,7 +1668,7 @@ func try_eat():
 	# 2. 背包没食物，找置物架
 	var food_source = _find_food_in_storage()
 	if not food_source.is_empty():
-		var center = _bld_world_center(food_source.bld)
+		var center = _get_building_adjacent_stand_pos(food_source.bld)
 		current_task = {
 			"type": "EAT_FROM_RACK",
 			"target_bld_pos": food_source.bld.grid_pos,
@@ -2010,7 +2009,7 @@ func assign_task(task_data: Dictionary) -> bool:
 		if game and game.world:
 			var ts = game.world.tile_size
 			# 采集/建造/拆除/维修任务：站在目标旁边的可行走格子上
-			if task_data.get("type") in ["HARVEST", "CONSTRUCT", "DEMOLISH", "REPAIR"]:
+			if task_data.get("type") in ["HARVEST", "CONSTRUCT", "DEMOLISH", "REPAIR", "CRAFT"]:
 				var target_grid = task_data.get("target_pos", Vector2i.ZERO)
 				var stand_grid = _find_adjacent_walkable(target_grid, game.world)
 				if stand_grid != Vector2i(-1, -1):
