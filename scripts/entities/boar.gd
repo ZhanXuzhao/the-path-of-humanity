@@ -245,9 +245,10 @@ func _process(delta):
 				_wait_timer = randf_range(1.0, 3.0)
 		
 		BoarState.COMBAT:
-			# 攻击冷却
+			# 攻击冷却（跟随游戏变速）
+			var effective_cd = attack_cooldown / (gm.time_speed if gm else 1.0)
 			if attack_target and is_instance_valid(attack_target):
-				if now - _last_attack_time >= attack_cooldown:
+				if now - _last_attack_time >= effective_cd:
 					if _is_adjacent_to_target():
 						_melee_attack()
 					else:

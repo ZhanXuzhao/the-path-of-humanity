@@ -263,8 +263,11 @@ func _process(delta):
 				_find_best_building_target()
 				return
 			
-			# 射箭攻击冷却
-			if now - _last_attack_time >= attack_cooldown:
+			# 射箭攻击冷却（跟随游戏变速）
+			var game_inst = get_node_or_null("/root/GameManager")
+			var speed_mult = game_inst.time_speed if game_inst else 1.0
+			var effective_cd = attack_cooldown / speed_mult
+			if now - _last_attack_time >= effective_cd:
 				_shoot_arrow_at_building()
 
 func _find_best_building_target():
