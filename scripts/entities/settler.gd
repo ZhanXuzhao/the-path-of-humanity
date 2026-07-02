@@ -698,7 +698,7 @@ func _tick_construct():
 			if max_carry <= 0:
 				# 背包已满，直接回去工地先存入
 				current_task["construct_phase"] = "return_to_site"
-				site_center = _bld_world_center(bld)
+				site_center = _get_building_adjacent_stand_pos(bld)
 				target_world_pos = site_center
 				set_state(SettlerState.MOVING)
 				return
@@ -722,9 +722,9 @@ func _tick_construct():
 							inventory.add_item(fetch_item, removed)
 							current_task["fetch_amount"] = fetch_amount - removed
 		
-		# 转向回建筑工地
+		# 转向回建筑工地（站在相邻格子）
 		current_task["construct_phase"] = "return_to_site"
-		site_center = _bld_world_center(bld)
+		site_center = _get_building_adjacent_stand_pos(bld)
 		target_world_pos = site_center
 		set_state(SettlerState.MOVING)
 		return
@@ -769,8 +769,8 @@ func _tick_construct():
 			missing = bld.get_missing_materials()
 		
 		if not missing.is_empty():
-			# 检查角色是否已在建筑位置（用于判断全局取料后是否需要移动）
-			var was_at_site = position.distance_to(_bld_world_center(bld)) < 10.0
+			# 检查角色是否已在建筑相邻位置（用于判断全局取料后是否需要移动）
+			var was_at_site = position.distance_to(_get_building_adjacent_stand_pos(bld)) < 10.0
 			
 			# 背包里的不够，去存储建筑或地面取材料
 			if _construct_fetch_from_storage(bld, missing):
@@ -1009,12 +1009,12 @@ func _tick_haul_construct_fetch():
 	current_task["haul_phase"] = "deliver"
 	current_task["fetch_amount"] = taken
 	
-	# 转向目标建筑
+	# 转向目标建筑（站在相邻格子）
 	var bld = game.building_system.get_building_at(target_bld_pos)
 	if bld == null:
 		complete_task()
 		return
-	var target_center = _bld_world_center(bld)
+	var target_center = _get_building_adjacent_stand_pos(bld)
 	target_world_pos = target_center
 	set_state(SettlerState.MOVING)
 
@@ -1348,6 +1348,43 @@ func _bld_world_center(bld) -> Vector2:
 		bld.grid_pos.x * ts + size.x * ts / 2.0,
 		bld.grid_pos.y * ts + size.y * ts / 2.0
 	)
+
+func _get_building_adjacent_stand_pos(bld) -> Vector2:
+	"""获取建筑旁边最近的可行走格子（含多格建筑）的世界坐标中心，用于建造/拆除时站位"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.world == null:
+		return Vector2.ZERO
+	var ts = game.world.tile_size
+	var size = bld.get_size()
+	
+	var best_grid = Vector2i(-1, -1)
+	var best_dist = INF
+	var my_grid = Vector2i(
+		floori(position.x / ts),
+		floori(position.y / ts)
+	)
+	
+	# 搜索建筑周围一圈的格子，跳过建筑内部
+	for dx in range(-1, size.x + 1):
+		for dy in range(-1, size.y + 1):
+			# 跳过建筑内部格子
+			if dx >= 0 and dx < size.x and dy >= 0 and dy < size.y:
+				continue
+			var check = bld.grid_pos + Vector2i(dx, dy)
+			if not game.world.is_walkable(check):
+				continue
+			var dist = my_grid.distance_squared_to(check)
+			if dist < best_dist:
+				best_dist = dist
+				best_grid = check
+	
+	if best_grid.x >= 0:
+		return Vector2(
+			best_grid.x * ts + ts / 2.0,
+			best_grid.y * ts + ts / 2.0
+		)
+	# 无可用的相邻可行走格子，回退到建筑中心
+	return _bld_world_center(bld)
 
 # -------- 存储任务（搬运） --------
 func _tick_store():
@@ -1924,8 +1961,8 @@ func assign_task(task_data: Dictionary) -> bool:
 		var game = get_node_or_null("/root/Game")
 		if game and game.world:
 			var ts = game.world.tile_size
-			# 采集/建造/维修任务：站在目标旁边的可行走格子上
-			if task_data.get("type") in ["HARVEST", "CONSTRUCT", "REPAIR"]:
+			# 采集/建造/拆除/维修任务：站在目标旁边的可行走格子上
+			if task_data.get("type") in ["HARVEST", "CONSTRUCT", "DEMOLISH", "REPAIR"]:
 				var target_grid = task_data.get("target_pos", Vector2i.ZERO)
 				var stand_grid = _find_adjacent_walkable(target_grid, game.world)
 				if stand_grid != Vector2i(-1, -1):
