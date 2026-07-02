@@ -171,7 +171,7 @@ static func _register_buildings():
 	_add_building("iron_wall", "铁墙", "坚不可摧的铁墙", BuildingCategory.DEFENSE, Vector2i(1, 1), 600, 20.0, {"iron_ingot": 5}, {}, {}, 0.0, 0, 19, false)
 	_add_building("iron_door", "铁门", "坚固的铁门", BuildingCategory.DEFENSE, Vector2i(1, 1), 400, 15.0, {"iron_ingot": 3}, {}, {}, 0.0, 0, 20, true)
 	# 防御建筑——哨塔（自动攻击）
-	_add_building("wood_watchtower", "木哨塔", "自动射箭攻击进入射程的敌人", BuildingCategory.DEFENSE, Vector2i(1, 1), 1000, 40.0, {"wood": 30}, {}, {}, 0.0, 0, 21, false, 5.0, 10.0, 2.0)
+	_add_building("wood_watchtower", "木哨塔", "自动射箭攻击进入射程的敌人", BuildingCategory.DEFENSE, Vector2i(1, 1), 500, 40.0, {"wood": 30}, {}, {}, 0.0, 0, 21, false, 5.0, 10.0, 2.0)
 
 	# 家具类
 	_add_building("wooden_bed", "木床", "一张舒适的木板床，可供一名定居者睡眠", BuildingCategory.FURNITURE, Vector2i(2, 1), 80, 20.0, {"wood": 10}, {}, {}, 0.0, 0, 16)

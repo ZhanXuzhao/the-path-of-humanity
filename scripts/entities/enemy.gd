@@ -20,18 +20,26 @@ static func get_state_display(state_val: int) -> String:
 	return STATE_NAMES.get(state_val, "未知")
 
 # 弓箭攻击属性（默认远程射箭）
-const ARROW_SPEED: float = 200.0       # 箭矢飞行速度
-const ARROW_RANGE: float = 4.0 * 32.0  # 4格射程 = 128像素
-const ARROW_DAMAGE: float = 5.0        # 箭矢基础伤害乘数
-const MELEE_RANGE: float = 1.5 * 32.0  # 近战距离 = 1.5格
+var arrow_speed: float = 200.0       # 箭矢飞行速度
+var arrow_range: float = 4.0 * 32.0  # 格数→像素
 
 # 属性
 var hp: float = 80.0
 var max_hp: float = 80.0
-var move_speed: float = 35.0  # 像素/秒
+var move_speed: float = 30.0  # 像素/秒
 var attack_damage: float = 5.0
 var attack_cooldown: float = 2.5  # 秒
 var _last_attack_time: float = 0.0
+
+# 弓箭投射物伤害
+var _arrow_projectile_damage: float = 5.0
+
+# 读取 GameConfig 的快捷函数
+static func _enemy_config(key: String, default_value):
+	var gc = Engine.get_main_loop().root.get_node_or_null("/root/GameConfig")
+	if gc and key in gc:
+		return gc.get(key)
+	return default_value
 
 # 状态
 enum EnemyState {
@@ -42,9 +50,6 @@ enum EnemyState {
 	DEAD,
 }
 var state: EnemyState = EnemyState.SPAWNING
-
-# 弓箭投射物伤害缓存
-var _arrow_projectile_damage: float = 7.5
 
 # 移动
 var target_world_pos: Vector2 = Vector2.ZERO
@@ -67,6 +72,7 @@ var facing_direction: Vector2 = Vector2.DOWN
 
 func _init():
 	_randomize_stats()
+	_apply_config()
 
 func _ready():
 	_setup_sprite()
@@ -90,12 +96,18 @@ func _setup_sprite():
 	add_child(_sprite)
 
 func _randomize_stats():
-	hp = 80.0 + randf_range(0.0, 40.0)
+	hp = _enemy_config("enemy_base_hp", 80.0) + randf_range(0.0, _enemy_config("enemy_hp_variance", 40.0))
 	max_hp = hp
-	attack_damage = 5.0 + randf_range(0.0, 5.0)
-	move_speed = 30.0 + randf_range(0.0, 15.0)
-	# 弓箭伤害 = 基础伤害 × 伤害乘数
-	_arrow_projectile_damage = attack_damage * 1.5
+	attack_damage = _enemy_config("enemy_attack_damage", 5.0)
+	attack_cooldown = _enemy_config("enemy_attack_cooldown", 2.5)
+	move_speed = _enemy_config("enemy_base_move_speed", 30.0) + randf_range(0.0, _enemy_config("enemy_move_speed_variance", 15.0))
+	_arrow_projectile_damage = _enemy_config("enemy_arrow_damage", 5.0)
+
+func _apply_config():
+	"""应用来自GameConfig的配置（非随机部分）"""
+	arrow_speed = _enemy_config("enemy_arrow_speed", 200.0)
+	var range_tiles = _enemy_config("enemy_arrow_range", 4.0)
+	arrow_range = range_tiles * 32.0
 
 # -------- 选中状态 --------
 func set_selected(selected: bool):
@@ -186,7 +198,7 @@ func _process(delta):
 			
 			# 到达路径终点后检查距离
 			var dist_to_building = _distance_to_building(target_building)
-			if dist_to_building <= ARROW_RANGE:
+			if dist_to_building <= arrow_range:
 				state = EnemyState.ATTACKING
 			else:
 				# 重新寻路
@@ -202,7 +214,7 @@ func _process(delta):
 				return
 			
 			var dist = _distance_to_building(target_building)
-			if dist <= ARROW_RANGE:
+			if dist <= arrow_range:
 				# 进入射程，停止移动开始攻击
 				state = EnemyState.ATTACKING
 				# 面向建筑
@@ -214,7 +226,7 @@ func _process(delta):
 				return
 			# 到达路径点后重新评估
 			dist = _distance_to_building(target_building)
-			if dist <= ARROW_RANGE:
+			if dist <= arrow_range:
 				state = EnemyState.ATTACKING
 		
 		EnemyState.ATTACKING:
@@ -230,7 +242,7 @@ func _process(delta):
 			
 			# 检查是否仍在射程内
 			var dist = _distance_to_building(target_building)
-			if dist > ARROW_RANGE * 1.2:
+			if dist > arrow_range * 1.2:
 				# 超出射程，重新靠近
 				state = EnemyState.APPROACHING
 				_find_best_building_target()
@@ -289,7 +301,7 @@ func _find_best_building_target():
 				_path = game.world.find_path_generated_only(my_grid, near_grid, 500)
 
 func _find_range_attack_position(bld_grid: Vector2i, bld_size: Vector2i, from_grid: Vector2i) -> Vector2i:
-	"""寻找可进入射程（ARROW_RANGE）攻击建筑的最佳位置（不一定要紧邻）"""
+	"""寻找可进入射程（arrow_range）攻击建筑的最佳位置（不一定要紧邻）"""
 	var game = get_node_or_null("/root/Game")
 	if not game or not game.world:
 		return Vector2i(-1, -1)
@@ -304,7 +316,7 @@ func _find_range_attack_position(bld_grid: Vector2i, bld_size: Vector2i, from_gr
 	var best_dist = INF
 	
 	# 在射程范围内搜索可行走格子（从近到远）
-	var range_tiles = ceil(ARROW_RANGE / tile_size)
+	var range_tiles = ceil(arrow_range / tile_size)
 	for radius in range(1, range_tiles + 1):
 		for dx in range(-radius, radius + 1):
 			for dy in range(-radius, radius + 1):
@@ -325,7 +337,7 @@ func _find_range_attack_position(bld_grid: Vector2i, bld_size: Vector2i, from_gr
 					check.y * tile_size + tile_size / 2.0
 				)
 				var dist_to_bld = check_center.distance_to(bld_center_pixel)
-				if dist_to_bld > ARROW_RANGE:
+				if dist_to_bld > arrow_range:
 					continue
 				
 				var dist_from_me = from_grid.distance_squared_to(check)
@@ -472,7 +484,7 @@ func _launch_arrow_visual(target_pos: Vector2, attacked_building, damage: float,
 	arrow.rotation = position.angle_to_point(target_pos)
 	
 	# 飞行 Tween
-	var fly_time = position.distance_to(target_pos) / ARROW_SPEED
+	var fly_time = position.distance_to(target_pos) / arrow_speed
 	var tween = create_tween()
 	tween.tween_property(arrow, "position", target_pos, fly_time).set_ease(Tween.EASE_IN)
 	

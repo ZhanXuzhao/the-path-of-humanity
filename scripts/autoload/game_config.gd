@@ -62,3 +62,14 @@ var initial_boar_count: int = 3
 
 # ===== 建筑设置 =====
 var storage_rack_capacity: int = 10000
+
+# ===== 敌对敌人设置 =====
+var enemy_base_hp: float = 80.0
+var enemy_hp_variance: float = 40.0
+var enemy_attack_damage: float = 5.0
+var enemy_attack_cooldown: float = 2.5
+var enemy_base_move_speed: float = 30.0
+var enemy_move_speed_variance: float = 15.0
+var enemy_arrow_damage: float = 5.0
+var enemy_arrow_range: float = 4.0  # 格数
+var enemy_arrow_speed: float = 200.0
