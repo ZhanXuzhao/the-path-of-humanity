@@ -279,7 +279,8 @@ func _pick_wander_target():
 	
 	if game.world.is_walkable(target_grid):
 		target_world_pos = _grid_to_world(target_grid)
-		_path = game.world.find_path_generated_only(cur_grid, target_grid, 200)
+		var occupied = _get_occupied()
+		_path = game.world.find_path_generated_only(cur_grid, target_grid, 200, occupied)
 		state = BoarState.WANDERING
 
 func _search_food():
@@ -321,7 +322,8 @@ func _search_food():
 	
 	if best_pos.x >= 0:
 		target_world_pos = _grid_to_world(best_pos)
-		_path = game.world.find_path_generated_only(cur_grid, best_pos, 200)
+		var occupied = _get_occupied()
+		_path = game.world.find_path_generated_only(cur_grid, best_pos, 200, occupied)
 		state = BoarState.MOVING_TO_FOOD
 	else:
 		_pick_wander_target()
@@ -442,7 +444,8 @@ func _chase_target(delta, game):
 	# 确保目标不在世界外
 	if game.world.is_in_world_bounds(target_grid):
 		target_world_pos = attack_target.position
-		_path = game.world.find_path_generated_only(cur_grid, target_grid, 200)
+		var occupied = _get_occupied()
+		_path = game.world.find_path_generated_only(cur_grid, target_grid, 200, occupied)
 	else:
 		# 目标跑到世界外了，放弃追击
 		attack_target = null
@@ -463,6 +466,14 @@ func _grid_to_world(grid: Vector2i) -> Vector2:
 		grid.x * TILE_SIZE + TILE_SIZE / 2.0,
 		grid.y * TILE_SIZE + TILE_SIZE / 2.0
 	)
+
+func _get_occupied() -> Dictionary:
+	"""获取当前所有被单位占据的网格位置"""
+	var occupied: Dictionary = {}
+	var game = get_node_or_null("/root/Game")
+	if not game:
+		return occupied
+	return game.get_occupied_grid_positions(self)
 
 var facing_direction: Vector2 = Vector2.RIGHT
 
@@ -487,7 +498,8 @@ func _move_towards(delta, game) -> bool:
 			_path.clear()
 		# 仅在目标位于世界边界内时寻路
 		if game.world.is_in_world_bounds(target_grid):
-			_path = game.world.find_path_generated_only(cur_grid, target_grid, 200)
+			var occupied = _get_occupied()
+			_path = game.world.find_path_generated_only(cur_grid, target_grid, 200, occupied)
 		else:
 			_path = []
 	

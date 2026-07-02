@@ -305,16 +305,17 @@ func _find_best_building_target():
 		var my_grid = _get_grid()
 		var target_grid = _find_range_attack_position(best.grid_pos, best.get_size(), my_grid)
 		
+		var occupied = _get_occupied()
 		if target_grid.x >= 0:
 			target_world_pos = _grid_to_world(target_grid)
-			_path = game.world.find_path_generated_only(my_grid, target_grid, 500)
+			_path = game.world.find_path_generated_only(my_grid, target_grid, 500, occupied)
 			state = EnemyState.APPROACHING
 		else:
 			# 找不到合适的远程位置，直接靠近建筑
 			var near_grid = _find_adjacent_walkable_target(best.grid_pos, best.get_size(), my_grid)
 			if near_grid.x >= 0:
 				target_world_pos = _grid_to_world(near_grid)
-				_path = game.world.find_path_generated_only(my_grid, near_grid, 500)
+				_path = game.world.find_path_generated_only(my_grid, near_grid, 500, occupied)
 
 func _find_range_attack_position(bld_grid: Vector2i, bld_size: Vector2i, from_grid: Vector2i) -> Vector2i:
 	"""寻找可进入射程（arrow_range）攻击建筑的最佳位置（不一定要紧邻）"""
@@ -551,7 +552,8 @@ func _pick_wander_target():
 	
 	if game.world.is_walkable(target_grid):
 		target_world_pos = _grid_to_world(target_grid)
-		_path = game.world.find_path_generated_only(cur_grid, target_grid, 200)
+		var occupied = _get_occupied()
+		_path = game.world.find_path_generated_only(cur_grid, target_grid, 200, occupied)
 	state = EnemyState.MOVING
 
 # -------- 伤害系统 --------
@@ -594,6 +596,14 @@ func _grid_to_world(grid: Vector2i) -> Vector2:
 		grid.y * TILE_SIZE + TILE_SIZE / 2.0
 	)
 
+func _get_occupied() -> Dictionary:
+	"""获取当前所有被单位占据的网格位置"""
+	var occupied: Dictionary = {}
+	var game = get_node_or_null("/root/Game")
+	if not game:
+		return occupied
+	return game.get_occupied_grid_positions(self)
+
 func _move_towards(delta, game) -> bool:
 	"""向目标移动，返回是否已到达"""
 	if target_world_pos == Vector2.ZERO:
@@ -614,7 +624,8 @@ func _move_towards(delta, game) -> bool:
 		if _path.size() > 0:
 			_path.clear()
 		if game.world.is_in_world_bounds(target_grid):
-			_path = game.world.find_path_generated_only(cur_grid, target_grid, 500)
+			var occupied = _get_occupied()
+			_path = game.world.find_path_generated_only(cur_grid, target_grid, 500, occupied)
 		else:
 			_path = []
 	

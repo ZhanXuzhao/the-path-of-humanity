@@ -2519,6 +2519,32 @@ func _deselect_enemy():
 	selected_enemy = null
 	enemy_deselected.emit()
 
+func get_occupied_grid_positions(exclude_unit = null) -> Dictionary:
+	"""获取所有被单位（定居者/敌人/野猪）占据的网格位置
+	返回 {"x,y": true} 格式的字典，排除 exclude_unit（可选）。"""
+	var occupied: Dictionary = {}
+	var ts = world.tile_size if world else 32.0
+	
+	for s in settlers:
+		if not is_instance_valid(s) or s == exclude_unit:
+			continue
+		var g = Vector2i(floori(s.position.x / ts), floori(s.position.y / ts))
+		occupied["%d,%d" % [g.x, g.y]] = true
+	
+	for e in enemies:
+		if not is_instance_valid(e) or e.state == e.EnemyState.DEAD or e == exclude_unit:
+			continue
+		var g = Vector2i(floori(e.position.x / ts), floori(e.position.y / ts))
+		occupied["%d,%d" % [g.x, g.y]] = true
+	
+	for b in boars:
+		if not is_instance_valid(b) or b.state == b.BoarState.DEAD or b == exclude_unit:
+			continue
+		var g = Vector2i(floori(b.position.x / ts), floori(b.position.y / ts))
+		occupied["%d,%d" % [g.x, g.y]] = true
+	
+	return occupied
+
 func _is_mouse_over_ui() -> bool:
 	"""检查鼠标是否悬浮在任意可见 UI 控件上方（点击UI时不触发世界操作）"""
 	var mouse_pos = get_viewport().get_mouse_position()

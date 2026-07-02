@@ -465,10 +465,8 @@ func _move_towards(delta):
 	if _path.is_empty() or target_grid != _path_target_grid:
 		_path_target_grid = target_grid
 		var start_grid = current_grid
-		_path = game.world.find_path(start_grid, target_grid, 800)
-		
-		if _path.is_empty() and start_grid != target_grid:
-			# 无路可走，取消任务
+			var occupied = game.get_occupied_grid_positions(self)
+			_path = game.world.find_path(start_grid, target_grid, 800, occupied)
 			complete_task()
 			return
 		

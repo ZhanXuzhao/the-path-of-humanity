@@ -397,13 +397,14 @@ func is_walkable(pos: Vector2i) -> bool:
 	
 	return true
 
-func find_path(from_pos: Vector2i, to_pos: Vector2i, max_steps: int = 500) -> Array[Vector2i]:
+func find_path(from_pos: Vector2i, to_pos: Vector2i, max_steps: int = 500, blocked: Dictionary = {}) -> Array[Vector2i]:
 	"""A*寻路，返回从 from_pos 到 to_pos 的网格路径（不含起点），
 	如果无路可走则返回空数组。
-	max_steps 限制搜索步数防止死循环。"""
+	max_steps 限制搜索步数防止死循环。
+	blocked 包含被单位占据的网格("x,y"=true)，寻路时会避开。"""
 	if from_pos == to_pos:
 		return []
-	if not is_walkable(to_pos):
+	if not is_walkable(to_pos) or blocked.has(_pos_key(to_pos)):
 		return []
 	
 	var came_from := Dictionary()  # Vector2i -> Vector2i
@@ -467,6 +468,8 @@ func find_path(from_pos: Vector2i, to_pos: Vector2i, max_steps: int = 500) -> Ar
 		for neighbor in neighbors:
 			if not is_walkable(neighbor):
 				continue
+			if blocked.has(_pos_key(neighbor)):
+				continue
 			
 			# 对角线移动时检查是否被角落阻挡
 			var diff = neighbor - current
@@ -506,12 +509,13 @@ func is_in_world_bounds(grid_pos: Vector2i) -> bool:
 	return chunk_pos.x >= _min_chunk_x and chunk_pos.x <= _max_chunk_x \
 		and chunk_pos.y >= _min_chunk_y and chunk_pos.y <= _max_chunk_y
 
-func find_path_generated_only(from_pos: Vector2i, to_pos: Vector2i, max_steps: int = 500) -> Array[Vector2i]:
+func find_path_generated_only(from_pos: Vector2i, to_pos: Vector2i, max_steps: int = 500, blocked: Dictionary = {}) -> Array[Vector2i]:
 	"""A*寻路（仅使用已生成区块，不触发新区块生成）
-	适用于野猪等不应触发地图增长的实体。"""
+	适用于野猪等不应触发地图增长的实体。
+	blocked 包含被单位占据的网格("x,y"=true)，寻路时会避开。"""
 	if from_pos == to_pos:
 		return []
-	if not is_walkable(to_pos):
+	if not is_walkable(to_pos) or blocked.has(_pos_key(to_pos)):
 		return []
 	if not is_in_world_bounds(to_pos):
 		return []
@@ -573,6 +577,8 @@ func find_path_generated_only(from_pos: Vector2i, to_pos: Vector2i, max_steps: i
 			if not is_in_world_bounds(neighbor):
 				continue
 			if not is_walkable(neighbor):
+				continue
+			if blocked.has(_pos_key(neighbor)):
 				continue
 			
 			var diff = neighbor - current
