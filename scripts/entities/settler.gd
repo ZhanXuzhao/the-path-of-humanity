@@ -209,7 +209,10 @@ func _process(delta):
 		SettlerState.EATING:
 			_tick_eat(delta)
 		SettlerState.COMBAT:
-			_tick_hunting(delta)
+			if current_task and current_task.get("type") == "COMBAT":
+				_tick_combat(delta)
+			else:
+				_tick_hunting(delta)
 
 # -------- 选中状态 --------
 func set_selected(selected: bool):
@@ -528,6 +531,9 @@ func _move_towards(delta):
 						_tick_haul_construct()
 				"HUNTING":
 					# 到达狩猎区后切换到战斗状态，由 _tick_hunting 处理
+					set_state(SettlerState.COMBAT, true)
+				"COMBAT":
+					# 到达目标位置后切换到战斗状态，由 _tick_combat 处理
 					set_state(SettlerState.COMBAT, true)
 				_:
 					set_state(SettlerState.WORKING, true)
@@ -1660,6 +1666,48 @@ func _tick_hunting(_delta):
 			move_to(boar.position)
 			current_task["target_world_pos"] = boar.position
 		# 若在 1~1.5 倍射程之间，原地等待野猪靠近或下一帧继续判断
+
+func _tick_combat(_delta):
+	"""战斗状态：追杀被标记的敌对敌人"""
+	if current_task == null:
+		set_state(SettlerState.IDLE, true)
+		return
+	
+	var enemy_inst_id = current_task.get("enemy_instance_id", 0)
+	if enemy_inst_id == 0:
+		complete_task()
+		return
+	
+	# 通过实例ID查找敌人
+	var enemy = instance_from_id(enemy_inst_id) if enemy_inst_id else null
+	if enemy == null or not is_instance_valid(enemy) or enemy.state == enemy.EnemyState.DEAD:
+		# 敌人已死亡，清理标记并完成任务
+		var game = get_node_or_null("/root/Game")
+		if game:
+			game.designated_enemies.erase(enemy_inst_id)
+		complete_task()
+		return
+	
+	# 检查是否有弓箭
+	if not has_ranged_weapon():
+		complete_task()
+		return
+	
+	# 检查距离——在射程内则射箭
+	var dist = position.distance_to(enemy.position)
+	if dist <= ARROW_RANGE:
+		# 面向敌人
+		var dir = enemy.position - position
+		if dir.length_squared() > 0:
+			facing_direction = dir.normalized()
+		# 射箭
+		shoot_at(enemy)
+	else:
+		# 距离太远：追击敌人
+		var min_chase_dist = ARROW_RANGE * 1.5
+		if dist > min_chase_dist:
+			move_to(enemy.position)
+			current_task["target_world_pos"] = enemy.position
 
 # 姓氏池（100个）
 const SURNAMES = [

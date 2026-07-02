@@ -96,6 +96,9 @@ var designated_resources: Dictionary = {}
 # 已标记的野猪 {boar_instance_id: true} — 狩猎目标
 var designated_boars: Dictionary = {}
 
+# 已标记的敌对敌人 {enemy_instance_id: true} — 攻击目标
+var designated_enemies: Dictionary = {}
+
 signal designation_mode_changed(active: bool, work_type: int)
 signal clear_mode_changed(active: bool)
 signal designated_resources_changed()
@@ -460,6 +463,10 @@ func toggle_resource_designation(grid_pos: Vector2i) -> bool:
 	var key = "%d,%d" % [grid_pos.x, grid_pos.y]
 	var is_auto = (designation_work_type == -2)
 	
+	# 攻击模式：标记/取消标记敌人
+	if designation_work_type == WorkManager.WorkType.COMBAT:
+		return _toggle_enemy_designation_at(grid_pos)
+	
 	# 狩猎/自动模式：标记/取消标记野猪
 	if designation_work_type == WorkManager.WorkType.HUNTING or is_auto:
 		if _toggle_boar_designation_at(grid_pos):
@@ -569,8 +576,44 @@ func _toggle_boar_designation_at_pos(global_pos: Vector2) -> bool:
 func is_boar_designated(boar_instance_id: int) -> bool:
 	return designated_boars.has(boar_instance_id)
 
+# -------- 敌人标记（攻击） --------
+func _toggle_enemy_designation_at(grid_pos: Vector2i) -> bool:
+	"""切换指定网格位置的敌人标记状态"""
+	var tile_center = Vector2(
+		grid_pos.x * world.tile_size + world.tile_size / 2.0,
+		grid_pos.y * world.tile_size + world.tile_size / 2.0
+	)
+	return _toggle_enemy_designation_at_pos(tile_center)
+
+func _toggle_enemy_designation_at_pos(global_pos: Vector2) -> bool:
+	"""使用鼠标像素位置查找并标记敌人"""
+	var click_dist = world.tile_size * 0.6
+	
+	for e in enemies:
+		if not is_instance_valid(e) or e.state == e.EnemyState.DEAD:
+			continue
+		var dist = e.position.distance_to(global_pos)
+		if dist < click_dist:
+			var inst_id = e.get_instance_id()
+			if designated_enemies.has(inst_id):
+				designated_enemies.erase(inst_id)
+				e.is_designated = false
+				e.queue_redraw()
+				designated_resources_changed.emit()
+				return true
+			else:
+				designated_enemies[inst_id] = true
+				e.is_designated = true
+				e.queue_redraw()
+				designated_resources_changed.emit()
+				return true
+	return false
+
+func is_enemy_designated(enemy_instance_id: int) -> bool:
+	return designated_enemies.has(enemy_instance_id)
+
 func clear_all_designations():
-	"""清除所有标记（包括资源标记和野猪标记）"""
+	"""清除所有标记（包括资源标记、野猪标记和敌人标记）"""
 	designated_resources.clear()
 	# 清除所有野猪标记视觉
 	for b in boars:
@@ -578,6 +621,12 @@ func clear_all_designations():
 			b.is_designated = false
 			b.queue_redraw()
 	designated_boars.clear()
+	# 清除所有敌人标记视觉
+	for e in enemies:
+		if is_instance_valid(e):
+			e.is_designated = false
+			e.queue_redraw()
+	designated_enemies.clear()
 	designated_resources_changed.emit()
 
 func clear_designations_by_type(work_type: int):
@@ -644,13 +693,31 @@ func _designate_resources_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 	var max_y = maxi(from_grid.y, to_grid.y)
 	var is_auto = (designation_work_type == -2)
 	
+	var tile_size = world.tile_size if world else 32.0
+	var rect_pixel_min = Vector2(min_x * tile_size, min_y * tile_size)
+	var rect_pixel_max = Vector2((max_x + 1) * tile_size, (max_y + 1) * tile_size)
+	
+	# 攻击模式：标记矩形内的敌对敌人
+	if designation_work_type == WorkManager.WorkType.COMBAT:
+		var enemy_changed = false
+		for e in enemies:
+			if not is_instance_valid(e) or e.state == e.EnemyState.DEAD:
+				continue
+			if e.position.x >= rect_pixel_min.x and e.position.x < rect_pixel_max.x \
+					and e.position.y >= rect_pixel_min.y and e.position.y < rect_pixel_max.y:
+				var inst_id = e.get_instance_id()
+				if not designated_enemies.has(inst_id):
+					designated_enemies[inst_id] = true
+					e.is_designated = true
+					e.queue_redraw()
+					enemy_changed = true
+		if enemy_changed:
+			designated_resources_changed.emit()
+		return
+	
 	# 标记矩形内的野猪（狩猎模式专用，或自动模式下也标记）
 	var boar_changed = false
 	if designation_work_type == WorkManager.WorkType.HUNTING or is_auto:
-		var tile_size = world.tile_size if world else 32.0
-		var rect_pixel_min = Vector2(min_x * tile_size, min_y * tile_size)
-		var rect_pixel_max = Vector2((max_x + 1) * tile_size, (max_y + 1) * tile_size)
-		
 		for b in boars:
 			if not is_instance_valid(b) or b.state == b.BoarState.DEAD:
 				continue
@@ -705,6 +772,20 @@ func _remove_designations_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 	var rect_pixel_min = Vector2(min_x * tile_size, min_y * tile_size)
 	var rect_pixel_max = Vector2((max_x + 1) * tile_size, (max_y + 1) * tile_size)
 	
+	# 清除矩形内的敌人标记
+	var enemy_changed = false
+	for e in enemies:
+		if not is_instance_valid(e) or e.state == e.EnemyState.DEAD:
+			continue
+		if e.position.x >= rect_pixel_min.x and e.position.x < rect_pixel_max.x \
+				and e.position.y >= rect_pixel_min.y and e.position.y < rect_pixel_max.y:
+			var inst_id = e.get_instance_id()
+			if designated_enemies.has(inst_id):
+				designated_enemies.erase(inst_id)
+				e.is_designated = false
+				e.queue_redraw()
+				enemy_changed = true
+	
 	# 清除矩形内的野猪标记
 	var boar_changed = false
 	for b in boars:
@@ -728,7 +809,7 @@ func _remove_designations_in_rect(from_grid: Vector2i, to_grid: Vector2i):
 				designated_resources.erase(key)
 				changed = true
 	
-	if changed or boar_changed:
+	if changed or boar_changed or enemy_changed:
 		designated_resources_changed.emit()
 
 func _update_designation_drag_visual():
@@ -1208,8 +1289,11 @@ func _input(event):
 					# 判断是点选还是框选
 					if _drag_start_grid == end_grid:
 						var is_auto = (designation_work_type == -2)
+						# 攻击模式：点选切换敌人标记
+						if designation_work_type == WorkManager.WorkType.COMBAT:
+							_toggle_enemy_designation_at_pos(global_pos)
 						# 点选：先尝试切换野猪标记（使用鼠标实际像素位置）
-						if designation_work_type == WorkManager.WorkType.HUNTING or is_auto:
+						elif designation_work_type == WorkManager.WorkType.HUNTING or is_auto:
 							if not _toggle_boar_designation_at_pos(global_pos) and is_auto:
 								# 自动模式下未点到野猪，回退到常规资源标记
 								toggle_resource_designation(_drag_start_grid)
@@ -1689,6 +1773,10 @@ func _assign_ai_tasks():
 	var hunting_tasks = _scan_hunting_targets(idle_settlers)
 	tasks.append_array(hunting_tasks)
 	
+	# 4.25 战斗任务 - 攻击被标记的敌对敌人
+	var combat_tasks = _scan_enemy_combat_targets(idle_settlers)
+	tasks.append_array(combat_tasks)
+	
 	# 4.5 维修任务 - 修复受损建筑
 	var repair_tasks = _scan_repair_tasks(idle_settlers)
 	tasks.append_array(repair_tasks)
@@ -1804,6 +1892,36 @@ func _scan_hunting_targets(_idle_settlers: Array) -> Array:
 			"work_required": 10.0,
 			"work_type": WorkManager.WorkType.HUNTING,
 			"boar_instance_id": inst_id,
+		})
+	
+	return result
+
+func _scan_enemy_combat_targets(_idle_settlers: Array) -> Array:
+	"""扫描被标记的敌对敌人，生成战斗任务"""
+	var result: Array = []
+	if designated_enemies.is_empty():
+		return result
+	
+	for e in enemies:
+		if not is_instance_valid(e) or e.state == e.EnemyState.DEAD:
+			var dead_id = e.get_instance_id() if is_instance_valid(e) else 0
+			if designated_enemies.has(dead_id):
+				designated_enemies.erase(dead_id)
+			continue
+		
+		var inst_id = e.get_instance_id()
+		if not designated_enemies.has(inst_id):
+			continue
+		
+		result.append({
+			"id": "combat_%d" % inst_id,
+			"type": "COMBAT",
+			"target_pos": Vector2i.ZERO,
+			"target_world_pos": e.position,
+			"skill": "combat",
+			"work_required": 10.0,
+			"work_type": WorkManager.WorkType.COMBAT,
+			"enemy_instance_id": inst_id,
 		})
 	
 	return result
@@ -2291,6 +2409,10 @@ func _update_enemies(_delta):
 		if not is_instance_valid(e) or e.state == e.EnemyState.DEAD:
 			dead_enemies.append(e)
 	for e in dead_enemies:
+		if is_instance_valid(e):
+			var dead_id = e.get_instance_id()
+			if designated_enemies.has(dead_id):
+				designated_enemies.erase(dead_id)
 		enemies.erase(e)
 	
 	# 定居者自动反击射程内的敌人

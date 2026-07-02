@@ -65,6 +65,8 @@ var _base_sprite_scale: float = 1.0
 
 # 选中状态
 var is_selected: bool = false
+# 攻击标记状态（被玩家标记为攻击目标）
+var is_designated: bool = false
 var _status_font: Font = null
 
 const TILE_SIZE: float = 32.0
@@ -116,6 +118,19 @@ func set_selected(selected: bool):
 
 func _draw():
 	var half_size = TILE_SIZE * 0.5
+	
+	# 被标记为攻击目标时，始终显示标记指示
+	if is_designated:
+		var mark_rect = Rect2(-half_size, -half_size, TILE_SIZE, TILE_SIZE)
+		# 深红色标记边框（比选中更粗更亮）
+		draw_rect(mark_rect, Color(1.0, 0.1, 0.1, 0.12), true)
+		draw_rect(mark_rect, Color(1.0, 0.1, 0.1, 0.8), false, 3.0)
+		# 右上角画一个攻击标记（X形）
+		var cross_size = 6.0
+		var cx = half_size - 4.0
+		var cy = -half_size + 4.0
+		draw_line(Vector2(cx - cross_size, cy - cross_size), Vector2(cx + cross_size, cy + cross_size), Color(1.0, 0.0, 0.0, 0.9), 2.0)
+		draw_line(Vector2(cx + cross_size, cy - cross_size), Vector2(cx - cross_size, cy + cross_size), Color(1.0, 0.0, 0.0, 0.9), 2.0)
 	
 	if not is_selected:
 		return
