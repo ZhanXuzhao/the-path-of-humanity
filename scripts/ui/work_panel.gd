@@ -40,11 +40,14 @@ func _ready():
 	_work_manager.work_priorities_changed.connect(_on_priorities_changed)
 	
 	# 监听定居者变化
-	var game = get_node_or_null("/root/Game")
-	if game:
-		game.settler_selected.connect(_refresh)
+	call_deferred("_connect_settler_selected")
 	
 	visible = false
+
+func _connect_settler_selected():
+	var game = get_node_or_null("/root/Game")
+	if game and game.selection_system:
+		game.selection_system.settler_selected.connect(_refresh)
 
 func _refresh(_unused = null):
 	"""刷新整个面板"""
@@ -110,7 +113,7 @@ func _rebuild_grid():
 		name_label.custom_minimum_size = Vector2(120, 30)
 		name_label.add_theme_constant_override("minimum_font_size", 12)
 		# 如果选中了此定居者，高亮名字
-		if game.selected_settler == s:
+		if game.selection_system.selected_settler == s:
 			name_label.add_theme_color_override("font_color", Color(0.3, 0.8, 1.0))
 		work_grid.add_child(name_label)
 		

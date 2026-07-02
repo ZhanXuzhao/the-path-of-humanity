@@ -15,6 +15,7 @@ const WorkManager = preload("res://scripts/autoload/work_manager.gd")
 @onready var world_renderer = $World/WorldRenderer
 @onready var _gm = get_node("/root/GameManager")
 var designation_system: DesignationSystem
+var selection_system: SelectionSystem
 
 # 建造模式
 var build_mode: bool = false
@@ -35,47 +36,6 @@ const MAX_BOARS: int = 5  # 地图上最多5头野猪
 
 # 敌对敌人管理
 var enemies: Array = []
-signal enemy_selected(enemy)
-signal enemy_deselected()
-
-# 选中敌人
-var selected_enemy = null
-
-# 选中定居者
-var selected_settler = null
-signal settler_selected(settler)
-signal settler_deselected()
-
-# 选中建筑（置物架等）
-var selected_building_instance = null
-signal building_selected(building_instance)
-signal building_deselected()
-
-# 选中在建建筑（施工进度）
-var selected_construction_building = null
-signal construction_selected(building_instance)
-signal construction_deselected()
-
-# 选中资源节点
-var selected_resource_pos: Vector2i = Vector2i(-1, -1)
-var selected_resource_deposit = null  # World.ResourceDeposit
-signal resource_selected(pos: Vector2i, deposit)
-signal resource_deselected()
-
-# 选中地面物品
-var selected_ground_item_pos: Vector2i = Vector2i(-1, -1)
-signal ground_item_selected(pos: Vector2i, stacks)
-signal ground_item_deselected()
-
-# 选中空格子（显示地块信息和坐标）
-var selected_tile_pos: Vector2i = Vector2i(-1, -1)
-signal tile_selected(pos: Vector2i, tile_type: int)
-signal tile_deselected()
-
-# 选中野猪
-var selected_boar = null
-signal boar_selected(boar)
-signal boar_deselected()
 
 # 建筑建造重试冷却（防止反复给同一缺物资建筑分配任务）
 var _construction_retry_cooldown: Dictionary = {}  # "x,y" -> frame_number
@@ -87,10 +47,13 @@ var _autonomy_timer: float = 0.0
 # key: "x,y" -> settler_id，表示该资源正被哪个定居者采集
 var _claimed_harvest_resources: Dictionary = {}
 func _ready():
-	# 初始化指令标记系统
+	# 初始化子系统
 	designation_system = DesignationSystem.new()
 	designation_system.name = "DesignationSystem"
 	add_child(designation_system)
+	selection_system = SelectionSystem.new()
+	selection_system.name = "SelectionSystem"
+	add_child(selection_system)
 	
 	# ===== 存档验证与加载 =====
 	# 1. 检查是否有存档
@@ -129,7 +92,6 @@ func _ready():
 	# 初始化系统引用
 	if building_system:
 		building_system.world = world
-		building_system.building_completed.connect(_on_building_completed)
 	
 	# 更新HUD速度标签（此时存档已加载完毕，time_speed 为实际值）
 	_update_speed_label()
@@ -185,31 +147,31 @@ func _process(delta):
 		_handle_idle_sleep()
 		
 		# 检查选中的定居者是否还存活
-		if selected_settler != null and not is_instance_valid(selected_settler):
-			_deselect_settler()
+		if selection_system.selected_settler != null and not is_instance_valid(selection_system.selected_settler):
+			selection_system.deselect_settler()
 		
 		# 检查选中的野猪是否还存活
-		if selected_boar != null and not is_instance_valid(selected_boar):
-			_deselect_boar()
+		if selection_system.selected_boar != null and not is_instance_valid(selection_system.selected_boar):
+			selection_system.deselect_boar()
 		
 		# 检查选中的敌人是否还存活
-		if selected_enemy != null and not is_instance_valid(selected_enemy):
-			_deselect_enemy()
+		if selection_system.selected_enemy != null and not is_instance_valid(selection_system.selected_enemy):
+			selection_system.deselect_enemy()
 		
 		# 检查选中的资源节点是否还存在（可能已被采集完）
-		if selected_resource_pos.x >= 0:
-			var res = world.get_resource_at(selected_resource_pos)
+		if selection_system.selected_resource_pos.x >= 0:
+			var res = world.get_resource_at(selection_system.selected_resource_pos)
 			if res == null or res.amount <= 0:
-				_deselect_resource()
+				selection_system.deselect_resource()
 		
 		# 清理已失效的资源采集标记（资源已被采完但标记未移除）
 		_cleanup_depleted_designations()
 		
 		# 检查选中的地面物品是否还存在（可能已被拾取完）
-		if selected_ground_item_pos.x >= 0:
-			var stacks = world.get_ground_items_at(selected_ground_item_pos)
+		if selection_system.selected_ground_item_pos.x >= 0:
+			var stacks = world.get_ground_items_at(selection_system.selected_ground_item_pos)
 			if stacks.is_empty():
-				_deselect_ground_item()
+				selection_system.deselect_ground_item()
 		
 		
 
@@ -400,294 +362,33 @@ func _try_place_building():
 		_gm.show_notification("无法建造: " + check.reason,
 			1)
 
-# -------- 定居者选择 --------
-func _find_settler_at_pos(global_pos: Vector2):
-	"""查找指定位置附近的定居者，返回定居者或 null"""
-	var closest = null
-	var closest_dist = world.tile_size * 0.6  # 约19像素，匹配角色视觉大小
-	
-	for s in settlers:
-		if not is_instance_valid(s):
-			continue
-		var dist = s.position.distance_to(global_pos)
-		if dist < closest_dist:
-			closest_dist = dist
-			closest = s
-	
-	return closest
-
-func _is_settler_at_grid(settler, grid_pos: Vector2i) -> bool:
-	"""判断定居者是否在指定网格位置"""
-	if settler == null or not is_instance_valid(settler):
-		return false
-	var s_grid = Vector2i(
-		floori(settler.position.x / world.tile_size),
-		floori(settler.position.y / world.tile_size)
-	)
-	return s_grid == grid_pos
-
-func _try_select_settler() -> bool:
-	"""尝试在鼠标位置选择定居者，返回是否选中"""
-	var s = _find_settler_at_pos(get_global_mouse_position())
-	if s != null:
-		_select_settler(s)
-		return true
-	
-	_deselect_settler()
-	return false
-
-func _select_settler(settler, focus_camera: bool = false):
-	"""选中定居者，可选是否镜头居中聚焦"""
-	if selected_settler == settler:
-		return
-	# 取消之前的选中
-	if selected_settler != null and is_instance_valid(selected_settler):
-		selected_settler.set_selected(false)
-	# 选中定居者时取消其他选中
-	if selected_boar != null:
-		_deselect_boar()
-	if selected_enemy != null:
-		_deselect_enemy()
-	if selected_tile_pos.x >= 0:
-		_deselect_tile()
-	# 选中新定居者
-	selected_settler = settler
-	settler.set_selected(true)
-	settler_selected.emit(settler)
-	# 镜头居中聚焦（默认鼠标点击不聚焦，Tab切换时聚焦）
-	if focus_camera and camera and is_instance_valid(camera):
-		camera.focus_on(settler.position)
-
-func _deselect_settler():
-	"""取消选中定居者"""
-	if selected_settler != null and is_instance_valid(selected_settler):
-		selected_settler.set_selected(false)
-	selected_settler = null
-	settler_deselected.emit()
-
-# -------- 野猪选择 --------
-func _find_boar_at_pos(global_pos: Vector2):
-	"""查找指定位置附近的野猪，返回野猪或 null"""
-	var closest = null
-	var closest_dist = world.tile_size * 0.6  # 约19像素
-	
-	for b in boars:
-		if not is_instance_valid(b) or b.state == b.BoarState.DEAD:
-			continue
-		var dist = b.position.distance_to(global_pos)
-		if dist < closest_dist:
-			closest_dist = dist
-			closest = b
-	
-	return closest
-
-func _select_boar(boar):
-	"""选中野猪"""
-	if selected_boar == boar:
-		return
-	# 取消之前的选中
-	_deselect_boar()
-	# 选中新野猪
-	selected_boar = boar
-	boar.set_selected(true)
-	boar_selected.emit(boar)
-	# 同时取消其他选中
-	_deselect_settler()
-	_deselect_enemy()
-	_deselect_construction()
-	_deselect_building()
-	_deselect_resource()
-	_deselect_ground_item()
-	_deselect_tile()
-
-func _deselect_boar():
-	"""取消选中野猪"""
-	if selected_boar != null and is_instance_valid(selected_boar):
-		selected_boar.set_selected(false)
-	selected_boar = null
-	boar_deselected.emit()
-
-func _switch_to_next_settler():
-	"""Tab切换：按定居者列表顺序切换到下一个定居者，镜头居中聚焦"""
-	if settlers.is_empty():
-		return
-	
-	# 过滤出有效的定居者
-	var valid_settlers = []
-	for s in settlers:
-		if is_instance_valid(s):
-			valid_settlers.append(s)
-	
-	if valid_settlers.is_empty():
-		return
-	
-	# 找到当前选中定居者在有效列表中的索引
-	var current_idx = -1
-	if selected_settler != null and is_instance_valid(selected_settler):
-		current_idx = valid_settlers.find(selected_settler)
-	
-	# 计算下一个索引（循环）
-	var next_idx = (current_idx + 1) % valid_settlers.size()
-	
-	# 使用 _select_settler 并带上聚焦标记
-	_select_settler(valid_settlers[next_idx], true)
-
-# -------- 建筑点击选择 --------
-func _try_select_building():
-	"""尝试在鼠标位置选择建筑"""
-	var global_pos = get_global_mouse_position()
-	var grid_pos = Vector2i(
-		floori(global_pos.x / world.tile_size),
-		floori(global_pos.y / world.tile_size)
-	)
-	_try_select_building_at(grid_pos)
-
-func _try_select_building_at(grid_pos: Vector2i):
-	"""在指定网格位置选择建筑
-	- 已完成 → 通用建筑信息面板（存储建筑显示库存）
-	- 未完成（施工中）→ 建筑进度面板
-	"""
-	# 选中建筑时取消其他选中
-	_deselect_resource()
-	_deselect_ground_item()
-	
-	var bld = building_system.get_building_at(grid_pos) if building_system else null
-	if bld == null:
-		_deselect_construction()
-		_deselect_building()
-		return
-	
-	# 已完成建筑 → 通用建筑信息
-	if bld.is_completed:
-		_deselect_construction()
-		_select_building(bld)
-		return
-	
-	# 未完成的建筑（施工中）→ 建筑进度面板
-	_deselect_building()
-	_select_construction(bld)
-
-func _select_building(bld):
-	"""选中存储建筑"""
-	if selected_building_instance == bld:
-		return
-	if selected_boar != null:
-		_deselect_boar()
-	selected_building_instance = bld
-	building_selected.emit(bld)
-
-func _deselect_building():
-	"""取消选中建筑"""
-	selected_building_instance = null
-	building_deselected.emit()
-
-func _select_construction(bld):
-	"""选中在建建筑，显示进度面板"""
-	if selected_construction_building == bld:
-		return
-	if selected_boar != null:
-		_deselect_boar()
-	selected_construction_building = bld
-	construction_selected.emit(bld)
-
-func _deselect_construction():
-	"""取消选中在建建筑"""
-	if selected_construction_building != null:
-		selected_construction_building = null
-		construction_deselected.emit()
-
-# -------- 资源节点选择 --------
-func _select_resource(pos: Vector2i, deposit):
-	"""选中资源节点"""
-	if selected_resource_pos == pos:
-		return
-	if selected_boar != null:
-		_deselect_boar()
-	selected_resource_pos = pos
-	selected_resource_deposit = deposit
-	resource_selected.emit(pos, deposit)
-
-func _deselect_resource():
-	"""取消选中资源节点"""
-	if selected_resource_pos.x >= 0:
-		selected_resource_pos = Vector2i(-1, -1)
-		selected_resource_deposit = null
-		resource_deselected.emit()
-
-# -------- 地面物品选择 --------
-func _select_ground_item(pos: Vector2i, stacks):
-	"""选中地面物品"""
-	if selected_ground_item_pos == pos:
-		return
-	if selected_boar != null:
-		_deselect_boar()
-	selected_ground_item_pos = pos
-	ground_item_selected.emit(pos, stacks)
-
-func _deselect_ground_item():
-	"""取消选中地面物品"""
-	if selected_ground_item_pos.x >= 0:
-		selected_ground_item_pos = Vector2i(-1, -1)
-		ground_item_deselected.emit()
-
-# -------- 空格子（地块信息）选择 --------
-func _select_tile(pos: Vector2i, tile_type: int):
-	"""选中空格子，显示地块信息和坐标"""
-	if selected_tile_pos == pos:
-		return
-	selected_tile_pos = pos
-	tile_selected.emit(pos, tile_type)
-
-func _deselect_tile():
-	"""取消选中空格子"""
-	if selected_tile_pos.x >= 0:
-		selected_tile_pos = Vector2i(-1, -1)
-		tile_deselected.emit()
-
-func _on_building_completed(pos: Vector2i):
-	"""建筑完成时：若当前正选中此建筑，自动切换显示"""
-	if selected_construction_building and selected_construction_building.grid_pos == pos:
-		_deselect_construction()
-		# 如果完成的是存储建筑，自动选中显示存储面板
-		var bld = building_system.get_building_at(pos) if building_system else null
-		if bld:
-			var data = bld.get_data()
-			if data and data.storage_capacity > 0 and bld.inventory:
-				_select_building(bld)
-
 # ==================== 定居者自主AI系统 ====================
 # 自主行为已合并到 _update_settlers 中
 
 func _input(event):
 	if event.is_action_pressed("ui_cancel"):
-		# 有选中定居者时，Esc 取消选中
-		if selected_settler != null:
-			_deselect_settler()
+		if selection_system.selected_settler != null:
+			selection_system.deselect_settler()
 			return
 		
-		# 有选中建筑时，Esc 取消
-		if selected_building_instance != null:
-			_deselect_building()
+		if selection_system.selected_building_instance != null:
+			selection_system.deselect_building()
 			return
 		
-		# 有选中在建建筑时，Esc 取消
-		if selected_construction_building != null:
-			_deselect_construction()
+		if selection_system.selected_construction_building != null:
+			selection_system.deselect_construction()
 			return
 		
-		# 有选中资源节点时，Esc 取消
-		if selected_resource_pos.x >= 0:
-			_deselect_resource()
+		if selection_system.selected_resource_pos.x >= 0:
+			selection_system.deselect_resource()
 			return
 		
-		# 有选中地面物品时，Esc 取消
-		if selected_ground_item_pos.x >= 0:
-			_deselect_ground_item()
+		if selection_system.selected_ground_item_pos.x >= 0:
+			selection_system.deselect_ground_item()
 			return
 		
-		# 有选中空格子时，Esc 取消
-		if selected_tile_pos.x >= 0:
-			_deselect_tile()
+		if selection_system.selected_tile_pos.x >= 0:
+			selection_system.deselect_tile()
 			return
 		if designation_system.demolition_mode:
 			designation_system.exit_demolition_mode()
@@ -771,17 +472,17 @@ func _input(event):
 			exit_build_mode()
 			return
 		# 右键取消所有选中
-		if selected_boar != null:
-			_deselect_boar()
+		if selection_system.selected_boar != null:
+			selection_system.deselect_boar()
 			return
-		if selected_settler != null:
-			_deselect_settler()
+		if selection_system.selected_settler != null:
+			selection_system.deselect_settler()
 			return
-		if selected_enemy != null:
-			_deselect_enemy()
+		if selection_system.selected_enemy != null:
+			selection_system.deselect_enemy()
 			return
-		if selected_tile_pos.x >= 0:
-			_deselect_tile()
+		if selection_system.selected_tile_pos.x >= 0:
+			selection_system.deselect_tile()
 			return
 	
 	# 点击UI控件时不处理世界点击逻辑
@@ -900,149 +601,127 @@ func _input(event):
 			floori(global_pos.y / world.tile_size)
 		)
 		
-		# 查找当前位置的所有可选目标
-		var clicked_settler = _find_settler_at_pos(global_pos)
-		var clicked_boar = _find_boar_at_pos(global_pos)
-		var clicked_enemy = _find_enemy_at_pos(global_pos)
+		var clicked_settler = selection_system.find_settler_at_pos(global_pos)
+		var clicked_boar = selection_system.find_boar_at_pos(global_pos)
+		var clicked_enemy = selection_system.find_enemy_at_pos(global_pos)
 		var clicked_bld = building_system.get_building_at(grid_pos) if building_system else null
 		
-		# 判断建筑是否可选择（所有建筑均可选）
 		var bld_selectable = clicked_bld != null
 		
-		# 敌人选择（优先级低于野猪，高于建筑/资源）
 		if clicked_enemy != null and clicked_settler == null and clicked_boar == null and not bld_selectable:
-			_deselect_settler()
-			_deselect_boar()
-			_deselect_construction()
-			_deselect_building()
-			_deselect_resource()
-			_deselect_ground_item()
-			_deselect_tile()
-			_select_enemy(clicked_enemy)
+			selection_system.deselect_settler()
+			selection_system.deselect_boar()
+			selection_system.deselect_construction()
+			selection_system.deselect_building()
+			selection_system.deselect_resource()
+			selection_system.deselect_ground_item()
+			selection_system.deselect_tile()
+			selection_system.select_enemy(clicked_enemy)
 			return
 		
-		# 如果有野猪在最上层（优先级高于定居者/建筑用于选中）
 		if clicked_boar != null and not bld_selectable and clicked_settler == null:
-			# 只有野猪
-			_deselect_settler()
-			_deselect_enemy()
-			_deselect_construction()
-			_deselect_building()
-			_deselect_resource()
-			_deselect_ground_item()
-			_deselect_tile()
-			_select_boar(clicked_boar)
+			selection_system.deselect_settler()
+			selection_system.deselect_enemy()
+			selection_system.deselect_construction()
+			selection_system.deselect_building()
+			selection_system.deselect_resource()
+			selection_system.deselect_ground_item()
+			selection_system.deselect_tile()
+			selection_system.select_boar(clicked_boar)
 			return
 		
 		if clicked_settler != null and bld_selectable:
-			# 同时有定居者和建筑 → 轮流选择
-			_deselect_resource()
-			_deselect_ground_item()
-			_deselect_tile()
-			if selected_settler != null and is_instance_valid(selected_settler):
-				# 当前选中定居者 → 切到建筑
-				_deselect_settler()
-				_try_select_building_at(grid_pos)
+			selection_system.deselect_resource()
+			selection_system.deselect_ground_item()
+			selection_system.deselect_tile()
+			if selection_system.selected_settler != null and is_instance_valid(selection_system.selected_settler):
+				selection_system.deselect_settler()
+				selection_system.try_select_building_at(grid_pos)
 			else:
-				# 当前选中建筑或未选中 → 切到定居者
-				_deselect_construction()
-				_deselect_building()
-				_select_settler(clicked_settler)
+				selection_system.deselect_construction()
+				selection_system.deselect_building()
+				selection_system.select_settler(clicked_settler)
 		elif clicked_settler != null:
-			# 检查该格是否同时有资源节点或地面物品
 			var res_at_pos = world.get_resource_at(grid_pos)
 			var has_resource = res_at_pos != null and res_at_pos.amount > 0
 			var ground_at_pos = world.get_ground_items_at(grid_pos)
 			var has_ground = not ground_at_pos.is_empty()
 			
 			if has_resource or has_ground:
-				# 同时有定居者和资源/地面物品 → 轮流选择
-				var settler_at_this_grid = _is_settler_at_grid(selected_settler, grid_pos)
-				if selected_settler != null and is_instance_valid(selected_settler) and settler_at_this_grid:
-					# 当前选中该位置的定居者 → 切到资源/地面物品
-					_deselect_settler()
-					_deselect_construction()
-					_deselect_building()
-					_deselect_tile()
+				var settler_at_this_grid = selection_system.is_settler_at_grid(selection_system.selected_settler, grid_pos)
+				if selection_system.selected_settler != null and is_instance_valid(selection_system.selected_settler) and settler_at_this_grid:
+					selection_system.deselect_settler()
+					selection_system.deselect_construction()
+					selection_system.deselect_building()
+					selection_system.deselect_tile()
 					if has_ground:
-						_select_ground_item(grid_pos, ground_at_pos)
+						selection_system.select_ground_item(grid_pos, ground_at_pos)
 					else:
-						_select_resource(grid_pos, res_at_pos)
+						selection_system.select_resource(grid_pos, res_at_pos)
 				else:
-					# 当前选中其他对象或未选中 → 切到定居者
-					_deselect_resource()
-					_deselect_ground_item()
-					_deselect_construction()
-					_deselect_building()
-					_deselect_tile()
-					_select_settler(clicked_settler)
+					selection_system.deselect_resource()
+					selection_system.deselect_ground_item()
+					selection_system.deselect_construction()
+					selection_system.deselect_building()
+					selection_system.deselect_tile()
+					selection_system.select_settler(clicked_settler)
 			else:
-				# 只有定居者，没有重叠对象
-				_deselect_resource()
-				_deselect_ground_item()
-				_deselect_tile()
-				_select_settler(clicked_settler)
-				_deselect_construction()
+				selection_system.deselect_resource()
+				selection_system.deselect_ground_item()
+				selection_system.deselect_tile()
+				selection_system.select_settler(clicked_settler)
+				selection_system.deselect_construction()
 		elif clicked_bld != null:
-			# 只有建筑
-			_deselect_resource()
-			_deselect_ground_item()
-			_deselect_tile()
-			_try_select_building_at(grid_pos)
+			selection_system.deselect_resource()
+			selection_system.deselect_ground_item()
+			selection_system.deselect_tile()
+			selection_system.try_select_building_at(grid_pos)
 		else:
-			# 检查是否有地面物品（优先级高于资源）
 			var clicked_ground_stacks = world.get_ground_items_at(grid_pos)
 			if not clicked_ground_stacks.is_empty():
-				# 有地面物品 - 选中它
-				_deselect_construction()
-				_deselect_building()
-				_deselect_settler()
-				_deselect_boar()
-				_deselect_enemy()
-				_deselect_resource()
-				_deselect_tile()
-				_select_ground_item(grid_pos, clicked_ground_stacks)
+				selection_system.deselect_construction()
+				selection_system.deselect_building()
+				selection_system.deselect_settler()
+				selection_system.deselect_boar()
+				selection_system.deselect_enemy()
+				selection_system.deselect_resource()
+				selection_system.deselect_tile()
+				selection_system.select_ground_item(grid_pos, clicked_ground_stacks)
 			else:
-				# 检查是否有可采集的资源
 				var clicked_resource = world.get_resource_at(grid_pos)
 				if clicked_resource != null and clicked_resource.amount > 0:
-					# 有资源 - 选中它（取消其他选中）
-					_deselect_construction()
-					_deselect_building()
-					_deselect_settler()
-					_deselect_boar()
-					_deselect_enemy()
-					_deselect_ground_item()
-					_deselect_tile()
-					_select_resource(grid_pos, clicked_resource)
+					selection_system.deselect_construction()
+					selection_system.deselect_building()
+					selection_system.deselect_settler()
+					selection_system.deselect_boar()
+					selection_system.deselect_enemy()
+					selection_system.deselect_ground_item()
+					selection_system.deselect_tile()
+					selection_system.select_resource(grid_pos, clicked_resource)
 				else:
-					# 检查是否有敌人可选中
 					if clicked_enemy != null:
-						_deselect_boar()
-						_deselect_construction()
-						_deselect_building()
-						_deselect_settler()
-						_deselect_resource()
-						_deselect_ground_item()
-						_select_enemy(clicked_enemy)
+						selection_system.deselect_boar()
+						selection_system.deselect_construction()
+						selection_system.deselect_building()
+						selection_system.deselect_settler()
+						selection_system.deselect_resource()
+						selection_system.deselect_ground_item()
+						selection_system.select_enemy(clicked_enemy)
 					else:
-						# 什么都没选中 → 显示地块信息
-						_deselect_enemy()
-						_deselect_boar()
-						_deselect_construction()
-						_deselect_building()
-						_deselect_settler()
-						_deselect_resource()
-						_deselect_ground_item()
-						# 选中空格子显示地块信息和坐标
+						selection_system.deselect_enemy()
+						selection_system.deselect_boar()
+						selection_system.deselect_construction()
+						selection_system.deselect_building()
+						selection_system.deselect_settler()
+						selection_system.deselect_resource()
+						selection_system.deselect_ground_item()
 						if world and world.is_in_world_bounds(grid_pos):
 							var tile_type = world.get_tile_at(grid_pos)
-							_select_tile(grid_pos, tile_type)
+							selection_system.select_tile(grid_pos, tile_type)
 	
-	# 快捷键 Tab：在定居者之间循环切换，镜头居中聚焦
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_TAB:
-			_switch_to_next_settler()
+			selection_system.switch_to_next_settler()
 			get_viewport().set_input_as_handled()
 			return
 	
@@ -2089,70 +1768,6 @@ func _apply_unit_separation(_delta: float):
 				b.position -= dir * push
 
 # -------- 敌人选择 --------
-func _find_enemy_at_pos(global_pos: Vector2):
-	"""查找指定位置附近的敌人"""
-	var closest = null
-	var closest_dist = world.tile_size * 0.6
-	
-	for e in enemies:
-		if not is_instance_valid(e) or e.state == e.EnemyState.DEAD:
-			continue
-		var dist = e.position.distance_to(global_pos)
-		if dist < closest_dist:
-			closest_dist = dist
-			closest = e
-	return closest
-
-func _select_enemy(enemy):
-	"""选中敌人"""
-	if selected_enemy == enemy:
-		return
-	_deselect_enemy()
-	selected_enemy = enemy
-	enemy.set_selected(true)
-	enemy_selected.emit(enemy)
-	# 取消其他选中
-	_deselect_settler()
-	_deselect_boar()
-	_deselect_construction()
-	_deselect_building()
-	_deselect_resource()
-	_deselect_ground_item()
-	_deselect_tile()
-
-func _deselect_enemy():
-	"""取消选中敌人"""
-	if selected_enemy != null and is_instance_valid(selected_enemy):
-		selected_enemy.set_selected(false)
-	selected_enemy = null
-	enemy_deselected.emit()
-
-func get_occupied_grid_positions(exclude_unit = null) -> Dictionary:
-	"""获取所有被单位（定居者/敌人/野猪）占据的网格位置
-	返回 {"x,y": true} 格式的字典，排除 exclude_unit（可选）。"""
-	var occupied: Dictionary = {}
-	var ts = world.tile_size if world else 32.0
-	
-	for s in settlers:
-		if not is_instance_valid(s) or s == exclude_unit:
-			continue
-		var g = Vector2i(floori(s.position.x / ts), floori(s.position.y / ts))
-		occupied["%d,%d" % [g.x, g.y]] = true
-	
-	for e in enemies:
-		if not is_instance_valid(e) or e.state == e.EnemyState.DEAD or e == exclude_unit:
-			continue
-		var g = Vector2i(floori(e.position.x / ts), floori(e.position.y / ts))
-		occupied["%d,%d" % [g.x, g.y]] = true
-	
-	for b in boars:
-		if not is_instance_valid(b) or b.state == b.BoarState.DEAD or b == exclude_unit:
-			continue
-		var g = Vector2i(floori(b.position.x / ts), floori(b.position.y / ts))
-		occupied["%d,%d" % [g.x, g.y]] = true
-	
-	return occupied
-
 func _is_mouse_over_ui() -> bool:
 	"""检查鼠标是否悬浮在任意可见 UI 控件上方（点击UI时不触发世界操作）"""
 	var mouse_pos = get_viewport().get_mouse_position()

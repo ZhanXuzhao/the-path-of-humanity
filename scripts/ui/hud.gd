@@ -160,22 +160,27 @@ var _inventory_container: VBoxContainer
 func _settler_info_connections():
 	var game = get_node("/root/Game")
 	if game:
-		game.settler_selected.connect(_on_settler_selected)
-		game.settler_deselected.connect(_on_settler_deselected)
-		game.building_selected.connect(_on_building_selected)
-		game.building_deselected.connect(_on_building_deselected)
-		game.construction_selected.connect(_on_construction_selected)
-		game.construction_deselected.connect(_on_construction_deselected)
-		game.resource_selected.connect(_on_resource_selected)
-		game.resource_deselected.connect(_on_resource_deselected)
-		game.ground_item_selected.connect(_on_ground_item_selected)
-		game.ground_item_deselected.connect(_on_ground_item_deselected_storage)
-		game.boar_selected.connect(_on_boar_selected)
-		game.boar_deselected.connect(_on_boar_deselected)
-		game.enemy_selected.connect(_on_enemy_selected)
-		game.enemy_deselected.connect(_on_enemy_deselected)
-		game.tile_selected.connect(_on_tile_selected)
-		game.tile_deselected.connect(_on_tile_deselected)
+		call_deferred("_connect_selection_signals")
+
+func _connect_selection_signals():
+	var game = get_node_or_null("/root/Game")
+	if game and game.selection_system:
+		game.selection_system.settler_selected.connect(_on_settler_selected)
+		game.selection_system.settler_deselected.connect(_on_settler_deselected)
+		game.selection_system.building_selected.connect(_on_building_selected)
+		game.selection_system.building_deselected.connect(_on_building_deselected)
+		game.selection_system.construction_selected.connect(_on_construction_selected)
+		game.selection_system.construction_deselected.connect(_on_construction_deselected)
+		game.selection_system.resource_selected.connect(_on_resource_selected)
+		game.selection_system.resource_deselected.connect(_on_resource_deselected)
+		game.selection_system.ground_item_selected.connect(_on_ground_item_selected)
+		game.selection_system.ground_item_deselected.connect(_on_ground_item_deselected_storage)
+		game.selection_system.boar_selected.connect(_on_boar_selected)
+		game.selection_system.boar_deselected.connect(_on_boar_deselected)
+		game.selection_system.enemy_selected.connect(_on_enemy_selected)
+		game.selection_system.enemy_deselected.connect(_on_enemy_deselected)
+		game.selection_system.tile_selected.connect(_on_tile_selected)
+		game.selection_system.tile_deselected.connect(_on_tile_deselected)
 
 func _hide_all_info_panels():
 	"""隐藏所有左下角信息面板，确保同时只显示一个"""
@@ -861,7 +866,7 @@ func _process(delta):
 		_on_settler_deselected()
 		var game = get_node("/root/Game")
 		if game:
-			game.selected_settler = null
+			game.selection_system.selected_settler = null
 	
 	# 选中野猪时实时更新信息面板
 	if boar_info_panel.visible and is_instance_valid(_tracked_boar):
@@ -884,36 +889,36 @@ func _process(delta):
 		_on_boar_deselected()
 		var game = get_node("/root/Game")
 		if game:
-			game.selected_boar = null
+			game.selection_system.selected_boar = null
 	
 	# 选中敌人时实时更新信息面板
 	if enemy_info_panel.visible:
 		var game = get_node("/root/Game")
-		if game and game.selected_enemy != null and is_instance_valid(game.selected_enemy):
-			var e = game.selected_enemy
+		if game and game.selection_system.selected_enemy != null and is_instance_valid(game.selection_system.selected_enemy):
+			var e = game.selection_system.selected_enemy
 			enemy_state_label.text = "状态: " + Enemy.get_state_display(e.state)
 			enemy_hp_bar.max_value = e.max_hp
 			enemy_hp_bar.value = e.hp
-		elif game and (game.selected_enemy == null or not is_instance_valid(game.selected_enemy)):
+		elif game and (game.selection_system.selected_enemy == null or not is_instance_valid(game.selection_system.selected_enemy)):
 			_on_enemy_deselected()
 	
 	# 选中地面物品时实时更新物品列表（复用存储面板）
 	if storage_panel.visible and _showing_ground_items:
 		var game = get_node("/root/Game")
-		if game and game.selected_ground_item_pos.x >= 0:
-			var stacks = game.world.get_ground_items_at(game.selected_ground_item_pos)
+		if game and game.selection_system.selected_ground_item_pos.x >= 0:
+			var stacks = game.world.get_ground_items_at(game.selection_system.selected_ground_item_pos)
 			if not stacks.is_empty():
 				_update_ground_item_storage_panel(stacks)
 			else:
 				# 地面物品已被拾取完，隐藏面板
 				_on_ground_item_deselected_storage()
-				game._deselect_ground_item()
+				game.selection_system.deselect_ground_item()
 	
 	# 选中资源节点时实时更新资源量
 	if resource_panel.visible:
 		var game = get_node("/root/Game")
-		if game and game.selected_resource_pos.x >= 0:
-			var deposit = game.world.get_resource_at(game.selected_resource_pos)
+		if game and game.selection_system.selected_resource_pos.x >= 0:
+			var deposit = game.world.get_resource_at(game.selection_system.selected_resource_pos)
 			if deposit != null and deposit.amount > 0:
 				_update_resource_panel(deposit)
 			else:
@@ -923,20 +928,20 @@ func _process(delta):
 	# 定时更新存储面板信息（仅当显示的是存储建筑时，地面物品走上面的实时更新）
 	if Engine.get_physics_frames() % 30 == 0 and storage_panel.visible and not _showing_ground_items:
 		var game = get_node("/root/Game")
-		if game and game.selected_building_instance:
-			_update_storage_panel(game.selected_building_instance)
+		if game and game.selection_system.selected_building_instance:
+			_update_storage_panel(game.selection_system.selected_building_instance)
 	
 	# 定时更新建造进度面板
 	if Engine.get_physics_frames() % 15 == 0 and construction_panel.visible:
 		var game = get_node("/root/Game")
-		if game and game.selected_construction_building:
-			_update_construction_panel(game.selected_construction_building)
+		if game and game.selection_system.selected_construction_building:
+			_update_construction_panel(game.selection_system.selected_construction_building)
 	
 	# 定时更新建筑信息面板（HP 实时变化）
 	if Engine.get_physics_frames() % 30 == 0 and building_info_panel.visible:
 		var game = get_node("/root/Game")
-		if game and game.selected_building_instance:
-			var bld = game.selected_building_instance
+		if game and game.selection_system.selected_building_instance:
+			var bld = game.selection_system.selected_building_instance
 			if is_instance_valid(bld) and bld.get_data():
 				# 只更新耐久度标签（最后一个子节点）
 				for child in building_info_extra_container.get_children():

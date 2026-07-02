@@ -466,7 +466,7 @@ func _move_towards(delta):
 	if _path.is_empty() or target_grid != _path_target_grid:
 		_path_target_grid = target_grid
 		var start_grid = current_grid
-		var occupied = game.get_occupied_grid_positions(self)
+		var occupied = game.selection_system.get_occupied_grid_positions(self)
 		_path = game.world.find_path(start_grid, target_grid, 800, occupied)
 		
 		if _path.is_empty() and start_grid != target_grid:

@@ -602,7 +602,7 @@ func _get_occupied() -> Dictionary:
 	var game = get_node_or_null("/root/Game")
 	if not game:
 		return occupied
-	return game.get_occupied_grid_positions(self)
+	return game.selection_system.get_occupied_grid_positions(self)
 
 func _move_towards(delta, game) -> bool:
 	"""向目标移动，返回是否已到达"""

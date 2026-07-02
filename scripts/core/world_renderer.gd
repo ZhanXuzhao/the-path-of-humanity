@@ -92,17 +92,8 @@ func _ready():
 		building_system.construction_progress_updated.connect(_on_construction_progress_updated)
 		building_system.building_damaged.connect(_on_building_damaged)
 	
-	# 连接选中信号
-	var game = get_node("/root/Game")
-	if game:
-		game.building_selected.connect(_on_building_selected)
-		game.building_deselected.connect(_on_building_deselected)
-		game.construction_selected.connect(_on_construction_selected)
-		game.construction_deselected.connect(_on_construction_deselected)
-		game.resource_selected.connect(_on_resource_selected)
-		game.resource_deselected.connect(_on_resource_deselected)
-		game.ground_item_selected.connect(_on_ground_item_selected)
-		game.ground_item_deselected.connect(_on_ground_item_deselected)
+	# 连接选中信号（延迟一帧确保 Game._ready() 已创建 SelectionSystem）
+	call_deferred("_connect_selection_signals")
 	
 	# 延迟一帧渲染，确保 Game._ready() 已完成区块生成
 	call_deferred("_render_existing_chunks")
@@ -546,7 +537,7 @@ func _on_resource_depleted(pos: Vector2i):
 	if _selected_resource_pos == pos:
 		var game = get_node("/root/Game")
 		if game:
-			game._deselect_resource()
+			game.selection_system.deselect_resource()
 
 func _build_resource_selection_overlay(deposit):
 	"""创建资源选中叠加层：选中框 + 资源信息标签（仅首次调用）"""
@@ -847,6 +838,18 @@ func _connect_designation_signals():
 	var game = get_node_or_null("/root/Game")
 	if game and game.designation_system:
 		game.designation_system.designated_resources_changed.connect(_on_designated_resources_changed)
+
+func _connect_selection_signals():
+	var game = get_node_or_null("/root/Game")
+	if game and game.selection_system:
+		game.selection_system.building_selected.connect(_on_building_selected)
+		game.selection_system.building_deselected.connect(_on_building_deselected)
+		game.selection_system.construction_selected.connect(_on_construction_selected)
+		game.selection_system.construction_deselected.connect(_on_construction_deselected)
+		game.selection_system.resource_selected.connect(_on_resource_selected)
+		game.selection_system.resource_deselected.connect(_on_resource_deselected)
+		game.selection_system.ground_item_selected.connect(_on_ground_item_selected)
+		game.selection_system.ground_item_deselected.connect(_on_ground_item_deselected)
 
 func _on_designated_resources_changed():
 	"""指令标记变化时，增量更新标记覆盖层"""

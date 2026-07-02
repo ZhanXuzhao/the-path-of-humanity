@@ -553,7 +553,7 @@ func _get_occupied() -> Dictionary:
 	var game = get_node_or_null("/root/Game")
 	if not game:
 		return occupied
-	return game.get_occupied_grid_positions(self)
+	return game.selection_system.get_occupied_grid_positions(self)
 
 var facing_direction: Vector2 = Vector2.RIGHT
 
