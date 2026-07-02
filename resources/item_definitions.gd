@@ -167,6 +167,7 @@ static func _register_buildings():
 	# 基础设施
 	_add_building("campfire", "篝火", "提供照明和温暖", BuildingCategory.INFRASTRUCTURE, Vector2i(1, 1), 30, 5.0, {"wood": 5, "stone": 3}, {}, {}, 0.0, 0, 12)
 	_add_building("road", "道路", "提高移动速度", BuildingCategory.INFRASTRUCTURE, Vector2i(1, 1), 40, 3.0, {"stone": 2}, {}, {}, 0.0, 0, 13)
+	_add_building("town_center", "城镇中心", "消耗2个面包招募新居民的核心建筑", BuildingCategory.INFRASTRUCTURE, Vector2i(3, 3), 300, 60.0, {"wood": 40, "stone": 30, "plank": 20}, {}, {}, 0.0, 500, 23)
 	# 防御建筑——墙（不可通行），门（可通行）
 	_add_building("wood_wall", "木墙", "简易木质围墙", BuildingCategory.DEFENSE, Vector2i(1, 1), 150, 8.0, {"wood": 5}, {}, {}, 0.0, 0, 14, false)
 	_add_building("wood_door", "木门", "简易木门", BuildingCategory.DEFENSE, Vector2i(1, 1), 100, 6.0, {"wood": 3}, {}, {}, 0.0, 0, 15, true)

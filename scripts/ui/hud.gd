@@ -49,6 +49,8 @@ const _FS = preload("res://scripts/systems/farming_system.gd")
 @onready var storage_name_label: Label = $StoragePanel/ScrollContainer/VBox/NameLabel
 @onready var storage_capacity_label: Label = $StoragePanel/ScrollContainer/VBox/CapacityLabel
 @onready var storage_items_container: VBoxContainer = $StoragePanel/ScrollContainer/VBox/ItemsContainer
+var _recruit_button: Button = null
+var _recruit_bld: Node = null  # 当前选中的城镇中心实例
 
 # 通用建筑信息面板（非存储建筑）
 @onready var building_info_panel: Panel = $BuildingInfoPanel
@@ -370,6 +372,13 @@ func _on_building_deselected():
 	_showing_ground_items = false
 	storage_panel.visible = false
 	building_info_panel.visible = false
+	_recruit_bld = null
+	if _recruit_button:
+		_recruit_button.queue_free()
+		_recruit_button = null
+	var sep = storage_items_container.get_node_or_null("RecruitSep")
+	if sep:
+		sep.queue_free()
 
 # -------- 在建建筑进度面板 --------
 func _on_construction_selected(bld):
@@ -719,29 +728,70 @@ func _update_storage_panel(bld):
 	for child in storage_items_container.get_children():
 		child.queue_free()
 	
+	_recruit_button = null
+	_recruit_bld = bld
+	
 	if bld.inventory == null or bld.inventory.is_empty():
 		var empty_label = Label.new()
 		empty_label.text = "  (空)"
 		empty_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
 		storage_items_container.add_child(empty_label)
-		return
+	else:
+		# 显示物品种类及总数（ inventories 现已按种类汇总）
+		for item_id in bld.inventory.items:
+			var total = bld.inventory.items[item_id]
+			var item_data = ItemDefinitions.get_item(item_id)
+			var name_str = item_data.name if item_data else item_id
+			var hbox = HBoxContainer.new()
+			var icon_label = Label.new()
+			icon_label.text = "•"
+			icon_label.custom_minimum_size = Vector2(16, 0)
+			var name_label = Label.new()
+			name_label.text = "%s × %d" % [name_str, total]
+			name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+			name_label.add_theme_constant_override("minimum_font_size", 12)
+			hbox.add_child(icon_label)
+			hbox.add_child(name_label)
+			storage_items_container.add_child(hbox)
 	
-	# 显示物品种类及总数（ inventories 现已按种类汇总）
-	for item_id in bld.inventory.items:
-		var total = bld.inventory.items[item_id]
-		var item_data = ItemDefinitions.get_item(item_id)
-		var name_str = item_data.name if item_data else item_id
-		var hbox = HBoxContainer.new()
-		var icon_label = Label.new()
-		icon_label.text = "•"
-		icon_label.custom_minimum_size = Vector2(16, 0)
-		var name_label = Label.new()
-		name_label.text = "%s × %d" % [name_str, total]
-		name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
-		name_label.add_theme_constant_override("minimum_font_size", 12)
-		hbox.add_child(icon_label)
-		hbox.add_child(name_label)
-		storage_items_container.add_child(hbox)
+	# 城镇中心特有：招募居民按钮
+	_refresh_recruit_button(bld)
+
+func _refresh_recruit_button(bld):
+	"""为城镇中心添加或更新招募居民按钮"""
+	if not is_instance_valid(bld):
+		return
+	var data = bld.get_data()
+	if data and data.id == "town_center":
+		if _recruit_button == null:
+			var sep = HSeparator.new()
+			sep.name = "RecruitSep"
+			storage_items_container.add_child(sep)
+			_recruit_button = Button.new()
+			_recruit_button.name = "RecruitButton"
+			_recruit_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			_recruit_button.custom_minimum_size = Vector2(0, 32)
+			storage_items_container.add_child(_recruit_button)
+			_recruit_button.pressed.connect(_on_recruit_pressed)
+		var bread_count = bld.inventory.get_item_count("bread") if bld.inventory else 0
+		var can_recruit = bread_count >= 2
+		_recruit_button.text = "招募居民 (消耗面包×2) [面包: %d/2]" % bread_count
+		_recruit_button.disabled = not can_recruit
+		_recruit_button.visible = true
+	else:
+		if _recruit_button:
+			_recruit_button.visible = false
+			_recruit_button = null
+		var sep = storage_items_container.get_node_or_null("RecruitSep")
+		if sep:
+			sep.queue_free()
+
+func _on_recruit_pressed():
+	var game = get_node_or_null("/root/Game")
+	if game and game.building_system and _recruit_bld and is_instance_valid(_recruit_bld):
+		if game.building_system.try_recruit_settler(_recruit_bld.grid_pos):
+			# 刷新面板显示
+			_update_storage_panel(game.selection_system.selected_building_instance if game.selection_system else null)
 
 func _update_building_info_panel(bld, data):
 	"""更新通用建筑信息面板内容（非存储建筑）"""

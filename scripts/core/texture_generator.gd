@@ -100,6 +100,7 @@ static func _load_buildings() -> Dictionary:
 	bld["wooden_bed"]       = _load_svg(BUILDINGS_PATH + "wooden_bed.svg")
 	bld["wood_watchtower"]  = _load_svg(BUILDINGS_PATH + "wood_watchtower.svg")
 	bld["mill"]             = _load_svg(BUILDINGS_PATH + "mill.svg")
+	bld["town_center"]      = _load_svg(BUILDINGS_PATH + "town_center.svg")
 	
 	return bld
 
