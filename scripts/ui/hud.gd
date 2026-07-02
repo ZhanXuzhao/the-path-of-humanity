@@ -1065,22 +1065,15 @@ var _event_list: Array[Dictionary] = [
 		"id": "enemy_raid",
 		"name": "⚔️ 敌袭",
 		"desc": "从地图边缘生成3名敌对战士，他们会主动攻击你的建筑！",
-		"cost": {},
-		"cooldown": 60.0,  # 冷却秒数（现实时间）
 		"enemy_count": 3,
 	},
 	{
 		"id": "enemy_raid_large",
 		"name": "⚔️ 大规模敌袭",
 		"desc": "从地图边缘生成6名敌对战士，危险程度更高！",
-		"cost": {},
-		"cooldown": 120.0,
 		"enemy_count": 6,
 	},
 ]
-
-# 事件冷却跟踪 {event_id: remaining_cooldown_seconds}
-var _event_cooldowns: Dictionary = {}
 
 func _populate_event_buttons():
 	"""填充事件按钮列表"""
@@ -1091,7 +1084,6 @@ func _populate_event_buttons():
 		child.queue_free()
 	
 	for evt in _event_list:
-		var event_id = evt.id
 		var event_frame = VBoxContainer.new()
 		
 		# 事件标题行
@@ -1103,14 +1095,6 @@ func _populate_event_buttons():
 		name_label.add_theme_constant_override("minimum_font_size", 14)
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		title_hbox.add_child(name_label)
-		
-		# 冷却标签
-		var cooldown_label = Label.new()
-		cooldown_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
-		cooldown_label.add_theme_constant_override("minimum_font_size", 11)
-		cooldown_label.visible = false
-		cooldown_label.name = "CooldownLabel"
-		title_hbox.add_child(cooldown_label)
 		
 		event_frame.add_child(title_hbox)
 		
@@ -1127,7 +1111,7 @@ func _populate_event_buttons():
 		trigger_btn.text = "触发事件"
 		trigger_btn.custom_minimum_size = Vector2(0, 30)
 		trigger_btn.add_theme_constant_override("minimum_font_size", 12)
-		trigger_btn.pressed.connect(_on_trigger_event.bind(event_id, trigger_btn, cooldown_label))
+		trigger_btn.pressed.connect(_on_trigger_event.bind(event_id, trigger_btn))
 		event_frame.add_child(trigger_btn)
 		
 		# 分隔线
@@ -1141,18 +1125,9 @@ func _on_event_pressed():
 	"""事件按钮：切换事件面板显示"""
 	if event_panel:
 		event_panel.visible = not event_panel.visible
-		if event_panel.visible:
-			_update_event_cooldowns()
 
-func _on_trigger_event(event_id: String, btn: Button, cooldown_label: Label):
+func _on_trigger_event(event_id: String, btn: Button):
 	"""触发指定事件"""
-	# 检查冷却
-	var now = Time.get_ticks_msec() / 1000.0
-	if _event_cooldowns.has(event_id) and _event_cooldowns[event_id] > now:
-		var remaining = int(_event_cooldowns[event_id] - now)
-		game_manager.show_notification("事件冷却中，剩余 %d 秒" % remaining, game_manager.NotificationType.WARNING)
-		return
-	
 	var evt = null
 	for e in _event_list:
 		if e.id == event_id:
@@ -1167,44 +1142,3 @@ func _on_trigger_event(event_id: String, btn: Button, cooldown_label: Label):
 			var game = get_node_or_null("/root/Game")
 			if game and game.has_method("trigger_enemy_raid"):
 				game.trigger_enemy_raid(evt.enemy_count)
-				# 设置冷却
-				var cooldown_end = now + evt.cooldown
-				_event_cooldowns[event_id] = cooldown_end
-				cooldown_label.visible = true
-				cooldown_label.text = "冷却中"
-				btn.disabled = true
-				# 启动冷却计时
-				_start_cooldown_timer(event_id, btn, cooldown_label, evt.cooldown)
-
-func _start_cooldown_timer(event_id: String, btn: Button, cooldown_label: Label, duration: float):
-	"""启动冷却计时器"""
-	var timer = Timer.new()
-	timer.name = "EventCooldown_%s" % event_id
-	timer.wait_time = 1.0
-	timer.one_shot = false
-	timer.timeout.connect(func():
-		var now = Time.get_ticks_msec() / 1000.0
-		var end_time = _event_cooldowns.get(event_id, 0.0)
-		var remaining = int(maxf(0.0, end_time - now))
-		
-		if remaining <= 0:
-			cooldown_label.visible = false
-			cooldown_label.text = ""
-			btn.disabled = false
-			_event_cooldowns.erase(event_id)
-			timer.queue_free()
-		else:
-			cooldown_label.text = "冷却 %ds" % remaining
-	)
-	add_child(timer)
-	timer.start()
-
-func _update_event_cooldowns():
-	"""打开面板时更新所有冷却显示"""
-	var now = Time.get_ticks_msec() / 1000.0
-	for evt in _event_list:
-		var event_id = evt.id
-		var remaining = _event_cooldowns.get(event_id, 0.0) - now
-		if remaining > 0:
-			# 找到对应的按钮和标签更新
-			pass  # 由计时器自动更新

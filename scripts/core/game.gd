@@ -2341,7 +2341,7 @@ func _apply_unit_separation(_delta: float):
 	if count < 2:
 		return
 	
-	var min_dist = world.tile_size * 0.5  # 半个格子
+	var min_dist = world.tile_size * 1.0  # 一格距离
 	var push_force = 0.5  # 每帧推开幅度
 	
 	for i in range(count):
