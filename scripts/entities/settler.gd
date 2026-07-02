@@ -899,10 +899,18 @@ func _construct_fetch_from_storage(_bld, missing: Dictionary) -> bool:
 		)
 		var ground_pos = game.world.find_nearest_ground_item(grid_center, mat_id, 10)
 		if ground_pos.x >= 0:
-			var world_pos = Vector2(
-				ground_pos.x * game.world.tile_size + game.world.tile_size / 2.0,
-				ground_pos.y * game.world.tile_size + game.world.tile_size / 2.0
-			)
+			var stand_grid = _find_adjacent_walkable(ground_pos, game.world)
+			var world_pos: Vector2
+			if stand_grid != Vector2i(-1, -1):
+				world_pos = Vector2(
+					stand_grid.x * game.world.tile_size + game.world.tile_size / 2.0,
+					stand_grid.y * game.world.tile_size + game.world.tile_size / 2.0
+				)
+			else:
+				world_pos = Vector2(
+					ground_pos.x * game.world.tile_size + game.world.tile_size / 2.0,
+					ground_pos.y * game.world.tile_size + game.world.tile_size / 2.0
+				)
 			var dist_sq = position.distance_squared_to(world_pos)
 			candidates.append({
 				"type": "ground",
@@ -2096,6 +2104,34 @@ func assign_task(task_data: Dictionary) -> bool:
 				elif not game.world.is_walkable(target_grid):
 					LogUtil.info(self, "目标格 %s 不可行走，无法执行任务" % target_grid)
 					return false  # 目标不可达，拒绝接受任务
+			elif task_data.get("type") == "HAUL_CONSTRUCT":
+				var source_type = task_data.get("source_type", "")
+				var source_bld_pos = task_data.get("source_bld_pos", Vector2i.ZERO)
+				if source_type == "ground" and source_bld_pos != Vector2i.ZERO:
+					var stand_grid = _find_adjacent_walkable(source_bld_pos, game.world)
+					if stand_grid != Vector2i(-1, -1):
+						target_pixel = Vector2(
+							stand_grid.x * ts + ts / 2.0,
+							stand_grid.y * ts + ts / 2.0
+						)
+					elif not game.world.is_walkable(source_bld_pos):
+						LogUtil.info(self, "搬运目标格 %s 不可行走，无法执行任务" % source_bld_pos)
+						return false
+				elif source_type == "storage" and source_bld_pos != Vector2i.ZERO:
+					if game.building_system:
+						var bld = game.building_system.get_building_at(source_bld_pos)
+						if bld:
+							target_pixel = _get_building_adjacent_stand_pos(bld)
+						else:
+							return false
+				else:
+					var target_grid = Vector2i(
+						floori(target_pixel.x / ts),
+						floori(target_pixel.y / ts)
+					)
+					if not game.world.is_walkable(target_grid):
+						LogUtil.info(self, "目标格 %s 不可行走，无法执行任务" % target_grid)
+						return false
 			else:
 				var target_grid = Vector2i(
 					floori(target_pixel.x / ts),
