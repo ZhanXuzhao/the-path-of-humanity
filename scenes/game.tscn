@@ -480,6 +480,34 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
 text = "总量: 0"
 
+[node name="TileInfoPanel" type="Panel" parent="UI/HUD" unique_id=219414470]
+visible = false
+offset_left = 6.0
+offset_top = 477.0
+offset_right = 258.0
+offset_bottom = 713.0
+theme_override_styles/panel = SubResource("2")
+
+[node name="ScrollContainer" type="ScrollContainer" parent="UI/HUD/TileInfoPanel" unique_id=1078830670]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = 248.0
+offset_bottom = 116.0
+
+[node name="VBox" type="VBoxContainer" parent="UI/HUD/TileInfoPanel/ScrollContainer" unique_id=1082579752]
+layout_mode = 2
+
+[node name="TypeLabel" type="Label" parent="UI/HUD/TileInfoPanel/ScrollContainer/VBox" unique_id=1196155580]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 1.0, 0.6, 1)
+text = "地形: 草地"
+
+[node name="CoordLabel" type="Label" parent="UI/HUD/TileInfoPanel/ScrollContainer/VBox" unique_id=1277553349]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.8, 0.8, 1)
+text = "坐标: (0, 0)"
+
 [node name="EventPanel" type="Panel" parent="UI/HUD" unique_id=15303250]
 visible = false
 anchors_preset = 2

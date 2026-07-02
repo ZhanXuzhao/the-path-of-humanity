@@ -70,6 +70,11 @@ const ItemDefinitions = preload("res://resources/item_definitions.gd")
 @onready var resource_amount_label: Label = $ResourcePanel/ScrollContainer/VBox/AmountLabel
 @onready var resource_max_label: Label = $ResourcePanel/ScrollContainer/VBox/MaxLabel
 
+# 地块信息面板（空格子）
+@onready var tile_info_panel: Panel = $TileInfoPanel
+@onready var tile_type_label: Label = $TileInfoPanel/ScrollContainer/VBox/TypeLabel
+@onready var tile_coord_label: Label = $TileInfoPanel/ScrollContainer/VBox/CoordLabel
+
 # 事件菜单面板
 @onready var event_panel: Panel = $EventPanel
 @onready var event_title_label: Label = $EventPanel/VBox/TitleLabel
@@ -169,6 +174,8 @@ func _settler_info_connections():
 		game.boar_deselected.connect(_on_boar_deselected)
 		game.enemy_selected.connect(_on_enemy_selected)
 		game.enemy_deselected.connect(_on_enemy_deselected)
+		game.tile_selected.connect(_on_tile_selected)
+		game.tile_deselected.connect(_on_tile_deselected)
 
 func _hide_all_info_panels():
 	"""隐藏所有左下角信息面板，确保同时只显示一个"""
@@ -179,6 +186,7 @@ func _hide_all_info_panels():
 	building_info_panel.visible = false
 	construction_panel.visible = false
 	resource_panel.visible = false
+	tile_info_panel.visible = false
 
 func _on_settler_selected(settler):
 	"""选中定居者时显示信息面板"""
@@ -396,6 +404,38 @@ func _update_resource_panel(deposit):
 		resource_amount_label.add_theme_color_override("font_color", Color(1.0, 0.8, 0.2))
 	else:
 		resource_amount_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))
+
+# -------- 地块信息面板（空格子）--------
+func _on_tile_selected(pos: Vector2i, tile_type: int):
+	"""选中空格子时显示地块信息和坐标"""
+	_hide_all_info_panels()
+	tile_info_panel.visible = true
+	_update_tile_info_panel(pos, tile_type)
+
+func _on_tile_deselected():
+	"""取消选中空格子"""
+	tile_info_panel.visible = false
+
+func _update_tile_info_panel(pos: Vector2i, tile_type: int):
+	"""更新地块信息面板内容"""
+	var type_names = {
+		World.TileType.GRASS: "草地",
+		World.TileType.DIRT: "泥土",
+		World.TileType.SAND: "沙地",
+		World.TileType.WATER: "水域",
+		World.TileType.DEEP_WATER: "深水",
+		World.TileType.STONE: "岩石地面",
+		World.TileType.FOREST: "森林",
+		World.TileType.MOUNTAIN: "山脉",
+		World.TileType.SNOW: "雪地",
+		World.TileType.ROAD: "道路",
+		World.TileType.FLOOR: "地板",
+		World.TileType.WALL: "墙壁",
+	}
+	
+	var type_name = type_names.get(tile_type, "未知地形")
+	tile_type_label.text = "地形: " + type_name
+	tile_coord_label.text = "坐标: (%d, %d)" % [pos.x, pos.y]
 
 # -------- 地面物品信息面板（复用存储面板）--------
 func _on_ground_item_selected(_pos: Vector2i, stacks):

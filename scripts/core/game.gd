@@ -66,6 +66,11 @@ var selected_ground_item_pos: Vector2i = Vector2i(-1, -1)
 signal ground_item_selected(pos: Vector2i, stacks)
 signal ground_item_deselected()
 
+# 选中空格子（显示地块信息和坐标）
+var selected_tile_pos: Vector2i = Vector2i(-1, -1)
+signal tile_selected(pos: Vector2i, tile_type: int)
+signal tile_deselected()
+
 # 选中野猪
 var selected_boar = null
 signal boar_selected(boar)
@@ -937,11 +942,13 @@ func _select_settler(settler, focus_camera: bool = false):
 	# 取消之前的选中
 	if selected_settler != null and is_instance_valid(selected_settler):
 		selected_settler.set_selected(false)
-	# 选中定居者时取消野猪和敌人选中
+	# 选中定居者时取消其他选中
 	if selected_boar != null:
 		_deselect_boar()
 	if selected_enemy != null:
 		_deselect_enemy()
+	if selected_tile_pos.x >= 0:
+		_deselect_tile()
 	# 选中新定居者
 	selected_settler = settler
 	settler.set_selected(true)
@@ -990,6 +997,7 @@ func _select_boar(boar):
 	_deselect_building()
 	_deselect_resource()
 	_deselect_ground_item()
+	_deselect_tile()
 
 func _deselect_boar():
 	"""取消选中野猪"""
@@ -1121,6 +1129,20 @@ func _deselect_ground_item():
 		selected_ground_item_pos = Vector2i(-1, -1)
 		ground_item_deselected.emit()
 
+# -------- 空格子（地块信息）选择 --------
+func _select_tile(pos: Vector2i, tile_type: int):
+	"""选中空格子，显示地块信息和坐标"""
+	if selected_tile_pos == pos:
+		return
+	selected_tile_pos = pos
+	tile_selected.emit(pos, tile_type)
+
+func _deselect_tile():
+	"""取消选中空格子"""
+	if selected_tile_pos.x >= 0:
+		selected_tile_pos = Vector2i(-1, -1)
+		tile_deselected.emit()
+
 func _on_building_completed(pos: Vector2i):
 	"""建筑完成时：若当前正选中此建筑，自动切换显示"""
 	if selected_construction_building and selected_construction_building.grid_pos == pos:
@@ -1162,14 +1184,10 @@ func _input(event):
 			_deselect_ground_item()
 			return
 		
-		if designation_mode:
-			exit_designation_mode()
+		# 有选中空格子时，Esc 取消
+		if selected_tile_pos.x >= 0:
+			_deselect_tile()
 			return
-		
-		if clear_mode:
-			exit_clear_mode()
-			return
-		
 		if build_mode:
 			exit_build_mode()
 			return
@@ -1250,6 +1268,9 @@ func _input(event):
 			return
 		if selected_enemy != null:
 			_deselect_enemy()
+			return
+		if selected_tile_pos.x >= 0:
+			_deselect_tile()
 			return
 	
 	# 点击UI控件时不处理世界点击逻辑
@@ -1392,6 +1413,7 @@ func _input(event):
 			_deselect_building()
 			_deselect_resource()
 			_deselect_ground_item()
+			_deselect_tile()
 			_select_enemy(clicked_enemy)
 			return
 		
@@ -1404,6 +1426,7 @@ func _input(event):
 			_deselect_building()
 			_deselect_resource()
 			_deselect_ground_item()
+			_deselect_tile()
 			_select_boar(clicked_boar)
 			return
 		
@@ -1411,6 +1434,7 @@ func _input(event):
 			# 同时有定居者和建筑 → 轮流选择
 			_deselect_resource()
 			_deselect_ground_item()
+			_deselect_tile()
 			if selected_settler != null and is_instance_valid(selected_settler):
 				# 当前选中定居者 → 切到建筑
 				_deselect_settler()
@@ -1435,6 +1459,7 @@ func _input(event):
 					_deselect_settler()
 					_deselect_construction()
 					_deselect_building()
+					_deselect_tile()
 					if has_ground:
 						_select_ground_item(grid_pos, ground_at_pos)
 					else:
@@ -1445,17 +1470,20 @@ func _input(event):
 					_deselect_ground_item()
 					_deselect_construction()
 					_deselect_building()
+					_deselect_tile()
 					_select_settler(clicked_settler)
 			else:
 				# 只有定居者，没有重叠对象
 				_deselect_resource()
 				_deselect_ground_item()
+				_deselect_tile()
 				_select_settler(clicked_settler)
 				_deselect_construction()
 		elif clicked_bld != null:
 			# 只有建筑
 			_deselect_resource()
 			_deselect_ground_item()
+			_deselect_tile()
 			_try_select_building_at(grid_pos)
 		else:
 			# 检查是否有地面物品（优先级高于资源）
@@ -1468,6 +1496,7 @@ func _input(event):
 				_deselect_boar()
 				_deselect_enemy()
 				_deselect_resource()
+				_deselect_tile()
 				_select_ground_item(grid_pos, clicked_ground_stacks)
 			else:
 				# 检查是否有可采集的资源
@@ -1480,6 +1509,7 @@ func _input(event):
 					_deselect_boar()
 					_deselect_enemy()
 					_deselect_ground_item()
+					_deselect_tile()
 					_select_resource(grid_pos, clicked_resource)
 				else:
 					# 检查是否有敌人可选中
@@ -1492,7 +1522,7 @@ func _input(event):
 						_deselect_ground_item()
 						_select_enemy(clicked_enemy)
 					else:
-						# 什么都没选中
+						# 什么都没选中 → 显示地块信息
 						_deselect_enemy()
 						_deselect_boar()
 						_deselect_construction()
@@ -1500,6 +1530,10 @@ func _input(event):
 						_deselect_settler()
 						_deselect_resource()
 						_deselect_ground_item()
+						# 选中空格子显示地块信息和坐标
+						if world and world.is_in_world_bounds(grid_pos):
+							var tile_type = world.get_tile_at(grid_pos)
+							_select_tile(grid_pos, tile_type)
 	
 	# 快捷键 Tab：在定居者之间循环切换，镜头居中聚焦
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -2272,18 +2306,23 @@ func _cleanup_depleted_designations():
 			to_remove.append(res_key)
 			continue
 		var grid_pos = Vector2i(int(parts[0]), int(parts[1]))
+		var wt = designated_resources[res_key]
+		
+		# 搬运标记：检查地面物品是否还在（不检查资源节点，因为地面物品不是资源节点）
+		if wt == WorkManager.WorkType.HAULING:
+			if world:
+				var stacks = world.get_ground_items_at(grid_pos)
+				if stacks.is_empty():
+					to_remove.append(res_key)
+			continue
+		
+		# 非搬运标记：检查资源节点是否还存在
 		if world:
 			var dep = world.get_resource_at(grid_pos)
 			if dep == null or dep.amount <= 0:
 				# 资源已不存在或已耗尽
 				to_remove.append(res_key)
 				continue
-		# 搬运模式下的地面物品标记：检查地面物品是否还在
-		var wt = designated_resources[res_key]
-		if wt == WorkManager.WorkType.HAULING and world:
-			var stacks = world.get_ground_items_at(grid_pos)
-			if stacks.is_empty():
-				to_remove.append(res_key)
 	
 	for key in to_remove:
 		designated_resources.erase(key)
@@ -2524,6 +2563,7 @@ func _select_enemy(enemy):
 	_deselect_building()
 	_deselect_resource()
 	_deselect_ground_item()
+	_deselect_tile()
 
 func _deselect_enemy():
 	"""取消选中敌人"""
