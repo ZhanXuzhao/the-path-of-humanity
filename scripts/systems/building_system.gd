@@ -386,20 +386,44 @@ func damage_building(pos: Vector2i, damage: float) -> bool:
 	"""对建筑造成伤害，返回建筑是否被摧毁"""
 	var bld = get_building_at(pos)
 	if bld == null:
-		print("[damage_building] no building at ", pos)
 		return false
 	if not bld.is_completed:
-		print("[damage_building] building at ", pos, " not completed")
 		return false
 	
 	bld.hp -= int(damage)
-	print("[damage_building] ", bld.building_id, " at ", pos, " took ", int(damage), " damage, hp now ", bld.hp, "/", bld.max_hp)
 	building_damaged.emit(bld.grid_pos, damage, bld.hp)
 	
 	if bld.hp <= 0:
 		_destroy_building(bld)
 		return true
 	return false
+
+func repair_building(pos: Vector2i, amount: float) -> bool:
+	"""维修建筑，恢复HP，返回是否已修满"""
+	var bld = get_building_at(pos)
+	if bld == null:
+		return false
+	if not bld.is_completed:
+		return false
+	if bld.hp >= bld.max_hp:
+		return true  # 已满
+	
+	bld.hp = mini(bld.hp + int(amount), bld.max_hp)
+	building_damaged.emit(bld.grid_pos, -amount, bld.hp)  # 负伤害表示维修
+	return bld.hp >= bld.max_hp
+
+func get_damaged_buildings() -> Array:
+	"""获取所有需要维修的已完工建筑（HP未满）"""
+	var result: Array = []
+	var seen: Dictionary = {}
+	for pos in buildings:
+		var bld = buildings[pos]
+		if seen.has(bld.grid_pos):
+			continue
+		seen[bld.grid_pos] = true
+		if bld.is_completed and bld.hp < bld.max_hp:
+			result.append(bld)
+	return result
 
 func _destroy_building(bld):
 	"""摧毁建筑并清理（掉落库存物品到地面）"""

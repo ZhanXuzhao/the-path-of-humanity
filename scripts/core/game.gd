@@ -1686,6 +1686,10 @@ func _assign_ai_tasks():
 	var hunting_tasks = _scan_hunting_targets(idle_settlers)
 	tasks.append_array(hunting_tasks)
 	
+	# 4.5 维修任务 - 修复受损建筑
+	var repair_tasks = _scan_repair_tasks(idle_settlers)
+	tasks.append_array(repair_tasks)
+	
 	# 5. 采集任务 - 在已生成的区块中找最近的资源（不主动生成新区块）
 	var harvest_tasks = _scan_nearby_resources(idle_settlers)
 	tasks.append_array(harvest_tasks)
@@ -1797,6 +1801,38 @@ func _scan_hunting_targets(_idle_settlers: Array) -> Array:
 			"work_required": 10.0,
 			"work_type": WorkManager.WorkType.HUNTING,
 			"boar_instance_id": inst_id,
+		})
+	
+	return result
+
+func _scan_repair_tasks(_idle_settlers: Array) -> Array:
+	"""扫描受损建筑，生成维修任务"""
+	var result: Array = []
+	if not building_system:
+		return result
+	
+	var damaged = building_system.get_damaged_buildings()
+	if damaged.is_empty():
+		return result
+	
+	for bld in damaged:
+		var damage_pct = float(bld.max_hp - bld.hp) / float(bld.max_hp)
+		# 工作量和受损程度成正比
+		var work_needed = 10.0 + damage_pct * 20.0
+		var center_pixel = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
+		
+		# 跳过在建建筑
+		if not bld.is_completed:
+			continue
+		
+		result.append({
+			"id": "repair_%d_%d" % [bld.grid_pos.x, bld.grid_pos.y],
+			"type": "REPAIR",
+			"target_pos": bld.grid_pos,
+			"target_world_pos": center_pixel,
+			"skill": "construction",
+			"work_required": work_needed,
+			"work_type": WorkManager.WorkType.REPAIR,
 		})
 	
 	return result

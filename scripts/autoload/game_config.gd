@@ -49,6 +49,7 @@ var hauling_priority: int = 1
 var research_priority: int = 3
 var combat_priority: int = 1
 var hunting_priority: int = 3
+var repair_priority: int = 3
 
 # ===== 速度档位 =====
 var speed_levels: Array[float] = [0.1, 0.2, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0]

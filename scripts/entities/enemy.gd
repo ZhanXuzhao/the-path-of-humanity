@@ -448,14 +448,12 @@ func _is_adjacent_to_building(bld) -> bool:
 func _shoot_arrow_at_building():
 	"""远程射箭攻击目标建筑"""
 	if target_building == null or not _is_building_valid(target_building):
-		print("[enemy] _shoot_arrow_at_building skipped: target invalid")
 		return
 	
 	_last_attack_time = Time.get_ticks_msec() / 1000.0
 	
 	var game = get_node_or_null("/root/Game")
 	if not game:
-		print("[enemy] _shoot_arrow_at_building skipped: no game")
 		return
 	
 	print("[enemy] shooting arrow at ", target_building.building_id, " pos=", target_building.grid_pos, " damage=", _arrow_projectile_damage)
@@ -491,14 +489,11 @@ func _launch_arrow_visual(target_pos: Vector2, attacked_building, damage: float,
 	# 命中后处理
 	tween.tween_callback(func():
 		# 对建筑造成伤害（BuildingInstance 不是 Node，不能用 is_instance_valid）
-		print("[enemy arrow] hit! building=", attacked_building.building_id if attacked_building else "null", " pos=", attacked_building.grid_pos if attacked_building else "?")
 		if attacked_building != null and game and game.building_system:
 			# 检查建筑是否仍存在于系统中（未被其他敌人先摧毁）
 			var still_exists = game.building_system.get_building_at(attacked_building.grid_pos) != null
-			print("[enemy arrow] still_exists=", still_exists)
 			if still_exists:
 				var killed = game.building_system.damage_building(attacked_building.grid_pos, damage)
-				print("[enemy arrow] killed=", killed)
 				if killed:
 					target_building = null
 					call_deferred("_find_best_building_target")

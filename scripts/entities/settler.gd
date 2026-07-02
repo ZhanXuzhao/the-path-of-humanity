@@ -382,6 +382,7 @@ static func get_work_type_from_task(task_data: Dictionary) -> String:
 		"RESEARCH": return "研究"
 		"COMBAT": return "战斗"
 		"HUNTING": return "狩猎"
+		"REPAIR": return "维修"
 		"EAT_FROM_RACK": return "进食"
 		"SLEEP": return "睡眠"
 		_: return ""
@@ -599,6 +600,8 @@ func _do_work_tick(task_type: String):
 			_tick_eat_from_rack()
 		"SLEEP":
 			_tick_go_sleep()
+		"REPAIR":
+			_tick_repair()
 
 func _tick_harvest():
 	"""执行一次采集工作——采集任务目标格子上的资源（角色站在相邻格子上采集）"""
@@ -1456,6 +1459,38 @@ func _tick_sleep(delta):
 			LogUtil.info(self, "睡眠结束：天亮了(游戏时间 %.1f)" % gm.game_time)
 			complete_task()
 
+# -------- 维修系统 --------
+func _tick_repair():
+	"""执行一次维修工作——修复受损建筑"""
+	var game = get_node_or_null("/root/Game")
+	if game == null or game.building_system == null:
+		complete_task()
+		return
+	
+	var grid_pos: Vector2i = current_task.get("target_pos", Vector2i.ZERO)
+	var bld = game.building_system.get_building_at(grid_pos)
+	if bld == null:
+		complete_task()
+		return
+	if not bld.is_completed:
+		complete_task()
+		return
+	if bld.hp >= bld.max_hp:
+		# 已修满，任务完成
+		complete_task()
+		return
+	
+	# 每次维修恢复 HP
+	var repair_amount = 5.0  # 每次工作刻恢复5点HP
+	game.building_system.repair_building(grid_pos, repair_amount)
+	
+	# 增加技能经验
+	add_skill_experience("construction", 0.5)
+	
+	# 检查是否已修满
+	if bld.hp >= bld.max_hp:
+		complete_task()
+
 func find_nearest_residential() -> Dictionary:
 	"""查找最近的居住建筑（优先使用自己的床，其次帐篷/房屋），返回{pos, world_pos}"""
 	var game = get_node_or_null("/root/Game")
@@ -1805,8 +1840,8 @@ func assign_task(task_data: Dictionary) -> bool:
 		var game = get_node_or_null("/root/Game")
 		if game and game.world:
 			var ts = game.world.tile_size
-			# 采集/建造任务：站在目标旁边的可行走格子上
-			if task_data.get("type") in ["HARVEST", "CONSTRUCT"]:
+			# 采集/建造/维修任务：站在目标旁边的可行走格子上
+			if task_data.get("type") in ["HARVEST", "CONSTRUCT", "REPAIR"]:
 				var target_grid = task_data.get("target_pos", Vector2i.ZERO)
 				var stand_grid = _find_adjacent_walkable(target_grid, game.world)
 				if stand_grid != Vector2i(-1, -1):
