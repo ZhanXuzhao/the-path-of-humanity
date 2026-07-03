@@ -140,13 +140,16 @@ func _assign_ai_tasks():
 			var bld = _game.building_system.get_building_at(job.building_pos) if _game.building_system else null
 			if bld == null:
 				continue
-			var center_pixel = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
+			var target_wp = _grid_to_world(bld.grid_pos + bld.get_size() / 2)
+			# 使用建筑固定操作位作为制作目标位置
+			if bld.operation_pos != Vector2i(-1, -1):
+				target_wp = _grid_to_world(bld.operation_pos)
 			var recipe = job.get_recipe()
 			tasks.append({
 				"id": "craft_%d_%d_%s" % [job.building_pos.x, job.building_pos.y, job.recipe_id],
 				"type": "CRAFT",
 				"target_pos": job.building_pos,
-				"target_world_pos": center_pixel,
+				"target_world_pos": target_wp,
 				"building_pos": job.building_pos,
 				"recipe_id": job.recipe_id,
 				"skill": "crafting",

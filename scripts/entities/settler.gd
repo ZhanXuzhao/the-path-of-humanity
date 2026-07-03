@@ -1092,6 +1092,28 @@ func _tick_craft():
 		complete_task()
 		return
 	
+	# 检查是否在操作位上（不能远程制作）
+	var bld = game.building_system.get_building_at(building_pos) if game.building_system else null
+	if bld != null:
+		var stand_pos = _get_building_adjacent_stand_pos(bld)
+		var ts = game.world.tile_size if game.world else 32.0
+		# 如果有固定操作位，必须站在该格子中心
+		if bld.operation_pos != Vector2i(-1, -1):
+			var op_center = Vector2(
+				bld.operation_pos.x * ts + ts / 2.0,
+				bld.operation_pos.y * ts + ts / 2.0
+			)
+			if position.distance_squared_to(op_center) > 4.0:
+				target_world_pos = op_center
+				set_state(SettlerState.MOVING)
+				return
+		else:
+			# 无固定操作位时兜底检查
+			if position.distance_to(stand_pos) > ts * 2.0:
+				target_world_pos = stand_pos
+				set_state(SettlerState.MOVING)
+				return
+	
 	# 检查是否有足够的输入材料，不够则去取
 	if not _craft_has_inputs(recipe):
 		if not _craft_fetch_inputs(recipe, building_pos):
@@ -1445,13 +1467,20 @@ func _bld_world_center(bld) -> Vector2:
 	)
 
 func _get_building_adjacent_stand_pos(bld) -> Vector2:
-	"""获取建筑旁边最近的可行走格子（含多格建筑）的世界坐标中心，用于建造/拆除时站位"""
+	"""获取建筑旁边的可行走格子世界坐标，优先使用固定操作位"""
 	var game = get_node_or_null("/root/Game")
 	if game == null or game.world == null:
 		return Vector2.ZERO
 	var ts = game.world.tile_size
-	var size = bld.get_size()
 	
+	# 优先使用建筑存储的固定操作位
+	if bld.operation_pos != null and bld.operation_pos != Vector2i(-1, -1):
+		return Vector2(
+			bld.operation_pos.x * ts + ts / 2.0,
+			bld.operation_pos.y * ts + ts / 2.0
+		)
+	
+	var size = bld.get_size()
 	var best_grid = Vector2i(-1, -1)
 	var best_dist = INF
 	var my_grid = Vector2i(
@@ -1462,7 +1491,6 @@ func _get_building_adjacent_stand_pos(bld) -> Vector2:
 	# 搜索建筑周围一圈的格子，跳过建筑内部
 	for dx in range(-1, size.x + 1):
 		for dy in range(-1, size.y + 1):
-			# 跳过建筑内部格子
 			if dx >= 0 and dx < size.x and dy >= 0 and dy < size.y:
 				continue
 			var check = bld.grid_pos + Vector2i(dx, dy)
@@ -1478,7 +1506,6 @@ func _get_building_adjacent_stand_pos(bld) -> Vector2:
 			best_grid.x * ts + ts / 2.0,
 			best_grid.y * ts + ts / 2.0
 		)
-	# 无可用的相邻可行走格子，回退到建筑中心
 	return _bld_world_center(bld)
 
 # -------- 存储任务（搬运） --------
@@ -2094,8 +2121,29 @@ func assign_task(task_data: Dictionary) -> bool:
 		var game = get_node_or_null("/root/Game")
 		if game and game.world:
 			var ts = game.world.tile_size
+			# 制作任务：使用建筑固定操作位
+			if task_data.get("type") == "CRAFT":
+				var bld_pos = task_data.get("building_pos", Vector2i.ZERO)
+				if game.building_system:
+					var bld = game.building_system.get_building_at(bld_pos)
+					if bld != null and bld.operation_pos != Vector2i(-1, -1):
+						target_pixel = Vector2(
+							bld.operation_pos.x * ts + ts / 2.0,
+							bld.operation_pos.y * ts + ts / 2.0
+						)
+					else:
+						var target_grid = task_data.get("target_pos", Vector2i.ZERO)
+						var stand_grid = _find_adjacent_walkable(target_grid, game.world)
+						if stand_grid != Vector2i(-1, -1):
+							target_pixel = Vector2(
+								stand_grid.x * ts + ts / 2.0,
+								stand_grid.y * ts + ts / 2.0
+							)
+						elif not game.world.is_walkable(target_grid):
+							LogUtil.info(self, "目标格 %s 不可行走，无法执行任务" % target_grid)
+							return false
 			# 采集/建造/拆除/维修任务：站在目标旁边的可行走格子上
-			if task_data.get("type") in ["HARVEST", "CONSTRUCT", "DEMOLISH", "REPAIR", "CRAFT"]:
+			elif task_data.get("type") in ["HARVEST", "CONSTRUCT", "DEMOLISH", "REPAIR"]:
 				var target_grid = task_data.get("target_pos", Vector2i.ZERO)
 				var stand_grid = _find_adjacent_walkable(target_grid, game.world)
 				if stand_grid != Vector2i(-1, -1):

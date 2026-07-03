@@ -30,6 +30,7 @@ class BuildingInstance:
 	var display_name: String = ""  # 显示名称（带编号，如"储物架 1"）
 	var assigned_settler_id: String = ""  # 分配给谁的床（木床专用）
 	var assigned_settler_name: String = ""  # 分配对象的姓名缓存
+	var operation_pos: Vector2i = Vector2i(-1, -1)  # 生产操作位（相邻格子的网格坐标）
 	
 	func get_data():
 		return ItemDefinitions.get_building(building_id)
@@ -198,6 +199,8 @@ func add_construction_progress(pos: Vector2i, amount: float) -> bool:
 	if data != null and bld.construction_progress >= data.work_cost:
 		bld.is_completed = true
 		bld.hp = data.hp
+		# 分配生产操作位
+		_assign_operation_pos(bld)
 		# 如果是存储建筑，加入索引
 		if data.storage_capacity > 0:
 			_completed_storage_index[bld.grid_pos] = bld
@@ -270,6 +273,44 @@ func get_all_beds() -> Array:
 	for pos in _completed_bed_index:
 		result.append(_completed_bed_index[pos])
 	return result
+
+func _assign_operation_pos(bld: BuildingInstance):
+	"""为建筑分配一个固定的生产操作位（相邻可行走格子），优先靠近建筑中间"""
+	if world == null:
+		return
+	var size = bld.get_size()
+	var gp = bld.grid_pos
+	var cx = (size.x - 1) * 0.5  # 建筑中心在边上对应的浮点偏移
+	var cy = (size.y - 1) * 0.5
+	# 按优先级收集候选，每边内按距中心距离升序排列
+	var candidates = []
+	# 下方（正面优先）
+	for x in _centered_order(size.x):
+		candidates.append({ "pos": gp + Vector2i(x, size.y), "dist": absf(x - cx) })
+	# 右侧
+	for y in _centered_order(size.y):
+		candidates.append({ "pos": gp + Vector2i(size.x, y), "dist": absf(y - cy) })
+	# 左侧
+	for y in _centered_order(size.y):
+		candidates.append({ "pos": gp + Vector2i(-1, y), "dist": absf(y - cy) })
+	# 上方
+	for x in _centered_order(size.x):
+		candidates.append({ "pos": gp + Vector2i(x, -1), "dist": absf(x - cx) })
+	# 四角（兜底）
+	for p in [Vector2i(-1, size.y), Vector2i(size.x, size.y), Vector2i(-1, -1), Vector2i(size.x, -1)]:
+		candidates.append({ "pos": gp + p, "dist": 999.0 })
+	candidates.sort_custom(func(a, b): return a.dist < b.dist)
+	for entry in candidates:
+		if world.is_walkable(entry.pos) and not buildings.has(entry.pos):
+			bld.operation_pos = entry.pos
+			return
+
+static func _centered_order(count: int) -> Array:
+	"""返回 [0, count-1] 按从中间向两侧排列的顺序"""
+	var mid = (count - 1) * 0.5
+	var indices = range(count)
+	indices.sort_custom(func(a, b): return absf(a - mid) < absf(b - mid))
+	return indices
 
 # -------- 建筑运行 --------
 func process_buildings(delta: float):
@@ -688,7 +729,8 @@ func to_dict() -> Dictionary:
 				"inventory": bld.inventory.to_dict() if bld.inventory else null,
 				"deposited_materials": bld.deposited_materials.duplicate(),
 				"assigned_settler_id": bld.assigned_settler_id,
-				"assigned_settler_name": bld.assigned_settler_name
+				"assigned_settler_name": bld.assigned_settler_name,
+				"operation_pos": {"x": bld.operation_pos.x, "y": bld.operation_pos.y}
 			}
 	return data
 
@@ -710,6 +752,10 @@ func from_dict(data: Dictionary):
 		if b_data.has("assigned_settler_id"):
 			bld.assigned_settler_id = b_data.assigned_settler_id
 			bld.assigned_settler_name = b_data.get("assigned_settler_name", "")
+		if b_data.has("operation_pos"):
+			bld.operation_pos = Vector2i(b_data.operation_pos.x, b_data.operation_pos.y)
+		elif bld.is_completed and bld.operation_pos == Vector2i(-1, -1):
+			_assign_operation_pos(bld)
 		
 		if b_data.inventory != null and bld.inventory != null:
 			bld.inventory.from_dict(b_data.inventory)

@@ -6,6 +6,7 @@ class_name WorldRenderer
 const _ID = preload("res://resources/item_definitions.gd")
 const _TG = preload("res://scripts/core/texture_generator.gd")
 const TowerRangeOverlay = preload("res://scripts/core/tower_range_overlay.gd")
+const OperationPosOverlay = preload("res://scripts/core/operation_pos_overlay.gd")
 const _FS = preload("res://scripts/systems/farming_system.gd")
 
 @onready var world: World = get_parent()
@@ -475,6 +476,9 @@ func _update_selection_overlay():
 	
 	# 如果选中的是箭塔等防御建筑，绘制射程范围
 	_update_tower_range_overlay()
+	
+	# 绘制生产操作位标记
+	_update_operation_pos_overlay()
 
 func _update_building_hp_bar():
 	"""在选中建筑上方绘制/刷新HP条"""
@@ -548,6 +552,24 @@ func _update_tower_range_overlay():
 	var overlay = TowerRangeOverlay.new()
 	overlay.center = center
 	overlay.radius = radius
+	_selection_overlay.add_child(overlay)
+	overlay.queue_redraw()
+
+func _update_operation_pos_overlay():
+	"""在选中建筑的操作位上绘制圆圈标记"""
+	var bld = _selected_building_instance
+	if bld == null:
+		return
+	if bld.operation_pos == Vector2i(-1, -1):
+		return
+	var tile_size = world.tile_size
+	var center = Vector2(
+		bld.operation_pos.x * tile_size + tile_size / 2.0,
+		bld.operation_pos.y * tile_size + tile_size / 2.0
+	)
+	var overlay = OperationPosOverlay.new()
+	overlay.center = center
+	overlay.tile_size = tile_size
 	_selection_overlay.add_child(overlay)
 	overlay.queue_redraw()
 
