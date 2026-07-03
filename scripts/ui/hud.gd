@@ -143,6 +143,8 @@ func _ready():
 			game.building_system.building_completed.connect(_refresh_resource_display)
 		if game.world:
 			game.world.ground_items_changed.connect(_on_ground_items_changed)
+		if game.crafting_system:
+			game.crafting_system.crafting_queue_changed.connect(_on_crafting_queue_changed)
 	
 	# 定居者选择信号连接
 	_settler_info_connections()
@@ -369,6 +371,16 @@ func _on_building_deselected():
 	_showing_ground_items = false
 	storage_panel.visible = false
 	building_info_panel.visible = false
+
+func _on_crafting_queue_changed(building_pos: Vector2i):
+	"""生产队列变化时刷新面板"""
+	if not building_info_panel.visible:
+		return
+	var game = get_node("/root/Game")
+	if game and game.selection_system.selected_building_instance:
+		var bld = game.selection_system.selected_building_instance
+		if is_instance_valid(bld) and bld.grid_pos == building_pos:
+			_update_building_info_panel(bld, bld.get_data())
 
 # -------- 在建建筑进度面板 --------
 func _on_construction_selected(bld):
@@ -854,6 +866,9 @@ func _update_building_info_panel(bld, data):
 	
 	# ===== 可制作配方（生产建筑专用） =====
 	_show_building_recipes(bld)
+	
+	# ===== 待生产队列 =====
+	_show_building_queue(bld)
 
 func _show_building_recipes(bld):
 	"""在建筑信息面板中显示可制作的配方和添加制作按钮"""
@@ -926,6 +941,112 @@ func _show_building_recipes(bld):
 		recipe_hbox.add_child(add_btn)
 		
 		building_info_extra_container.add_child(recipe_hbox)
+
+func _show_building_queue(bld):
+	"""在建筑信息面板中显示待生产队列"""
+	var game = get_node_or_null("/root/Game")
+	if not game or not game.crafting_system:
+		return
+	
+	var queue = game.crafting_system.crafting_queues.get(bld.grid_pos)
+	if queue == null or queue.is_empty():
+		return
+	
+	var sep = HSeparator.new()
+	building_info_extra_container.add_child(sep)
+	
+	var title = Label.new()
+	title.text = "生产队列:"
+	title.add_theme_color_override("font_color", Color(0.6, 0.9, 1.0))
+	building_info_extra_container.add_child(title)
+	
+	for i in range(queue.size()):
+		var job = queue[i]
+		var recipe = job.get_recipe()
+		var recipe_name = recipe.name if recipe else job.recipe_id
+		
+		var row = HBoxContainer.new()
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.name = "queue_item_%d" % i
+		
+		var info = Label.new()
+		info.text = "  #%d %s" % [i + 1, recipe_name]
+		info.custom_minimum_size = Vector2(160, 0)
+		info.autowrap_mode = 1
+		info.add_theme_color_override("font_color", Color(0.9, 0.9, 0.9))
+		info.add_theme_constant_override("minimum_font_size", 10)
+		row.add_child(info)
+		
+		var progress = Label.new()
+		progress.name = "queue_progress_%d" % i
+		progress.add_theme_constant_override("minimum_font_size", 10)
+		progress.custom_minimum_size = Vector2(50, 0)
+		if job.is_active and recipe:
+			var pct = int(job.progress / max(recipe.work_time, 0.001) * 100.0)
+			progress.text = "%d%%" % min(pct, 100)
+			progress.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))
+		else:
+			progress.text = "待命中"
+			progress.add_theme_color_override("font_color", Color(0.8, 0.8, 0.3))
+		row.add_child(progress)
+		
+		var remove_btn = Button.new()
+		remove_btn.text = "✕"
+		remove_btn.custom_minimum_size = Vector2(24, 24)
+		remove_btn.add_theme_constant_override("minimum_font_size", 10)
+		var idx = i
+		var pos = bld.grid_pos
+		remove_btn.pressed.connect(func():
+			if game and game.crafting_system:
+				game.crafting_system.remove_from_queue(pos, idx)
+		)
+		row.add_child(remove_btn)
+		
+		building_info_extra_container.add_child(row)
+	
+	var clear_hbox = HBoxContainer.new()
+	var clear_btn = Button.new()
+	clear_btn.text = "清空队列"
+	clear_btn.custom_minimum_size = Vector2(80, 24)
+	clear_btn.add_theme_constant_override("minimum_font_size", 10)
+	var pos2 = bld.grid_pos
+	clear_btn.pressed.connect(func():
+		if game and game.crafting_system:
+			game.crafting_system.clear_queue(pos2)
+	)
+	clear_hbox.add_child(clear_btn)
+	building_info_extra_container.add_child(clear_hbox)
+
+func _update_queue_progress_in_panel(bld):
+	"""更新面板中队列项目的进度显示"""
+	var game = get_node_or_null("/root/Game")
+	if not game or not game.crafting_system:
+		return
+	var queue = game.crafting_system.crafting_queues.get(bld.grid_pos)
+	if queue == null:
+		return
+	for child in building_info_extra_container.get_children():
+		if child is HBoxContainer and child.name.begins_with("queue_item_"):
+			var idx_str = child.name.trim_prefix("queue_item_")
+			var idx = int(idx_str)
+			if idx < 0 or idx >= queue.size():
+				continue
+			var job = queue[idx]
+			var recipe = job.get_recipe()
+			var progress_label = null
+			for c in child.get_children():
+				if c is Label and c.name.begins_with("queue_progress_"):
+					progress_label = c
+					break
+			if progress_label == null:
+				continue
+			if job.is_active and recipe:
+				var pct = int(job.progress / max(recipe.work_time, 0.001) * 100.0)
+				progress_label.text = "%d%%" % min(pct, 100)
+				progress_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))
+			else:
+				progress_label.text = "待命中"
+				progress_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.3))
 
 func _update_population():
 	"""更新人口显示"""
@@ -1104,6 +1225,8 @@ func _process(delta):
 						child.text = "耐久: %d/%d" % [bld.hp, bld.max_hp]
 						child.add_theme_color_override("font_color", hp_color)
 						break
+				# 更新队列进度
+				_update_queue_progress_in_panel(bld)
 	
 	# 定时更新人口（不每帧刷新）
 	if Engine.get_physics_frames() % 60 == 0:
