@@ -23,6 +23,12 @@ var farming_system: FarmingSystem
 var build_mode: bool = false
 var selected_building: String = ""
 var build_preview: Sprite2D = null
+var build_preview_overlay: Node2D = null
+var _bpo_fill: ColorRect
+var _bpo_top: ColorRect
+var _bpo_bottom: ColorRect
+var _bpo_left: ColorRect
+var _bpo_right: ColorRect
 var mouse_grid_pos: Vector2i
 
 # 种植模式
@@ -353,6 +359,41 @@ func enter_build_mode(building_id: String):
 	if data:
 		build_preview.scale = Vector2(world.tile_size / 32.0, world.tile_size / 32.0)
 	
+	# 创建建筑占地区域矩形色块叠加层
+	if build_preview_overlay == null:
+		build_preview_overlay = Node2D.new()
+		build_preview_overlay.z_index = 99
+		build_preview_overlay.name = "BuildPreviewOverlay"
+		add_child(build_preview_overlay)
+		
+		var bw = 2.0
+		_bpo_fill = ColorRect.new()
+		_bpo_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_bpo_fill.name = "BPOFill"
+		build_preview_overlay.add_child(_bpo_fill)
+		
+		_bpo_top = ColorRect.new()
+		_bpo_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_bpo_top.name = "BPOTop"
+		build_preview_overlay.add_child(_bpo_top)
+		
+		_bpo_bottom = ColorRect.new()
+		_bpo_bottom.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_bpo_bottom.name = "BPOBottom"
+		build_preview_overlay.add_child(_bpo_bottom)
+		
+		_bpo_left = ColorRect.new()
+		_bpo_left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_bpo_left.name = "BPOLeft"
+		build_preview_overlay.add_child(_bpo_left)
+		
+		_bpo_right = ColorRect.new()
+		_bpo_right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_bpo_right.name = "BPORight"
+		build_preview_overlay.add_child(_bpo_right)
+	
+	build_preview_overlay.visible = true
+		
 	# 默认绿色（可建造）
 	build_preview.modulate = Color(0, 1, 0, 0.5)
 
@@ -361,6 +402,8 @@ func exit_build_mode():
 	selected_building = ""
 	if build_preview:
 		build_preview.visible = false
+	if build_preview_overlay:
+		build_preview_overlay.visible = false
 	
 	# 同时关闭建造菜单（右键退出建造模式时菜单也应关闭）
 	var build_menu = get_node_or_null("UI/BuildMenu")
@@ -400,6 +443,51 @@ func _update_build_preview():
 			build_preview.modulate = Color(0, 1, 0, 0.5)  # 绿色-可建造
 		else:
 			build_preview.modulate = Color(1, 0, 0, 0.5)  # 红色-不可建造
+		
+		# 更新占地区域矩形色块
+		_update_build_preview_overlay(data, check.can_place)
+
+func _update_build_preview_overlay(data, can_place: bool):
+	if not build_preview_overlay or not build_preview_overlay.visible:
+		return
+	if data == null:
+		build_preview_overlay.visible = false
+		return
+	
+	var size = data.size
+	var pixel_pos = Vector2(
+		mouse_grid_pos.x * world.tile_size,
+		mouse_grid_pos.y * world.tile_size
+	)
+	var pixel_size = Vector2(
+		size.x * world.tile_size,
+		size.y * world.tile_size
+	)
+	
+	var fill_color = Color(0, 1, 0, 0.12) if can_place else Color(1, 0, 0, 0.12)
+	var border_color = Color(0, 1, 0, 0.7) if can_place else Color(1, 0, 0, 0.7)
+	
+	_bpo_fill.color = fill_color
+	_bpo_fill.position = pixel_pos
+	_bpo_fill.size = pixel_size
+	
+	var bw = 2.0
+	
+	_bpo_top.color = border_color
+	_bpo_top.position = pixel_pos
+	_bpo_top.size = Vector2(pixel_size.x, bw)
+	
+	_bpo_bottom.color = border_color
+	_bpo_bottom.position = pixel_pos + Vector2(0, pixel_size.y - bw)
+	_bpo_bottom.size = Vector2(pixel_size.x, bw)
+	
+	_bpo_left.color = border_color
+	_bpo_left.position = pixel_pos
+	_bpo_left.size = Vector2(bw, pixel_size.y)
+	
+	_bpo_right.color = border_color
+	_bpo_right.position = pixel_pos + Vector2(pixel_size.x - bw, 0)
+	_bpo_right.size = Vector2(bw, pixel_size.y)
 
 func _try_place_building():
 	if not build_mode or selected_building == "":
