@@ -1017,37 +1017,6 @@ func _show_building_queue(bld):
 	clear_hbox.add_child(clear_btn)
 	building_info_extra_container.add_child(clear_hbox)
 
-func _update_queue_progress_in_panel(bld):
-	"""更新面板中队列项目的进度显示"""
-	var game = get_node_or_null("/root/Game")
-	if not game or not game.crafting_system:
-		return
-	var queue = game.crafting_system.crafting_queues.get(bld.grid_pos)
-	if queue == null:
-		return
-	for child in building_info_extra_container.get_children():
-		if child is HBoxContainer and child.name.begins_with("queue_item_"):
-			var idx_str = child.name.trim_prefix("queue_item_")
-			var idx = int(idx_str)
-			if idx < 0 or idx >= queue.size():
-				continue
-			var job = queue[idx]
-			var recipe = job.get_recipe()
-			var progress_label = null
-			for c in child.get_children():
-				if c is Label and c.name.begins_with("queue_progress_"):
-					progress_label = c
-					break
-			if progress_label == null:
-				continue
-			if job.is_active and recipe:
-				var pct = int(job.progress / max(recipe.work_time, 0.001) * 100.0)
-				progress_label.text = "%d%%" % min(pct, 100)
-				progress_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3))
-			else:
-				progress_label.text = "待命中"
-				progress_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.3))
-
 func _update_population():
 	"""更新人口显示"""
 	var game = get_node("/root/Game")
@@ -1207,26 +1176,13 @@ func _process(delta):
 		if game and game.selection_system.selected_construction_building:
 			_update_construction_panel(game.selection_system.selected_construction_building)
 	
-	# 定时更新建筑信息面板（HP 实时变化）
-	if Engine.get_physics_frames() % 30 == 0 and building_info_panel.visible:
+	# 定时刷新建筑信息面板（含队列）
+	if Engine.get_physics_frames() % 15 == 0 and building_info_panel.visible:
 		var game = get_node("/root/Game")
 		if game and game.selection_system.selected_building_instance:
 			var bld = game.selection_system.selected_building_instance
 			if is_instance_valid(bld) and bld.get_data():
-				# 只更新耐久度标签（最后一个子节点）
-				for child in building_info_extra_container.get_children():
-					if child is Label and child.text.begins_with("耐久:"):
-						var hp_ratio = float(bld.hp) / float(bld.max_hp) if bld.max_hp > 0 else 1.0
-						var hp_color = Color(0.3, 1.0, 0.3)
-						if hp_ratio < 0.3:
-							hp_color = Color(1.0, 0.3, 0.3)
-						elif hp_ratio < 0.6:
-							hp_color = Color(1.0, 0.8, 0.2)
-						child.text = "耐久: %d/%d" % [bld.hp, bld.max_hp]
-						child.add_theme_color_override("font_color", hp_color)
-						break
-				# 更新队列进度
-				_update_queue_progress_in_panel(bld)
+				_update_building_info_panel(bld, bld.get_data())
 	
 	# 定时更新人口（不每帧刷新）
 	if Engine.get_physics_frames() % 60 == 0:

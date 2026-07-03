@@ -1131,16 +1131,17 @@ func _tick_craft():
 				if gm:
 					gm.show_notification("制作完成: %s %s" % [recipe.name, out_desc], gm.NotificationType.SUCCESS)
 				
-				game.crafting_system.complete_crafting(job, recipe)
-				queue.erase(job)
-				game.crafting_system.active_jobs.erase(job)
-				# 如果是重复任务，重新加入队列
-				if job.repeat:
-					var new_job = game.crafting_system.CraftingJob.new(recipe_id, building_pos, settler_id)
-					new_job.repeat = true
-					queue.append(new_job)
-					game.crafting_system._try_start_next_job(building_pos)
-				complete_task()
+			game.crafting_system.complete_crafting(job, recipe)
+			queue.erase(job)
+			game.crafting_system.active_jobs.erase(job)
+			# 如果是重复任务，重新加入队列
+			if job.repeat:
+				var new_job = game.crafting_system.CraftingJob.new(recipe_id, building_pos, settler_id)
+				new_job.repeat = true
+				queue.append(new_job)
+			game.crafting_system._try_start_next_job(building_pos)
+			game.crafting_system.crafting_queue_changed.emit(building_pos)
+			complete_task()
 			return
 	
 	# 没有找到对应的活跃任务
@@ -1207,6 +1208,7 @@ func _abort_craft_job(building_pos: Vector2i, recipe_id: String, game):
 		if job.recipe_id == recipe_id and job.is_active:
 			queue.erase(job)
 			game.crafting_system.active_jobs.erase(job)
+			game.crafting_system.crafting_queue_changed.emit(building_pos)
 			return
 
 # -------- 库存负重管理 --------

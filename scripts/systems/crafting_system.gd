@@ -65,8 +65,11 @@ func clear_queue(building_pos: Vector2i):
 	crafting_queue_changed.emit(building_pos)
 
 func _try_start_next_job(building_pos: Vector2i):
-	"""尝试开始队列中的下一个任务"""
+	"""尝试开始队列中的下一个任务（同一建筑同时只能有一个活跃任务）"""
 	var queue = get_or_create_queue(building_pos)
+	for job in queue:
+		if job.is_active:
+			return
 	for job in queue:
 		if not job.is_active:
 			job.is_active = true
@@ -88,6 +91,12 @@ func process_crafting(delta: float):
 		if job.progress >= recipe.work_time:
 			complete_crafting(job, recipe)
 			active_jobs.remove_at(i)
+			# 从队列中移除已完成的任务并尝试启动下一个
+			var queue = crafting_queues.get(job.building_pos)
+			if queue != null:
+				queue.erase(job)
+				_try_start_next_job(job.building_pos)
+			crafting_queue_changed.emit(job.building_pos)
 
 func complete_crafting(job, _recipe):
 	"""完成制作（由定居者AI或系统调用）"""
